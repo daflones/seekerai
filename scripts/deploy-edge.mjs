@@ -39,6 +39,9 @@ const EDGE_SECRET_KEYS = [
   "AI_TEXT_MODEL",
   "AI_IMAGE_MODEL",
   "AI_SITE_MODEL",
+  "NVIDIA_API_KEY",
+  "NVIDIA_TEXT_MODEL",
+  "NVIDIA_IMAGE_MODEL",
 ];
 
 const env = loadLocalEnv();

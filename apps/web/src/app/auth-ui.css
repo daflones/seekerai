@@ -293,7 +293,49 @@ a.seek-badge:hover { border-color: #a879d166; }
 .ticket-aberto { background: #f59e0b1c; color: #fbbf24; }
 .ticket-em_andamento { background: #60a5fa1c; color: #93c5fd; }
 .ticket-resolvido { background: #6be3cc1c; color: #70efdc; }
+.ticket-pendente { background: #a879d11c; color: #c9a7f2; }
+.ticket-cancelado { background: #f871711c; color: #fca5a5; }
 .ticket-reply { margin-top: 10px; padding: 10px 12px; border-left: 2px solid #a879d1; font-size: 12.5px; color: #b3a8c4; line-height: 1.6; }
+.ticket-open { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: none; border: none; padding: 0; text-align: left; cursor: pointer; color: inherit; }
+.ticket-open > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ticket-open.active strong { color: #d7bcf5; }
+.ticket-open-right { display: flex; align-items: center; gap: 10px; color: #77688a; flex-shrink: 0; }
+.ticket-open-right .ticket-status { float: none; }
+.ticket-chat-wrap { margin-top: 12px; border-top: 1px solid #a879d114; padding-top: 12px; }
+
+/* ── Chat do chamado ── */
+.chat { display: flex; flex-direction: column; gap: 10px; }
+.chat-messages { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto; padding: 4px 2px; }
+.chat-loading { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #77688a; padding: 14px 4px; }
+.chat-msg { max-width: 82%; padding: 9px 13px; border-radius: 12px; font-size: 13px; line-height: 1.55; }
+.chat-msg p { margin: 2px 0 4px; color: #e7dbee; white-space: pre-wrap; word-break: break-word; }
+.chat-msg small { font-size: 10px; color: #77688a; }
+.chat-msg-from { display: block; font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.chat-msg-user { align-self: flex-end; background: #a879d126; border: 1px solid #a879d138; border-bottom-right-radius: 4px; }
+.chat-msg-user .chat-msg-from { color: #c9a7f2; }
+.chat-msg-admin { align-self: flex-start; background: #6be3cc14; border: 1px solid #6be3cc2e; border-bottom-left-radius: 4px; }
+.chat-msg-admin .chat-msg-from { color: #70efdc; }
+.chat-composer { display: flex; gap: 8px; align-items: flex-end; }
+.chat-composer textarea { flex: 1; background: #0d0816; border: 1px solid #b387d133; border-radius: 10px; color: #e7dbee; font-size: 13.5px; padding: 10px 12px; resize: none; font-family: inherit; }
+.chat-composer textarea:focus { outline: none; border-color: #a177ff80; box-shadow: 0 0 0 3px #a177ff22; }
+.chat-composer button { display: inline-flex; align-items: center; gap: 6px; background: #a879d1; color: #16091f; font-weight: 700; font-size: 12.5px; border: none; border-radius: 10px; padding: 11px 16px; cursor: pointer; }
+.chat-composer button:disabled { opacity: .45; cursor: default; }
+.chat-closed { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #77688a; background: #a879d10a; border: 1px dashed #a879d12e; border-radius: 10px; padding: 11px 13px; }
+
+/* ── Filtros e status (admin) ── */
+.chamados-filters { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.chamados-filters button { padding: 7px 14px; border-radius: 999px; border: 1px solid #b387d133; background: #0d0816; color: #a99cba; font-size: 12px; font-weight: 600; cursor: pointer; }
+.chamados-filters button.active { border-color: #a879d1; background: #a879d11f; color: #eadcf5; }
+.chamados-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-bottom: 10px; }
+.chamados-actions > span { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #77688a; }
+.status-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; border: 1px solid #b387d133; background: #0d0816; color: #a99cba; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.status-btn.active { pointer-events: none; }
+.status-btn.status-em_andamento.active, .status-btn.status-pendente.active { border-color: #a879d1; color: #c9a7f2; background: #a879d11f; }
+.status-btn.status-resolvido.active { border-color: #6be3cc; color: #70efdc; background: #6be3cc14; }
+.status-btn.status-cancelado.active { border-color: #f87171; color: #fca5a5; background: #f8717114; }
+.status-btn:disabled { cursor: default; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Status dos secrets (admin) ── */
 .secrets-status { margin: 22px 0; }

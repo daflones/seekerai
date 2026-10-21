@@ -31,13 +31,18 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Revise os campos." }, { status: 400 });
   }
-  const { error } = await session.supabase.from("support_tickets").insert({
+  const { data: ticket, error } = await session.supabase.from("support_tickets").insert({
     user_id: session.user.id,
     assunto: parsed.data.assunto,
     categoria: parsed.data.categoria,
     prioridade: parsed.data.prioridade,
     mensagem: parsed.data.mensagem,
+  }).select("id").single();
+  if (error || !ticket) return NextResponse.json({ error: "Não foi possível abrir o chamado." }, { status: 500 });
+  // A descrição inicial vira a primeira mensagem da conversa.
+  await session.supabase.from("ticket_messages").insert({
+    ticket_id: ticket.id, sender_id: session.user.id, sender_role: "user",
+    mensagem: parsed.data.mensagem,
   });
-  if (error) return NextResponse.json({ error: "Não foi possível abrir o chamado." }, { status: 500 });
-  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, id: ticket.id }, { headers: { "Cache-Control": "no-store" } });
 }

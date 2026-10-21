@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Send } from "lucide-react";
 
 const CATEGORIAS = [
@@ -25,6 +26,7 @@ export function SupportForm() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,6 +46,7 @@ export function SupportForm() {
         return;
       }
       setDone(true);
+      router.refresh();
     } catch {
       setError("Sem conexão. Tente novamente.");
       setBusy(false);
@@ -53,7 +56,7 @@ export function SupportForm() {
   if (done) return <div className="ticket-done">
     <CheckCircle2 size={26} />
     <strong>Chamado aberto.</strong>
-    <p>Nossa equipe recebeu sua mensagem e responde por e-mail. Ele aparece na lista abaixo após recarregar.</p>
+    <p>Nossa equipe recebeu sua mensagem. Clique no chamado na lista abaixo para acompanhar e responder pela conversa.</p>
   </div>;
 
   return <form className="ticket-form" onSubmit={submit}>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleDollarSign, Compass, Headset, Images, LayoutDashboard, LogOut, PanelsTopLeft, ShieldCheck, Users } from "lucide-react";
+import { CircleDollarSign, Compass, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, ShieldCheck, Users } from "lucide-react";
 import { Brand } from "./brand";
 
 async function doLogout() {
@@ -23,6 +23,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/chamados", label: "Chamados", icon: MessageCircle },
   { href: "/admin/planos", label: "Cards de plano", icon: PanelsTopLeft },
   { href: "/admin/integracoes", label: "Integrações", icon: ShieldCheck },
 ];

@@ -1,5 +1,7 @@
 // Geração com IA via OpenRouter — deep_strategy, sales_reply, generate_site,
-// generate_image. Chave fica como secret do Supabase; consome créditos.
+// generate_image. Se o OpenRouter falhar, cai para a NVIDIA (build.nvidia.com)
+// como fallback gratuito — texto via chat/completions e imagem via genai.
+// Chaves ficam como secrets do Supabase; consome créditos.
 //
 // generate_site é um pipeline: usa imagens reais do contexto (Apify/Places)
 // e, se faltar material visual, gera imagens dedicadas via modelo de imagem
@@ -21,7 +23,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
-import { requireSecret } from "../_shared/secrets.ts";
+import { getSecret, requireSecret } from "../_shared/secrets.ts";
 
 const ACTIONS = new Set([
   "deep_strategy",
@@ -34,6 +36,69 @@ const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
 const IMAGE_MODEL = optionalEnv("AI_IMAGE_MODEL") ?? "google/gemini-2.5-flash-image";
 const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "anthropic/claude-sonnet-4.5";
 const MAX_SITE_IMAGES = 3;
+
+// Fallback NVIDIA (build.nvidia.com) — gratuito, OpenAI-compatible.
+const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
+const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "meta/llama-3.3-70b-instruct";
+const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-labs/flux.2-klein-4b";
+
+/** Chat de texto na NVIDIA — mesmo formato OpenAI. Retorna o JSON ou null. */
+async function nvidiaChat(
+  system: string,
+  userContent: string,
+  maxTokens?: number,
+): Promise<Record<string, unknown> | null> {
+  const key = await getSecret("NVIDIA_API_KEY");
+  if (!key) return null;
+  const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: NVIDIA_TEXT_MODEL,
+      stream: false,
+      max_tokens: maxTokens ?? 4096,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+    }),
+    signal: AbortSignal.timeout(120_000),
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.error("[nvidia] chat falhou:", res?.status ?? "network");
+    return null;
+  }
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+/** Imagem na NVIDIA (genai/FLUX). Retorna data URL ou null. */
+async function nvidiaImage(prompt: string): Promise<string | null> {
+  const key = await getSecret("NVIDIA_API_KEY");
+  if (!key) return null;
+  const res = await fetch(`https://ai.api.nvidia.com/v1/genai/${NVIDIA_IMAGE_MODEL}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      prompt: prompt.slice(0, 10_000),
+      mode: "Image Generation",
+      width: 1024, height: 1024,
+      cfg_scale: 0, samples: 1, seed: 0, steps: 4,
+    }),
+    signal: AbortSignal.timeout(120_000),
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.error("[nvidia] imagem falhou:", res?.status ?? "network");
+    return null;
+  }
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
+  const b64 = isRecord(artifacts[0]) ? asString(artifacts[0].base64, 8_000_000) : null;
+  return b64 ? `data:image/jpeg;base64,${b64}` : null;
+}
 
 interface GenerateBody {
   action?: string;
@@ -98,7 +163,7 @@ function contextImages(context: Record<string, unknown> | undefined): string[] {
   return [...images].slice(0, MAX_SITE_IMAGES);
 }
 
-/** Gera imagem via modelo de imagem do OpenRouter; retorna data URL ou null. */
+/** Gera imagem via OpenRouter; se falhar, cai para a NVIDIA. Retorna data URL ou null. */
 async function generateSiteImage(
   apiKey: string,
   imagePrompt: string,
@@ -117,23 +182,23 @@ async function generateSiteImage(
       messages: [{ role: "user", content: imagePrompt }],
     }),
     signal: AbortSignal.timeout(90_000),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    console.error("[site-image] falhou:", res.status);
-    return null;
-  }
-  const choices = Array.isArray(data.choices) ? data.choices : [];
-  const message = isRecord(choices[0]) && isRecord(choices[0].message)
-    ? choices[0].message
-    : {};
-  if (Array.isArray(message.images)) {
-    for (const img of message.images) {
-      const url = isRecord(img) && isRecord(img.image_url) ? img.image_url.url : null;
-      if (typeof url === "string") return url;
+  }).catch(() => null);
+  if (res?.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const choices = Array.isArray(data.choices) ? data.choices : [];
+    const message = isRecord(choices[0]) && isRecord(choices[0].message)
+      ? choices[0].message
+      : {};
+    if (Array.isArray(message.images)) {
+      for (const img of message.images) {
+        const url = isRecord(img) && isRecord(img.image_url) ? img.image_url.url : null;
+        if (typeof url === "string") return url;
+      }
     }
+  } else {
+    console.error("[site-image] openrouter falhou:", res?.status ?? "network");
   }
-  return null;
+  return nvidiaImage(imagePrompt);
 }
 
 function imagePromptsFor(context: Record<string, unknown> | undefined): string[] {
@@ -208,6 +273,11 @@ Deno.serve(async (req) => {
           ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
           : prompt;
 
+      // Cadeia de provedores: OpenRouter primeiro; NVIDIA como fallback
+      // gratuito quando o principal falha (rede, 402, 5xx) ou não devolve imagem.
+      let data: Record<string, unknown> | null = null;
+      let modelo = model;
+      const systemPrompt = systemPromptFor(action);
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -221,18 +291,49 @@ Deno.serve(async (req) => {
           modalities: action === "generate_image" ? ["image", "text"] : undefined,
           max_tokens: action === "generate_site" ? 16000 : undefined,
           messages: [
-            { role: "system", content: systemPromptFor(action) },
+            { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
           ],
         }),
-      });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok) {
+      }).catch(() => null);
+      const orStatus = res?.status ?? 0;
+      if (res?.ok) {
+        data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+      } else {
+        console.error("[openrouter] falhou:", orStatus || "network");
+      }
+
+      // Fallback NVIDIA — texto (ou imagem dedicada quando o OR não entrega).
+      if (action === "generate_image") {
+        const orChoices = data && Array.isArray(data.choices) ? data.choices : [];
+        const orMsg = isRecord(orChoices[0]) && isRecord(orChoices[0].message) ? orChoices[0].message : {};
+        const orHasImage = Array.isArray(orMsg.images) && orMsg.images.length > 0;
+        if (!orHasImage) {
+          const img = await nvidiaImage(userContent);
+          if (img) {
+            await settleAction(db, user.id, requestRef, "completed");
+            return json({
+              imagens: [img],
+              modelo: NVIDIA_IMAGE_MODEL,
+              provedor: "nvidia",
+              creditosCobrados: reservation.cost,
+            });
+          }
+        }
+      } else if (!data) {
+        const nv = await nvidiaChat(systemPrompt, userContent, action === "generate_site" ? 16000 : undefined);
+        if (nv) {
+          data = nv;
+          modelo = NVIDIA_TEXT_MODEL;
+          console.log("[ai-generate] respondido via NVIDIA (fallback)");
+        }
+      }
+
+      if (!data) {
         await settleAction(db, user.id, requestRef, "refunded");
-        if (res.status === 402) {
+        if (orStatus === 402) {
           throw httpError(503, "Geração de IA temporariamente indisponível");
         }
-        console.error("[openrouter] falhou:", res.status);
         throw httpError(502, "Provedor de IA indisponível no momento");
       }
       await settleAction(db, user.id, requestRef, "completed");
@@ -256,7 +357,7 @@ Deno.serve(async (req) => {
         conteudo,
         imagens: images.length > 0 ? images : undefined,
         imagensUsadas: action === "generate_site" ? imageUrls : undefined,
-        modelo: model,
+        modelo,
         creditosCobrados: reservation.cost,
       });
     } catch (err) {

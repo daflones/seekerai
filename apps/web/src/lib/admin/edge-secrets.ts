@@ -6,6 +6,7 @@ export const REQUIRED_SECRETS = [
   "GOOGLE_PLACES_API_KEY", "APIFY_API_TOKEN", "OPENROUTER_API_KEY",
   "EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE",
   "AI_TEXT_MODEL", "AI_IMAGE_MODEL", "AI_SITE_MODEL",
+  "NVIDIA_API_KEY", "NVIDIA_TEXT_MODEL", "NVIDIA_IMAGE_MODEL",
 ] as const;
 
 // Lista nomes de secrets configurados nas Edge Functions via Management API
