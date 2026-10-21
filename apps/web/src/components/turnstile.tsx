@@ -28,6 +28,9 @@ export function Turnstile({ siteKey, action, epoch, onToken }: {
       id = api.render(holder.current, {
         sitekey: siteKey, action, theme: "dark",
         size: holder.current.clientWidth < 300 ? "compact" : "flexible",
+        // Em desenvolvimento o desafio resolve sozinho e invisível quando a
+        // Cloudflare não exige interação; o token continua real e verificado.
+        ...(process.env.NODE_ENV !== "production" ? { appearance: "interaction-only" } : {}),
         callback: (token: string) => { setError(false); callback.current(token); },
         "expired-callback": () => callback.current(null),
         "timeout-callback": () => callback.current(null),

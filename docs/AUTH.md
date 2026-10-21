@@ -30,6 +30,13 @@ O script e a site key são compartilhados na troca login/cadastro. O token não
 é armazenado em localStorage/cookies e não persiste entre tentativas. Cada envio,
 falha, expiração ou mudança de fluxo exige um token novo.
 
+Em desenvolvimento o widget usa `appearance: "interaction-only"`: o desafio
+continua real e verificado pelo GoTrue, mas a caixa só aparece quando a
+Cloudflare exige interação — na maior parte do tempo o token chega sem clique.
+Não desligar o captcha em dev: o projeto Supabase valida nativamente e um token
+falso ou ausente falharia com `captcha_failed` no login/cadastro/recuperação.
+Em produção a aparência padrão permanece.
+
 No painel Cloudflare, permitir `eletrify.me` e os hosts de desenvolvimento
 usados (`localhost`, `127.0.0.1`). Caso utilize `www`, ele também precisa ser
 configurado explicitamente. Site key/secret não permitem alterar esse allowlist;
