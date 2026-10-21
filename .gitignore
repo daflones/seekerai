@@ -16,3 +16,5 @@ supabase/.temp/
 *.log
 .cache/
 referencias/
+site-teste.html
+gen-site-test.mjs
