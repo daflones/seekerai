@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowDownUp, ArrowRight, Bookmark, Check, Copy, Globe, LayoutGrid, ListFilter, MapPin, Radar, Search, Sparkles, Star, X } from "lucide-react";
+import { ArrowDownUp, ArrowRight, Bookmark, Check, Copy, Globe, Instagram, LayoutGrid, ListFilter, MapPin, MessageCircle, Radar, Search, Sparkles, Star, X } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cityGroups, formatPotential, makeDemoLeads, nicheGroups, services, type DemoLead } from "@/lib/catalog";
 import { serviceCategories } from "@/lib/service-catalog";
@@ -40,7 +40,18 @@ export function ProductDemo({ full = false }: { full?: boolean }) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(message);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(message);
+      } else {
+        const area = document.createElement("textarea");
+        area.value = message;
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand("copy");
+        document.body.removeChild(area);
+      }
       setCopied(true);
       setCopyError(false);
     } catch {
@@ -118,12 +129,21 @@ export function ProductDemo({ full = false }: { full?: boolean }) {
             <span className="eyebrow">ANÁLISE ILUSTRATIVA</span>
             <Dialog.Title>{active?.name}</Dialog.Title>
             <Dialog.Description>Exemplo fictício para {services.find((item) => item.id === query.service)?.label.toLowerCase()} em {query.city}. Não é uma análise de um estabelecimento real.</Dialog.Description>
-            <div className="analysis-box"><Sparkles size={19} /><div><strong>{active?.issue}</strong><p>Em uma busca real, os sinais disponíveis ajudam a entender se existe uma oportunidade. Confirme as necessidades do negócio antes de propor uma solução.</p></div></div>
+            <div className="analysis-box"><Sparkles size={19} /><div><strong>{active?.issue}</strong><p>Sinais como este aparecem em cada resultado da busca. Eles mostram onde está a porta de entrada para a sua oferta.</p></div></div>
+            <h3>O que uma análise real mostra</h3>
+            <p className="dialog-text">Em uma busca de verdade, cada estabelecimento chega com os sinais que importam para decidir se vale a abordagem:</p>
+            <ul className="signal-list">
+              <li><Globe size={14} /><span><strong>Site próprio?</strong> Se não tem — ou se o &ldquo;site&rdquo; é só um Instagram — já é oportunidade para quem vende presença digital.</span></li>
+              <li><MessageCircle size={14} /><span><strong>WhatsApp verificado.</strong> O número é testado na hora, para você nunca falar no vazio.</span></li>
+              <li><Instagram size={14} /><span><strong>Instagram separado.</strong> O @ do negócio aparece como canal, sem esconder a ausência de site.</span></li>
+              <li><Star size={14} /><span><strong>Avaliação e telefone.</strong> Reputação e contato direto, sem precisar abrir o Google.</span></li>
+            </ul>
+            <p className="dialog-text">Com isso, a plataforma gera a mensagem de abordagem certa para o seu serviço — e, se quiser, uma prévia de site ou a estratégia completa para aquele negócio.</p>
             <h3>Uma conversa começa com contexto.</h3>
             <blockquote>{message}</blockquote>
             <button className="button button-primary" onClick={copy}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? "Mensagem copiada" : "Copiar mensagem de exemplo"}</button>
             {copyError && <p role="alert">Não foi possível copiar automaticamente. Selecione e copie o texto da mensagem.</p>}
-            <p className="dialog-note">Nenhum contato real é usado nesta demonstração. As integrações serão habilitadas nas próximas fases.</p>
+            <p className="dialog-note">Demonstração com dados ilustrativos. Na conta real, a busca traz estabelecimentos de verdade com contatos verificados.</p>
             {full && <BusinessToolsPreview service={query.service} />}
             <Link className="text-link" href="/cadastro">Conhecer o acesso antecipado <ArrowRight size={15} /></Link>
           </Dialog.Content>
