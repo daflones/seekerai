@@ -31,6 +31,7 @@ const ACTIONS = new Set([
   "generate_site",
   "generate_image",
   "lead_assist",
+  "image_prompt",
 ]);
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
@@ -293,6 +294,13 @@ Deno.serve(async (req) => {
     try {
       const apiKey = await requireSecret("OPENROUTER_API_KEY");
       const context = isRecord(body.context) ? body.context : {};
+
+      // Só o prompt — a pessoa copia e usa na IA que quiser (grátis).
+      if (action === "image_prompt") {
+        const enhanced = await enhanceImagePrompt(prompt, context);
+        await settleAction(db, user.id, requestRef, "completed");
+        return json({ conteudo: enhanced, modelo: NVIDIA_TEXT_MODEL, creditosCobrados: reservation.cost });
+      }
 
       // Pipeline de imagens para generate_site: reais do scrape + geradas se faltar.
       const imageUrls: string[] = [];

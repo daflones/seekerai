@@ -13,7 +13,7 @@ import { LeadAssistant } from "./lead-assistant";
 
 interface OutputRow {
   id: string;
-  tipo: "sales_reply" | "deep_strategy" | "generate_site" | "generate_image";
+  tipo: "sales_reply" | "deep_strategy" | "generate_site" | "generate_image" | "image_prompt";
   conteudo: string;
   modelo: string | null;
   created_at: string;
@@ -24,6 +24,7 @@ const OUTPUT_LABEL: Record<string, string> = {
   deep_strategy: "Estratégia",
   generate_site: "Site gerado",
   generate_image: "Imagem",
+  image_prompt: "Prompt de imagem",
 };
 
 function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
@@ -209,16 +210,16 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     setNotice(`${OUTPUT_LABEL[tipo]} gerada.`);
   }
 
-  async function generateImage() {
+  async function generateImage(kind: "generate_image" | "image_prompt" = "generate_image") {
     const prompt = imagePrompt.trim();
-    if (isBusy("generate_image") || !prompt) return;
-    setBusyKey("generate_image", true);
+    if (isBusy(kind) || !prompt) return;
+    setBusyKey(kind, true);
     setError("");
     setNotice("");
-    const res = await callAction<{ imagens?: string[]; modelo?: string; creditosCobrados?: number }>(
+    const res = await callAction<{ conteudo?: string; imagens?: string[]; modelo?: string; creditosCobrados?: number }>(
       "ai-generate",
       {
-        action: "generate_image",
+        action: kind,
         serviceSlug: lead.service_slug,
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
@@ -231,25 +232,25 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         },
       },
     );
-    const url = res.ok ? res.data.imagens?.[0] : null;
-    if (!res.ok || !url) {
-      setBusyKey("generate_image", false);
-      setError(res.ok ? "A IA não devolveu imagem." : res.error);
+    const conteudo = kind === "image_prompt" ? res.data.conteudo : res.ok ? res.data.imagens?.[0] : null;
+    if (!res.ok || !conteudo) {
+      setBusyKey(kind, false);
+      setError(res.ok ? "A IA não devolveu conteúdo." : res.error);
       return;
     }
     const save = await fetch(`/api/leads/${lead.id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tipo: "generate_image", conteudo: url, modelo: res.data.modelo ?? null }),
+      body: JSON.stringify({ tipo: kind, conteudo, modelo: res.data.modelo ?? null }),
     });
     const saved = (await save.json().catch(() => null)) as { output?: OutputRow } | null;
     if (saved?.output) {
-      setOutputs((list) => [{ ...saved.output!, conteudo: url }, ...list]);
+      setOutputs((list) => [{ ...saved.output!, conteudo }, ...list]);
       setOpen((o) => ({ ...o, [saved.output!.id]: true }));
     }
     setImagePrompt("");
-    setBusyKey("generate_image", false);
-    setNotice("Imagem gerada.");
+    setBusyKey(kind, false);
+    setNotice(kind === "image_prompt" ? "Prompt gerado — copie e use na IA que quiser." : "Imagem gerada.");
   }
 
   async function patch(body: Record<string, unknown>) {
@@ -359,10 +360,15 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           onChange={(e) => setImagePrompt(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generateImage(); } }}
         />
+        <button type="button" className="button button-glass button-small" disabled={isBusy("image_prompt") || !imagePrompt.trim()}
+          onClick={() => void generateImage("image_prompt")}>
+          {isBusy("image_prompt") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
+          Gerar prompt
+        </button>
         <button type="button" className="button button-primary button-small" disabled={isBusy("generate_image") || !imagePrompt.trim()}
           onClick={() => void generateImage()}>
           {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
-          Gerar
+          Gerar imagem
         </button>
       </div>
     </section>}
@@ -387,7 +393,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               <Download size={14} />Baixar imagem
             </a>
           </div>}
-          {(o.tipo === "sales_reply" || o.tipo === "deep_strategy") && <>
+          {(o.tipo === "sales_reply" || o.tipo === "deep_strategy" || o.tipo === "image_prompt") && <>
             <pre className="lead-output-text">{o.conteudo}</pre>
             <div className="lead-output-actions">
               <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />Copiar</button>

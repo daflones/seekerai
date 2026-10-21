@@ -12,7 +12,7 @@ const patchSchema = z.object({
 });
 
 const outputSchema = z.object({
-  tipo: z.enum(["sales_reply", "deep_strategy", "generate_site", "generate_image"]),
+  tipo: z.enum(["sales_reply", "deep_strategy", "generate_site", "generate_image", "image_prompt"]),
   conteudo: z.string().min(1).max(8_000_000),
   modelo: z.string().max(120).nullish(),
 });
