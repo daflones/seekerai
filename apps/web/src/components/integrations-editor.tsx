@@ -31,7 +31,7 @@ const KNOWN_KEYS: { nome: string; descricao: string }[] = [
   { nome: "EVOLUTION_API_KEY", descricao: "Evolution — apikey da instância" },
   { nome: "AI_TEXT_MODEL", descricao: "Modelo de texto (padrão: openai/gpt-4o-mini)" },
   { nome: "AI_IMAGE_MODEL", descricao: "Modelo de imagem (padrão: google/gemini-2.5-flash-image)" },
-  { nome: "AI_SITE_MODEL", descricao: "Modelo de sites (padrão: anthropic/claude-sonnet-4)" },
+  { nome: "AI_SITE_MODEL", descricao: "Modelo de sites (padrão: anthropic/claude-sonnet-4.5)" },
 ];
 
 export function IntegrationsEditor({

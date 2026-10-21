@@ -27,7 +27,7 @@ const ACTIONS = new Set([
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
 const IMAGE_MODEL = optionalEnv("AI_IMAGE_MODEL") ?? "google/gemini-2.5-flash-image";
-const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "anthropic/claude-sonnet-4";
+const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "anthropic/claude-sonnet-4.5";
 
 interface GenerateBody {
   action?: string;
@@ -130,8 +130,14 @@ Deno.serve(async (req) => {
         .filter((u): u is string => typeof u === "string")
       : [];
 
+    let conteudo = typeof message.content === "string" ? message.content : null;
+    if (conteudo && action === "generate_site") {
+      // Modelos costumam embrulhar HTML em fence de markdown — remove.
+      conteudo = conteudo.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim();
+    }
+
     return json({
-      conteudo: typeof message.content === "string" ? message.content : null,
+      conteudo,
       imagens: images.length > 0 ? images : undefined,
       modelo: model,
       creditosCobrados: reservation.cost,
