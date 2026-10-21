@@ -32,11 +32,11 @@ describe("validação de autenticação", () => {
   });
   it("valida origem de produção sem confiar no Host da requisição", () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://eletrify.me");
-    expect(allowedOrigin("https://eletrify.me")).toBe(true);
-    expect(allowedOrigin("https://eletrify.me.evil.example")).toBe(false);
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://seekerai.digital");
+    expect(allowedOrigin("https://seekerai.digital")).toBe(true);
+    expect(allowedOrigin("https://seekerai.digital.evil.example")).toBe(false);
     expect(allowedOrigin("http://localhost:3000")).toBe(false);
     expect(allowedOrigin(null)).toBe(false);
-    expect(callbackOrigin("https://evil.example")).toBe("https://eletrify.me");
+    expect(callbackOrigin("https://evil.example")).toBe("https://seekerai.digital");
   });
 });

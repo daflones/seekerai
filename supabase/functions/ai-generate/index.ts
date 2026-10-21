@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
       headers: {
         Authorization: `Bearer ${await requireSecret("OPENROUTER_API_KEY")}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://eletrify.me",
+        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
         "X-Title": "SeekerAi",
       },
       body: JSON.stringify({

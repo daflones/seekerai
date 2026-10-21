@@ -8,7 +8,7 @@ O provisionamento remoto foi executado: migrations aplicadas sem destruição,
 confirmação de e-mail e Turnstile nativo ativos e conta admin promovida.
 `SUPABASE_AUTH_READY=false` mantém os envios bloqueados até a configuração.
 
-URL canônica configurada no ambiente local: `https://eletrify.me`.
+URL canônica configurada no ambiente local: `https://seekerai.digital`.
 Nenhuma senha de admin consta em código, migrations, docs ou env versionado.
 
 ## Captcha: proteção no provedor
@@ -37,7 +37,7 @@ Não desligar o captcha em dev: o projeto Supabase valida nativamente e um token
 falso ou ausente falharia com `captcha_failed` no login/cadastro/recuperação.
 Em produção a aparência padrão permanece.
 
-No painel Cloudflare, permitir `eletrify.me` e os hosts de desenvolvimento
+No painel Cloudflare, permitir `seekerai.digital` e os hosts de desenvolvimento
 usados (`localhost`, `127.0.0.1`). Caso utilize `www`, ele também precisa ser
 configurado explicitamente. Site key/secret não permitem alterar esse allowlist;
 isso exige acesso ao painel ou uma credencial de gestão da conta Cloudflare.

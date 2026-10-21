@@ -15,7 +15,7 @@ import {
 } from "../_shared/common.ts";
 import { requireSecret } from "../_shared/secrets.ts";
 
-const APP_URL = optionalEnv("APP_URL") ?? "https://eletrify.me";
+const APP_URL = optionalEnv("APP_URL") ?? "https://seekerai.digital";
 // API pública MercosulPay (mesmo contrato do projeto iastetic).
 const MERCOSUL_API_URL = "https://mercosulpay.com/api/public/v1";
 

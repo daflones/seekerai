@@ -64,7 +64,7 @@ const wantsFunctions = !process.argv.includes("--secrets") || process.argv.inclu
 
 if (wantsSecrets) {
   const lines = ["# Gerado por deploy-edge.mjs — não commitar (gitignored via .env*)"];
-  lines.push(`APP_URL=${env.NEXT_PUBLIC_APP_URL ?? "https://eletrify.me"}`);
+  lines.push(`APP_URL=${env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital"}`);
   const missing = [];
   for (const key of EDGE_SECRET_KEYS) {
     if (env[key]) lines.push(`${key}=${env[key]}`);
