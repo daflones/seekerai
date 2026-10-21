@@ -15,10 +15,38 @@ const faqs = [
   ["O copiloto consegue ouvir uma ligação no meu celular?", "Não diretamente. Os modos previstos são áudio compartilhado no computador, microfone em viva-voz ou texto. Gravação e transcrição exigem aviso e consentimento apropriados. O recurso ainda não está conectado nesta demonstração."],
 ];
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "SeekerAi",
+      url: appUrl,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      inLanguage: "pt-BR",
+      description:
+        "Plataforma de prospecção que encontra empresas locais que precisam dos seus serviços, verifica contatos e gera abordagens com contexto.",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "BRL", description: "Acesso antecipado gratuito" },
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: faqs.map(([question, answer]) => ({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: { "@type": "Answer", text: answer },
+      })),
+    },
+  ],
+};
+
 export default async function Home() {
   const pricing = await publicPlanCards();
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Navigation />
       <main id="conteudo">
         <section className="hero">
