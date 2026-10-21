@@ -9,6 +9,7 @@ import {
   FileText, MonitorSmartphone,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { LeadAssistant } from "./lead-assistant";
 
 interface OutputRow {
   id: string;
@@ -68,6 +69,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const canImage = enabledActions.includes("generate_image");
   const waDigits = (lead.telefone ?? "").replace(/\D/g, "");
   const waLink = waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}` : null;
+  const waMsgLink = (text: string) =>
+    waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}?text=${encodeURIComponent(text)}` : null;
+  const hasReply = outputs.some((o) => o.tipo === "sales_reply");
+  const hasStrategy = outputs.some((o) => o.tipo === "deep_strategy");
 
   async function generate(tipo: "sales_reply" | "deep_strategy" | "generate_site") {
     if (busy) return;
@@ -225,16 +230,16 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </header>
 
     <section className="lead-actions">
-      <button type="button" className="button button-primary button-small" disabled={busy !== null}
+      {!hasReply && <button type="button" className="button button-primary button-small" disabled={busy !== null}
         onClick={() => void generate("sales_reply")}>
         {busy === "sales_reply" ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
         Mensagem de abordagem{costs.sales_reply ? ` · ${costs.sales_reply}cr` : " · grátis"}
-      </button>
-      <button type="button" className="button button-glass button-small" disabled={busy !== null}
+      </button>}
+      {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void generate("deep_strategy")}>
         {busy === "deep_strategy" ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
         Estratégia{costs.deep_strategy ? ` · ${costs.deep_strategy}cr` : ""}
-      </button>
+      </button>}
       {canSite && <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void generate("generate_site")}>
         {busy === "generate_site" ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
@@ -290,7 +295,15 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           </div>}
           {(o.tipo === "sales_reply" || o.tipo === "deep_strategy") && <>
             <pre className="lead-output-text">{o.conteudo}</pre>
-            <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />Copiar</button>
+            <div className="lead-output-actions">
+              <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />Copiar</button>
+              {o.tipo === "sales_reply" && waMsgLink(o.conteudo) && (
+                <a className="button button-primary button-small lead-wa-send"
+                  href={waMsgLink(o.conteudo)!} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle size={14} />Enviar no WhatsApp
+                </a>
+              )}
+            </div>
           </>}
         </div>}
       </article>)}
@@ -310,5 +323,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         Salvar notas
       </button>
     </section>
+
+    <LeadAssistant lead={lead} serviceName={serviceName} />
   </>;
 }

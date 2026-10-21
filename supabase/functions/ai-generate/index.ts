@@ -30,6 +30,7 @@ const ACTIONS = new Set([
   "sales_reply",
   "generate_site",
   "generate_image",
+  "lead_assist",
 ]);
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
@@ -135,6 +136,17 @@ function systemPromptFor(action: string): string {
         "- Botão de contato/WhatsApp com link real quando telefone disponível.",
         "- Responsivo mobile-first, HTML semântico e acessível (alt real, aria onde preciso).",
         "Responda APENAS com o código HTML, sem comentários fora do código.",
+      ].join("\n");
+    case "lead_assist":
+      return [
+        "Você é o copiloto de conversão do SeekerAi: um closer B2B brasileiro experiente",
+        "acompanhando este lead específico em tempo real.",
+        "Use TODOS os dados do contexto (estabelecimento, avaliações, site, WhatsApp, status",
+        "do funil e o que já foi gerado) para responder de forma concreta.",
+        "Ajude a converter: sugira ângulos de abordagem, mensagens prontas para copiar,",
+        "respostas para objeções, próximos passos e o que fazer em cada etapa do funil",
+        "(novo → contatado → respondeu → proposta → ganho).",
+        "Respostas curtas e diretas em pt-BR, com mensagens prontas entre aspas quando fizer sentido.",
       ].join("\n");
     case "generate_image":
       return [
@@ -256,10 +268,11 @@ Deno.serve(async (req) => {
         const faltando = Math.min(2, MAX_SITE_IMAGES - imageUrls.length);
         if (faltando > 0) {
           const prompts = imagePromptsFor(context);
-          for (let i = 0; i < faltando; i++) {
-            const url = await generateSiteImage(apiKey, prompts[i]);
-            if (url) imageUrls.push(url);
-          }
+          // Paralelo — senão cada imagem soma ~30-60s e estoura o tempo da function.
+          const generated = await Promise.all(
+            prompts.slice(0, faltando).map((p) => generateSiteImage(apiKey, p)),
+          );
+          imageUrls.push(...generated.filter((u): u is string => typeof u === "string"));
         }
       }
 
@@ -295,12 +308,14 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model,
           modalities: action === "generate_image" ? ["image", "text"] : undefined,
-          max_tokens: action === "generate_site" ? 16000 : undefined,
+          max_tokens: action === "generate_site" ? 16000 : action === "lead_assist" ? 1200 : undefined,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
           ],
         }),
+        // Sem timeout o OpenRouter pode segurar a conexão até o 524 do gateway.
+        signal: AbortSignal.timeout(action === "generate_site" ? 95_000 : 60_000),
       }).catch(() => null);
       const orStatus = res?.status ?? 0;
       if (res?.ok) {
@@ -327,7 +342,11 @@ Deno.serve(async (req) => {
           }
         }
       } else if (!data) {
-        const nv = await nvidiaChat(systemPrompt, userContent, action === "generate_site" ? 16000 : undefined);
+        const nv = await nvidiaChat(
+          systemPrompt,
+          userContent,
+          action === "generate_site" ? 16000 : action === "lead_assist" ? 1200 : undefined,
+        );
         if (nv) {
           data = nv;
           modelo = NVIDIA_TEXT_MODEL;
