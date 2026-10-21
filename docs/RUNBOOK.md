@@ -81,8 +81,17 @@ Webhooks a cadastrar nos provedores (apontam para `functions/v1/<nome>`):
 
 Após cadastrar, copie os webhook secrets para `.env.local`
 (`STRIPE_WEBHOOK_SECRET`, `MERCOSULPAY_WEBHOOK_SECRET`) e rode
-`node scripts/deploy-edge.mjs --secrets` de novo. Enquanto o secret não estiver
+`node scripts/deploy-edge.mjs --secrets` de novo — ou cadastre pela tela
+`/admin/integracoes` (provedor `edge`, criptografado em `integration_secrets`,
+com fallback para os secrets de ambiente). Enquanto o secret não estiver
 configurado, o webhook responde 500/401 — comportamento esperado.
+
+O provedor de busca (`google_places` ou `apify` actor
+`compass~crawler-google-places`) é escolhido em `/admin/integracoes` via
+`app_settings.search_provider`. Contrato MercosulPay segue o projeto iastetic:
+`POST /api/public/v1/pix/charges` + assinatura
+`x-mercosulpay-signature: sha256=hmac(secret, ts.body)` com dedup por
+`x-mercosulpay-delivery`.
 
 Dedup de eventos é garantido por `webhook_events (provider, event_id)`; evento
 com falha anterior é reprocessado (status `retry`). Mutações só via RPCs

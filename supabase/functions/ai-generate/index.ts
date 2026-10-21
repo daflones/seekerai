@@ -9,7 +9,6 @@ import {
   json,
   optionalEnv,
   readJson,
-  requireEnv,
   requirePost,
   requireUser,
   reserveAction,
@@ -17,6 +16,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
+import { requireSecret } from "../_shared/secrets.ts";
 
 const ACTIONS = new Set([
   "deep_strategy",
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${requireEnv("OPENROUTER_API_KEY")}`,
+        Authorization: `Bearer ${await requireSecret("OPENROUTER_API_KEY")}`,
         "Content-Type": "application/json",
         "HTTP-Referer": optionalEnv("APP_URL") ?? "https://eletrify.me",
         "X-Title": "SeekerAi",

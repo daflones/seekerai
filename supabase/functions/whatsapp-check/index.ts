@@ -8,7 +8,6 @@ import {
   isRecord,
   json,
   readJson,
-  requireEnv,
   requirePost,
   requireUser,
   reserveAction,
@@ -16,6 +15,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
+import { requireSecret } from "../_shared/secrets.ts";
 
 interface CheckBody {
   phone?: string;
@@ -50,12 +50,12 @@ Deno.serve(async (req) => {
       requestRef,
     });
 
-    const base = requireEnv("EVOLUTION_API_URL").replace(/\/+$/, "");
-    const instance = requireEnv("EVOLUTION_INSTANCE");
+    const base = (await requireSecret("EVOLUTION_API_URL")).replace(/\/+$/, "");
+    const instance = await requireSecret("EVOLUTION_INSTANCE");
     const res = await fetch(`${base}/chat/whatsappNumbers/${instance}`, {
       method: "POST",
       headers: {
-        apikey: requireEnv("EVOLUTION_API_KEY"),
+        apikey: await requireSecret("EVOLUTION_API_KEY"),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ numbers: [phone] }),

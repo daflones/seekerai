@@ -9,16 +9,15 @@ import {
   json,
   optionalEnv,
   readJson,
-  requireEnv,
   requirePost,
   requireUser,
   serviceClient,
 } from "../_shared/common.ts";
+import { requireSecret } from "../_shared/secrets.ts";
 
 const APP_URL = optionalEnv("APP_URL") ?? "https://eletrify.me";
-// Ajuste ao path real de criação de cobrança PIX na primeira chamada sandbox.
-const MERCOSUL_API_URL = optionalEnv("MERCOSULPAY_API_URL") ?? "https://api.mercosulpay.com.br";
-const MERCOSUL_PIX_PATH = "/v1/payments";
+// API pública MercosulPay (mesmo contrato do projeto iastetic).
+const MERCOSUL_API_URL = "https://mercosulpay.com/api/public/v1";
 
 interface CheckoutBody {
   planSlug?: string;
@@ -51,7 +50,7 @@ async function createStripeSession(
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}`,
+      Authorization: `Bearer ${await requireSecret("STRIPE_SECRET_KEY")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: params.toString(),
@@ -69,30 +68,28 @@ async function createStripeSession(
 
 async function createMercosulPix(
   plan: { id: string; slug: string; nome: string; preco_centavos: number },
-  userId: string,
   internalRef: string,
 ): Promise<Record<string, unknown>> {
-  const res = await fetch(`${MERCOSUL_API_URL}${MERCOSUL_PIX_PATH}`, {
+  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${requireEnv("MERCOSULPAY_API_KEY")}`,
+      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       amount: plan.preco_centavos / 100,
       currency: "BRL",
-      payment_method: "pix",
-      description: `SeekerAi — ${plan.nome}`,
-      external_reference: internalRef,
-      metadata: { user_id: userId, plan_id: plan.id, plan_slug: plan.slug },
+      description: `SeekerAi — ${plan.nome}`.slice(0, 200),
+      reference_id: internalRef,
     }),
+    signal: AbortSignal.timeout(20_000),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     console.error("[mercosulpay] cobrança PIX falhou:", res.status);
     throw httpError(502, "MercosulPay recusou a criação do PIX");
   }
-  return data;
+  return isRecord(data.data) ? data.data : data;
 }
 
 function pickDeep(obj: Record<string, unknown>, keys: string[]): string | null {
@@ -167,13 +164,13 @@ Deno.serve(async (req) => {
     if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
     try {
-      const charge = await createMercosulPix(plan, user.id, internalRef);
+      const charge = await createMercosulPix(plan, internalRef);
       return json({
         provider: "mercosulpay",
         method,
         reference: internalRef,
-        qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste", "copia_e_cola"]),
-        qrCodeImage: pickDeep(charge, ["qr_code_base64", "qrCodeBase64", "qr_code_image"]),
+        qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste"]),
+        qrCodeImage: pickDeep(charge, ["qr_code_image", "qrCodeBase64"]),
         expiresAt: pickDeep(charge, ["expires_at", "expiration", "expiresAt"]),
       });
     } catch (err) {

@@ -1,153 +1,139 @@
-// Webhook MercosulPay → Supabase Edge Function (sem JWT: assinatura é a auth).
+// Webhook MercosulPay → Edge Function (sem JWT: a assinatura é a auth).
 // Deploy: supabase functions deploy mercosulpay-webhook --no-verify-jwt
 // URL:    https://<ref>.supabase.co/functions/v1/mercosulpay-webhook
 //
-// Verificação: tenta os dois formatos comuns em gateways BR —
-//   1) X-Hub-Signature-256: sha256=<hmac(body)> (chave = secret; se o secret
-//      for hex de 64 chars, também tenta decodificado)
-//   2) x-signature: ts=...,v1=<hmac("id:{data.id};request-id:{x-request-id};ts:{ts};")>
-// Se o painel Mercosul usar outro esquema, o primeiro evento real revela —
-// ajuste apenas verifySignature().
+// Contrato real (igual ao projeto iastetic):
+//   x-mercosulpay-timestamp: <epoch_s>
+//   x-mercosulpay-signature: sha256=<hmac_sha256(secret, `${ts}.${rawBody}`)>
+//   x-mercosulpay-event:     pix.received | pix.sent | pix.refunded | ...
+//   x-mercosulpay-delivery:  <id único da entrega> (dedup)
+//   payload.data.reference_id = nosso UUID interno (payments.provider_ref)
 
 import {
   fail,
-  hexToBytes,
   hmacSha256Hex,
   httpError,
   isRecord,
   json,
-  requireEnv,
   requirePost,
   serviceClient,
   timingSafeEqual,
 } from "../_shared/common.ts";
+import { requireSecret } from "../_shared/secrets.ts";
 
-const PAID_STATUSES = new Set([
-  "approved", "paid", "confirmed", "completed", "settled", "authorized",
-]);
+const TOLERANCE_SECONDS = 300;
+const UUID_RE = /^[-0-9a-f]{36}$/i;
 
-function pick(obj: Record<string, unknown>, keys: string[]): string | null {
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === "string" && value.length > 0) return value;
-    if (typeof value === "number") return String(value);
-    if (isRecord(value)) {
-      const nested = pick(value, ["external_reference", "ref", "reference", "external_id", "id"]);
-      if (nested) return nested;
-    }
+async function verifySignature(req: Request, rawBody: string) {
+  const secret = await requireSecret("MERCOSULPAY_WEBHOOK_SECRET");
+  const ts = req.headers.get("x-mercosulpay-timestamp") ?? "";
+  const sig = req.headers.get("x-mercosulpay-signature") ?? "";
+  if (!ts || Math.abs(Date.now() / 1000 - Number(ts)) > TOLERANCE_SECONDS) {
+    throw httpError(401, "Entrega expirada");
   }
-  return null;
-}
-
-async function verifySignature(req: Request, rawBody: string): Promise<void> {
-  const secret = requireEnv("MERCOSULPAY_WEBHOOK_SECRET");
-
-  const hubHeader = req.headers.get("x-hub-signature-256");
-  if (hubHeader?.startsWith("sha256=")) {
-    const given = hubHeader.slice(7);
-    const candidates = [await hmacSha256Hex(secret, rawBody)];
-    if (/^[0-9a-f]{64}$/i.test(secret)) {
-      candidates.push(await hmacSha256Hex(hexToBytes(secret), rawBody));
-    }
-    if (candidates.some((sig) => timingSafeEqual(sig, given))) return;
-    throw httpError(401, "Assinatura inválida");
-  }
-
-  const mpHeader = req.headers.get("x-signature");
-  if (mpHeader) {
-    const ts = mpHeader.split(",").find((p) => p.startsWith("ts="))?.slice(2);
-    const v1 = mpHeader.split(",").find((p) => p.startsWith("v1="))?.slice(3);
-    const body = JSON.parse(rawBody) as Record<string, unknown>;
-    const dataId = pick(isRecord(body.data) ? body.data : body, ["id"]) ?? "";
-    const requestId = req.headers.get("x-request-id") ?? "";
-    if (ts && v1) {
-      const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
-      const expected = await hmacSha256Hex(secret, manifest);
-      if (timingSafeEqual(v1, expected)) return;
-    }
-    throw httpError(401, "Assinatura inválida");
-  }
-
-  throw httpError(401, "Assinatura ausente");
-}
-
-/** Extrai a referência que bate com payments.provider_ref criado no checkout
- *  (a nossa referência interna volta como external_reference/metadata). */
-function extractPaymentRef(body: Record<string, unknown>): string | null {
-  return pick(body, [
-    "external_reference", "reference", "metadata",
-    "payment_id", "transaction_id", "charge_id", "id", "data", "payment",
-  ]);
-}
-
-async function processEvent(
-  db: ReturnType<typeof serviceClient>,
-  body: Record<string, unknown>,
-  eventType: string,
-): Promise<Record<string, unknown>> {
-  const status = String(body.status ?? "").toLowerCase();
-  const isPaid =
-    PAID_STATUSES.has(status) ||
-    /paid|approved|confirm/i.test(eventType);
-  if (!isPaid) {
-    return { status: "ignored", reason: `not_paid:${status || eventType}` };
-  }
-
-  const ref = extractPaymentRef(body);
-  if (!ref) return { status: "ignored", reason: "no_payment_ref" };
-
-  const periodEnd = new Date(Date.now() + 32 * 24 * 3600 * 1000).toISOString();
-  const { data, error } = await db.rpc("confirm_plan_payment", {
-    p_provider: "mercosulpay",
-    p_provider_ref: ref,
-    p_provider_subscription_id: null,
-    p_period_end: periodEnd,
-    p_cycle_ref: `mercosul:${ref}`,
-  });
-  if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
-  return data as Record<string, unknown>;
+  const expected = `sha256=${await hmacSha256Hex(secret, `${ts}.${rawBody}`)}`;
+  if (!timingSafeEqual(expected, sig)) throw httpError(401, "Assinatura inválida");
+  return {
+    eventType: req.headers.get("x-mercosulpay-event") ?? "unknown",
+    deliveryId: req.headers.get("x-mercosulpay-delivery") ?? "",
+  };
 }
 
 Deno.serve(async (req) => {
   try {
     requirePost(req);
     const rawBody = await req.text();
-    await verifySignature(req, rawBody);
+    const { eventType, deliveryId } = await verifySignature(req, rawBody);
+    if (!deliveryId) throw httpError(400, "Entrega sem id");
 
-    const body = JSON.parse(rawBody) as Record<string, unknown>;
-    const eventType = String(body.event ?? body.type ?? body.action ?? "unknown");
-    const ref = extractPaymentRef(body);
-    const eventId = String(body.event_id ?? body.notification_id ?? (ref ? `${eventType}:${ref}` : ""));
-    if (!eventId) throw httpError(400, "Evento sem id");
-
+    const payload = JSON.parse(rawBody) as Record<string, unknown>;
     const db = serviceClient();
     const { data: state, error: ingestError } = await db.rpc("ingest_webhook_event", {
       p_provider: "mercosulpay",
-      p_event_id: eventId,
+      p_event_id: deliveryId,
       p_event_type: eventType,
-      p_payload: body,
+      p_payload: payload,
     });
     if (ingestError) throw httpError(500, `ingest_webhook_event: ${ingestError.message}`);
     if (state === "processed") return json({ received: true, duplicate: true });
 
-    let result: Record<string, unknown>;
+    let processError: string | null = null;
     try {
-      result = await processEvent(db, body, eventType);
+      const data = isRecord(payload.data) ? payload.data
+        : isRecord(payload.object) ? payload.object
+        : payload;
+      const reference = typeof data.reference_id === "string" ? data.reference_id : null;
+
+      if (eventType === "pix.received") {
+        if (!reference || !UUID_RE.test(reference)) {
+          throw httpError(400, "Referência inválida");
+        }
+        const { data: payment } = await db
+          .from("payments")
+          .select("id, amount_cents, status, provider")
+          .eq("provider", "mercosulpay")
+          .eq("provider_ref", reference)
+          .maybeSingle();
+        if (!payment) throw httpError(404, "Pagamento desconhecido");
+
+        const paidCents = typeof data.amount === "number"
+          ? Math.round(data.amount * 100)
+          : null;
+        const chargeCompleted = String(data.status ?? "") === "completed";
+        if (!chargeCompleted) {
+          await finish(db, deliveryId, `charge_status:${data.status}`);
+          return json({ received: true, result: { status: "ignored" } });
+        }
+        if (paidCents !== null && paidCents !== payment.amount_cents) {
+          // Valor divergente → revisão manual, sem conceder créditos.
+          await db.from("payments").update({ status: "review" }).eq("id", payment.id);
+          await finish(db, deliveryId, "amount_mismatch_review");
+          return json({ received: true, result: { status: "review" } });
+        }
+
+        const periodEnd = new Date(Date.now() + 32 * 24 * 3600 * 1000).toISOString();
+        const { data: result, error } = await db.rpc("confirm_plan_payment", {
+          p_provider: "mercosulpay",
+          p_provider_ref: reference,
+          p_provider_subscription_id: null,
+          p_period_end: periodEnd,
+          p_cycle_ref: `mercosul:${reference}`,
+        });
+        if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
+        await finish(db, deliveryId, null);
+        return json({ received: true, result });
+      }
+
+      if (eventType === "pix.refunded" && reference && UUID_RE.test(reference)) {
+        await db.from("payments")
+          .update({ status: "review" })
+          .eq("provider", "mercosulpay")
+          .eq("provider_ref", reference)
+          .eq("status", "paid");
+        await finish(db, deliveryId, null);
+        return json({ received: true, result: { status: "review" } });
+      }
+
+      await finish(db, deliveryId, null);
+      return json({ received: true, result: { status: "ignored", eventType } });
     } catch (err) {
-      await db.rpc("finish_webhook_event", {
-        p_provider: "mercosulpay",
-        p_event_id: eventId,
-        p_error: err instanceof Error ? err.message : String(err),
-      });
+      processError = err instanceof Error ? err.message : String(err);
+      await finish(db, deliveryId, processError);
       throw err;
     }
-    await db.rpc("finish_webhook_event", {
-      p_provider: "mercosulpay",
-      p_event_id: eventId,
-      p_error: null,
-    });
-    return json({ received: true, result });
   } catch (err) {
     return fail(err);
   }
 });
+
+async function finish(
+  db: ReturnType<typeof serviceClient>,
+  deliveryId: string,
+  error: string | null,
+) {
+  await db.rpc("finish_webhook_event", {
+    p_provider: "mercosulpay",
+    p_event_id: deliveryId,
+    p_error: error,
+  });
+}

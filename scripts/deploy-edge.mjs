@@ -22,13 +22,16 @@ function loadLocalEnv() {
 }
 
 // Secrets consumidos pelas edge functions — nunca vão para o Easypanel.
+// APP_ENCRYPTION_KEY permite descriptografar integration_secrets (painel admin).
 const EDGE_SECRET_KEYS = [
+  "APP_ENCRYPTION_KEY",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "MERCOSULPAY_API_KEY",
   "MERCOSULPAY_WEBHOOK_SECRET",
   "MERCOSULPAY_API_URL",
   "GOOGLE_PLACES_API_KEY",
+  "APIFY_API_TOKEN",
   "OPENROUTER_API_KEY",
   "EVOLUTION_API_URL",
   "EVOLUTION_API_KEY",

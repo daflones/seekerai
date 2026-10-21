@@ -8,11 +8,11 @@ import {
   httpError,
   isRecord,
   json,
-  requireEnv,
   requirePost,
   serviceClient,
   timingSafeEqual,
 } from "../_shared/common.ts";
+import { requireSecret } from "../_shared/secrets.ts";
 
 const SIGNATURE_TOLERANCE_SECONDS = 300;
 
@@ -33,7 +33,10 @@ async function verifyStripeSignature(rawBody: string, header: string | null): Pr
   if (!Number.isFinite(age) || age > SIGNATURE_TOLERANCE_SECONDS) {
     throw httpError(401, "Assinatura expirada");
   }
-  const expected = await hmacSha256Hex(requireEnv("STRIPE_WEBHOOK_SECRET"), `${ts}.${rawBody}`);
+  const expected = await hmacSha256Hex(
+    await requireSecret("STRIPE_WEBHOOK_SECRET"),
+    `${ts}.${rawBody}`,
+  );
   if (!signatures.some((sig) => timingSafeEqual(sig, expected))) {
     throw httpError(401, "Assinatura inválida");
   }
@@ -41,7 +44,7 @@ async function verifyStripeSignature(rawBody: string, header: string | null): Pr
 
 async function stripeGet(path: string): Promise<Record<string, unknown>> {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
-    headers: { Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}` },
+    headers: { Authorization: `Bearer ${await requireSecret("STRIPE_SECRET_KEY")}` },
   });
   if (!res.ok) throw httpError(502, `Stripe respondeu ${res.status}`);
   return (await res.json()) as Record<string, unknown>;

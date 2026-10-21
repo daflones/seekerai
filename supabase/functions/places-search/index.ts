@@ -1,5 +1,7 @@
-// Busca de estabelecimentos via Google Places API (New) — Text Search.
-// Chave do Google fica como secret do Supabase; consome créditos do usuário.
+// Busca de estabelecimentos — provedor configurável no admin (app_settings):
+//   "google_places" → Places API (New) Text Search
+//   "apify"         → Actor compass~crawler-google-places (run-sync)
+// Consome créditos (ação 'search'). Chaves ficam como secrets do Supabase.
 
 import {
   asString,
@@ -7,9 +9,7 @@ import {
   httpError,
   isRecord,
   json,
-  optionalEnv,
   readJson,
-  requireEnv,
   requirePost,
   requireUser,
   reserveAction,
@@ -17,6 +17,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
+import { getSetting, requireSecret } from "../_shared/secrets.ts";
 
 const FIELD_MASK = [
   "places.id",
@@ -32,11 +33,125 @@ const FIELD_MASK = [
   "places.regularOpeningHours.openNow",
 ].join(",");
 
+const APIFY_ACTOR = "compass~crawler-google-places";
+
 interface SearchBody {
   query?: string;
   serviceSlug?: string;
   requestRef?: string;
   regionCode?: string;
+}
+
+interface NormalizedPlace {
+  id: string | null;
+  nome: string | null;
+  endereco: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  telefone: string | null;
+  site: string | null;
+  avaliacao: number | null;
+  totalAvaliacoes: number | null;
+  status: string | null;
+  categoria: string | null;
+  mapsUrl: string | null;
+  imagem: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+async function searchGooglePlaces(query: string, regionCode: string): Promise<NormalizedPlace[]> {
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "X-Goog-Api-Key": await requireSecret("GOOGLE_PLACES_API_KEY"),
+      "X-Goog-FieldMask": FIELD_MASK,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      textQuery: query,
+      languageCode: "pt-BR",
+      regionCode,
+      pageSize: 20,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) throw httpError(502, "Google Places indisponível no momento");
+  return (Array.isArray(data.places) ? data.places : []).map((p) => {
+    const place = isRecord(p) ? p : {};
+    return {
+      id: asString(place.id, 300),
+      nome: isRecord(place.displayName) ? asString(place.displayName.text) : null,
+      endereco: asString(place.formattedAddress),
+      bairro: null,
+      cidade: null,
+      uf: null,
+      telefone: asString(place.nationalPhoneNumber ?? place.internationalPhoneNumber),
+      site: asString(place.websiteUri, 500),
+      avaliacao: typeof place.rating === "number" ? place.rating : null,
+      totalAvaliacoes:
+        typeof place.userRatingCount === "number" ? place.userRatingCount : null,
+      status: asString(place.businessStatus),
+      categoria: isRecord(place.primaryTypeDisplayName)
+        ? asString(place.primaryTypeDisplayName.text)
+        : null,
+      mapsUrl: null,
+      imagem: null,
+      lat: null,
+      lng: null,
+    };
+  });
+}
+
+async function searchApify(query: string): Promise<NormalizedPlace[]> {
+  const token = await requireSecret("APIFY_API_TOKEN");
+  const res = await fetch(
+    `https://api.apify.com/v2/actors/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        searchStringsArray: [query],
+        maxCrawledPlacesPerSearch: 20,
+        language: "pt-BR",
+        maxReviews: 0,
+      }),
+      signal: AbortSignal.timeout(120_000),
+    },
+  );
+  const items = (await res.json().catch(() => [])) as unknown;
+  if (!res.ok) throw httpError(502, "Apify indisponível no momento");
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const p = isRecord(item) ? item : {};
+    const loc = isRecord(p.location) ? p.location : {};
+    return {
+      id: asString(p.placeId ?? p.fid ?? p.cid, 300),
+      nome: asString(p.title),
+      endereco: asString(p.address, 500),
+      bairro: asString(p.neighborhood),
+      cidade: asString(p.city),
+      uf: asString(p.state),
+      telefone: asString(p.phone ?? p.phoneUnformatted),
+      site: asString(p.website, 500),
+      avaliacao: typeof p.totalScore === "number" ? p.totalScore : null,
+      totalAvaliacoes: typeof p.reviewsCount === "number" ? p.reviewsCount : null,
+      status: p.permanentlyClosed === true
+        ? "CLOSED_PERMANENTLY"
+        : p.temporarilyClosed === true
+          ? "CLOSED_TEMPORARILY"
+          : "OPERATIONAL",
+      categoria: asString(p.categoryName) ??
+        (Array.isArray(p.categories) && typeof p.categories[0] === "string"
+          ? p.categories[0]
+          : null),
+      mapsUrl: asString(p.url, 800),
+      imagem: asString(p.imageUrl, 800),
+      lat: typeof loc.lat === "number" ? loc.lat : null,
+      lng: typeof loc.lng === "number" ? loc.lng : null,
+    };
+  });
 }
 
 Deno.serve(async (req) => {
@@ -53,7 +168,10 @@ Deno.serve(async (req) => {
       throw httpError(400, "Informe query, serviceSlug e requestRef");
     }
 
-    const inputHash = await sha256Hex(JSON.stringify({ query, regionCode, service }));
+    const provider = await getSetting("search_provider", "google_places");
+    const inputHash = await sha256Hex(
+      JSON.stringify({ query, regionCode, service, provider }),
+    );
     const db = serviceClient();
     const reservation = await reserveAction(db, {
       userId: user.id,
@@ -64,47 +182,16 @@ Deno.serve(async (req) => {
       requestRef,
     });
 
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "X-Goog-Api-Key": requireEnv("GOOGLE_PLACES_API_KEY"),
-        "X-Goog-FieldMask": FIELD_MASK,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        textQuery: query,
-        languageCode: "pt-BR",
-        regionCode,
-        pageSize: 20,
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) {
+    try {
+      const resultados = provider === "apify"
+        ? await searchApify(query)
+        : await searchGooglePlaces(query, regionCode);
+      await settleAction(db, user.id, requestRef, "completed");
+      return json({ resultados, provedor: provider, creditosCobrados: reservation.cost });
+    } catch (err) {
       await settleAction(db, user.id, requestRef, "refunded");
-      throw httpError(502, "Google Places indisponível no momento");
+      throw err;
     }
-    await settleAction(db, user.id, requestRef, "completed");
-
-    const places = (Array.isArray(data.places) ? data.places : []).map((p) => {
-      const place = isRecord(p) ? p : {};
-      const name = isRecord(place.displayName) ? place.displayName.text : null;
-      const phone = place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null;
-      return {
-        id: place.id ?? null,
-        nome: name ?? null,
-        endereco: place.formattedAddress ?? null,
-        telefone: phone,
-        site: place.websiteUri ?? null,
-        avaliacao: place.rating ?? null,
-        totalAvaliacoes: place.userRatingCount ?? null,
-        status: place.businessStatus ?? null,
-        categoria: isRecord(place.primaryTypeDisplayName)
-          ? place.primaryTypeDisplayName.text
-          : null,
-      };
-    });
-
-    return json({ resultados: places, creditosCobrados: reservation.cost });
   } catch (err) {
     return fail(err);
   }
