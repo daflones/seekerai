@@ -19,55 +19,98 @@ export const niches = nicheGroups.flatMap((group) => group.niches);
 export interface DemoCity {
   label: string;
   region: string;
-  /** Estimativa ilustrativa de estabelecimentos no radar. */
-  potential: string;
+  /** Base ilustrativa de estabelecimentos locais. */
+  businesses: number;
 }
 
 export const cityGroups: { region: string; cities: DemoCity[] }[] = [
   { region: "Sudeste", cities: [
-    { label: "São Paulo, SP", region: "Sudeste", potential: "+120 mil" },
-    { label: "Campinas, SP", region: "Sudeste", potential: "+28 mil" },
-    { label: "Ribeirão Preto, SP", region: "Sudeste", potential: "+19 mil" },
-    { label: "São José dos Campos, SP", region: "Sudeste", potential: "+17 mil" },
-    { label: "Santos, SP", region: "Sudeste", potential: "+12 mil" },
-    { label: "Rio de Janeiro, RJ", region: "Sudeste", potential: "+86 mil" },
-    { label: "Niterói, RJ", region: "Sudeste", potential: "+14 mil" },
-    { label: "Belo Horizonte, MG", region: "Sudeste", potential: "+42 mil" },
-    { label: "Uberlândia, MG", region: "Sudeste", potential: "+15 mil" },
-    { label: "Vitória, ES", region: "Sudeste", potential: "+11 mil" },
+    { label: "São Paulo, SP", region: "Sudeste", businesses: 120000 },
+    { label: "Campinas, SP", region: "Sudeste", businesses: 28000 },
+    { label: "Ribeirão Preto, SP", region: "Sudeste", businesses: 19000 },
+    { label: "São José dos Campos, SP", region: "Sudeste", businesses: 17000 },
+    { label: "Santos, SP", region: "Sudeste", businesses: 12000 },
+    { label: "Rio de Janeiro, RJ", region: "Sudeste", businesses: 86000 },
+    { label: "Niterói, RJ", region: "Sudeste", businesses: 14000 },
+    { label: "Belo Horizonte, MG", region: "Sudeste", businesses: 42000 },
+    { label: "Uberlândia, MG", region: "Sudeste", businesses: 15000 },
+    { label: "Vitória, ES", region: "Sudeste", businesses: 11000 },
   ] },
   { region: "Sul", cities: [
-    { label: "Curitiba, PR", region: "Sul", potential: "+32 mil" },
-    { label: "Londrina, PR", region: "Sul", potential: "+12 mil" },
-    { label: "Florianópolis, SC", region: "Sul", potential: "+14 mil" },
-    { label: "Joinville, SC", region: "Sul", potential: "+13 mil" },
-    { label: "Porto Alegre, RS", region: "Sul", potential: "+30 mil" },
-    { label: "Caxias do Sul, RS", region: "Sul", potential: "+11 mil" },
+    { label: "Curitiba, PR", region: "Sul", businesses: 32000 },
+    { label: "Londrina, PR", region: "Sul", businesses: 12000 },
+    { label: "Florianópolis, SC", region: "Sul", businesses: 14000 },
+    { label: "Joinville, SC", region: "Sul", businesses: 13000 },
+    { label: "Porto Alegre, RS", region: "Sul", businesses: 30000 },
+    { label: "Caxias do Sul, RS", region: "Sul", businesses: 11000 },
   ] },
   { region: "Nordeste", cities: [
-    { label: "Salvador, BA", region: "Nordeste", potential: "+38 mil" },
-    { label: "Fortaleza, CE", region: "Nordeste", potential: "+36 mil" },
-    { label: "Recife, PE", region: "Nordeste", potential: "+28 mil" },
-    { label: "Natal, RN", region: "Nordeste", potential: "+12 mil" },
-    { label: "João Pessoa, PB", region: "Nordeste", potential: "+12 mil" },
-    { label: "Maceió, AL", region: "Nordeste", potential: "+13 mil" },
-    { label: "São Luís, MA", region: "Nordeste", potential: "+14 mil" },
-    { label: "Teresina, PI", region: "Nordeste", potential: "+10 mil" },
+    { label: "Salvador, BA", region: "Nordeste", businesses: 38000 },
+    { label: "Fortaleza, CE", region: "Nordeste", businesses: 36000 },
+    { label: "Recife, PE", region: "Nordeste", businesses: 28000 },
+    { label: "Natal, RN", region: "Nordeste", businesses: 12000 },
+    { label: "João Pessoa, PB", region: "Nordeste", businesses: 12000 },
+    { label: "Maceió, AL", region: "Nordeste", businesses: 13000 },
+    { label: "São Luís, MA", region: "Nordeste", businesses: 14000 },
+    { label: "Teresina, PI", region: "Nordeste", businesses: 10000 },
   ] },
   { region: "Centro-Oeste", cities: [
-    { label: "Brasília, DF", region: "Centro-Oeste", potential: "+34 mil" },
-    { label: "Goiânia, GO", region: "Centro-Oeste", potential: "+21 mil" },
-    { label: "Campo Grande, MS", region: "Centro-Oeste", potential: "+12 mil" },
-    { label: "Cuiabá, MT", region: "Centro-Oeste", potential: "+10 mil" },
+    { label: "Brasília, DF", region: "Centro-Oeste", businesses: 34000 },
+    { label: "Goiânia, GO", region: "Centro-Oeste", businesses: 21000 },
+    { label: "Campo Grande, MS", region: "Centro-Oeste", businesses: 12000 },
+    { label: "Cuiabá, MT", region: "Centro-Oeste", businesses: 10000 },
   ] },
   { region: "Norte", cities: [
-    { label: "Manaus, AM", region: "Norte", potential: "+18 mil" },
-    { label: "Belém, PA", region: "Norte", potential: "+15 mil" },
-    { label: "Palmas, TO", region: "Norte", potential: "+6 mil" },
+    { label: "Manaus, AM", region: "Norte", businesses: 18000 },
+    { label: "Belém, PA", region: "Norte", businesses: 15000 },
+    { label: "Palmas, TO", region: "Norte", businesses: 6000 },
   ] },
 ];
 
 export const cities = cityGroups.flatMap((group) => group.cities);
+
+// Participação aproximada do nicho no comércio local (fração ilustrativa).
+const nicheWeight: Record<string, number> = {
+  Barbearias: 0.018, "Clínicas de estética": 0.012, "Salões de beleza": 0.02, "Estúdios de tatuagem": 0.006,
+  Restaurantes: 0.032, Pizzarias: 0.01, Padarias: 0.008, Cafeterias: 0.006, Hamburguerias: 0.005,
+  "Buffets e eventos": 0.004, "Açougues": 0.004, "Mercados e mercearias": 0.012,
+  Academias: 0.012, "Studios de pilates": 0.006, "Personal trainers": 0.005, Nutricionistas: 0.004,
+  "Psicólogos": 0.007, "Clínicas odontológicas": 0.014, "Clínicas veterinárias": 0.006,
+  "Pet shops": 0.006, "Farmácias": 0.008, "Óticas": 0.003,
+  "Imobiliárias": 0.01, "Escritórios de contabilidade": 0.008, Advocacia: 0.012,
+  "Arquitetura e interiores": 0.004, "Agências de viagem": 0.003,
+  "Assistência técnica de celular": 0.005, "Informática e eletrônicos": 0.005,
+  "Escolas de idiomas": 0.003, "Escolas particulares": 0.004, Autoescolas: 0.003,
+  "Cursos profissionalizantes": 0.004,
+  "Oficinas mecânicas": 0.01, "Lava jatos": 0.004, "Estética automotiva": 0.003, Borracharias: 0.004,
+  "Lojas de roupas": 0.014, "Lojas de calçados": 0.006, Joalherias: 0.003, Floriculturas: 0.003,
+  "Móveis e decoração": 0.006,
+  "Construção e reformas": 0.01, "Elétrica e hidráulica": 0.006, "Pintura e acabamento": 0.006,
+  "Hotéis e pousadas": 0.006,
+};
+
+// Fração dos estabelecimentos do nicho que tipicamente precisa do serviço.
+const serviceFit: Record<string, number> = {
+  sites: 0.85, landing_pages: 0.8, ecommerce: 0.5, google_business: 0.8, seo: 0.7,
+  automacao: 0.35, chatbots: 0.4,
+  trafego: 0.55, social: 0.6, copywriting: 0.5, email_marketing: 0.4,
+  gestao_whatsapp: 0.55, consultoria_marketing: 0.35,
+  design: 0.6, branding: 0.55, fotografia: 0.45, gravacao_video: 0.4,
+  edicao_video: 0.45, motion_design: 0.35, producao_conteudo: 0.5,
+};
+
+/** Estimativa ilustrativa de leads potenciais: cidade × nicho × serviço. */
+export function formatPotential(city: DemoCity, niche: string, service: string): string {
+  const estimate = city.businesses
+    * (nicheWeight[niche] ?? 0.008)
+    * (serviceFit[service] ?? 0.5);
+  if (estimate >= 10_000) return `+${Math.round(estimate / 1000)} mil`;
+  if (estimate >= 1_000) {
+    const rounded = Math.round(estimate / 100) / 10;
+    return `+${rounded.toLocaleString("pt-BR")} mil`;
+  }
+  return `+${Math.max(10, Math.round(estimate / 10) * 10)}`;
+}
 
 export type DemoLead = {
   id: string;

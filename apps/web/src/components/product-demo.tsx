@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowDownUp, ArrowRight, Bookmark, Check, Copy, Globe, LayoutGrid, ListFilter, MapPin, Radar, Search, Sparkles, Star, X } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { cityGroups, makeDemoLeads, nicheGroups, services, type DemoLead } from "@/lib/catalog";
+import { cityGroups, formatPotential, makeDemoLeads, nicheGroups, services, type DemoLead } from "@/lib/catalog";
 import { serviceCategories } from "@/lib/service-catalog";
 import { BusinessToolsPreview } from "./business-tools-preview";
 import { FancySelect } from "./fancy-select";
@@ -82,7 +82,11 @@ export function ProductDemo({ full = false }: { full?: boolean }) {
             <label>Onde?<FancySelect ariaLabel="Cidade ou estado" value={city} onChange={setCity} icon={<MapPin size={14} />}
               groups={cityGroups.map((group) => ({
                 label: group.region,
-                options: group.cities.map((item) => ({ value: item.label, label: item.label, badge: item.potential })),
+                options: group.cities.map((item) => ({
+                  value: item.label,
+                  label: item.label,
+                  badge: formatPotential(item, niche, service),
+                })),
               }))} /></label>
             <button className="button button-primary search-button" disabled={loading}><Search size={16} />{loading ? "Buscando..." : "Explorar exemplo"}</button>
           </form>
