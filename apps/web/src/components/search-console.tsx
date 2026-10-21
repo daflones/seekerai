@@ -52,9 +52,11 @@ function siteCheckBadge(check: NonNullable<PlaceResult["siteCheck"]>) {
 export function SearchConsole({
   services,
   canSearch = true,
+  freeSearchesLeft = null,
 }: {
   services: { slug: string; nome: string; categoria: string }[];
   canSearch?: boolean;
+  freeSearchesLeft?: number | null;
 }) {
   const router = useRouter();
   const [service, setService] = useState(services[0]?.slug ?? "");
@@ -286,11 +288,17 @@ export function SearchConsole({
         : <Link href="/app/planos" className="button button-primary"><Lock size={15} />Assinar para buscar</Link>}
     </form>
 
+    {canSearch && freeSearchesLeft !== null && <p className="seek-meta seek-free-left" role="note">
+      {freeSearchesLeft === 1
+        ? "Última busca gratuita restante — depois disso, assine para continuar."
+        : `${freeSearchesLeft} buscas gratuitas restantes no plano grátis.`}
+    </p>}
+
     {!canSearch && <div className="seek-locked" role="note">
       <Lock size={18} />
       <div>
-        <strong>A busca de empresas faz parte dos planos pagos.</strong>
-        <p>Assinando, o radar traz estabelecimentos reais com WhatsApp verificado, sinais de oportunidade e a mensagem pronta.</p>
+        <strong>Suas buscas gratuitas acabaram.</strong>
+        <p>Assinando, o radar continua trazendo estabelecimentos reais com WhatsApp verificado, sinais de oportunidade e a mensagem pronta.</p>
         <Link href="/app/planos" className="text-link">Ver planos <ExternalLink size={12} /></Link>
       </div>
     </div>}
@@ -302,7 +310,6 @@ export function SearchConsole({
 
     {meta && results !== null && !busy && <p className="seek-meta">
       {results.length} estabelecimento{results.length === 1 ? "" : "s"} encontrado{results.length === 1 ? "" : "s"}
-      {meta.creditos ? ` · ${meta.creditos} créditos` : ""}
       {meta.replay && <strong className="seek-replay-tag"> · demonstração (replay)</strong>}
     </p>}
 

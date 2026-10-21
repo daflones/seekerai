@@ -131,7 +131,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
     }
     setBusy(null);
     const label = QUICK.find((q) => q.kind === kind)?.label ?? "Saída";
-    notice(lead.id, `${label} gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : " · grátis"}`);
+    notice(lead.id, `${label} gerada`);
   }
 
   return <>
@@ -188,13 +188,12 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
             <div className="lead-actions">
               {QUICK.filter((q) => actions.includes(q.kind)).map(({ kind, label, icon: Icon }) => {
                 const key = `${lead.id}:${kind}`;
-                const cost = costs[kind];
                 return <button key={kind} type="button" className="lead-action"
-                  disabled={busy !== null}
-                  title={cost === null ? `${label} indisponível` : cost ? `${label} · ${cost} créditos` : `${label} · grátis`}
+                  disabled={busy !== null || costs[kind] === null}
+                  title={costs[kind] === null ? `${label} indisponível` : label}
                   onClick={() => void generate(lead, kind)}>
                   {busy === key ? <Loader2 size={13} className="spin" /> : <Icon size={13} />}
-                  {label}{cost ? <small>{cost}cr</small> : null}
+                  {label}
                 </button>;
               })}
               <Link className="lead-open" href={`/app/leads/${lead.id}`}>Abrir <ArrowUpRight size={13} /></Link>

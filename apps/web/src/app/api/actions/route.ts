@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Busca real exige assinatura ativa. Admin (donos) burla para replay/testes.
+  // Busca real: 2 grátis no plano gratuito; depois exige assinatura ativa.
+  // Admin (donos) burla para replay/testes.
   if (parsed.data.funcao === "places-search" && profile.role !== "admin") {
     const { data: sub } = await session.supabase
       .from("subscriptions")
@@ -58,10 +59,18 @@ export async function POST(request: NextRequest) {
       .in("status", ["active"])
       .maybeSingle();
     if (!sub) {
-      return NextResponse.json(
-        { error: "A busca real exige um plano ativo. Assine para desbloquear o radar." },
-        { status: 403 },
-      );
+      const { count } = await session.supabase
+        .from("credit_operations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", session.user.id)
+        .eq("action", "search")
+        .in("status", ["reserved", "completed"]);
+      if ((count ?? 0) >= 2) {
+        return NextResponse.json(
+          { error: "Suas 2 buscas gratuitas acabaram. Assine um plano para continuar usando o radar." },
+          { status: 403 },
+        );
+      }
     }
   }
 

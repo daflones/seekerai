@@ -41,12 +41,11 @@ function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
   }
 }
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, costs }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
-  costs: Record<string, number | null>;
 }) {
   const router = useRouter();
   const [lead, setLead] = useState(initialLead);
@@ -118,7 +117,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setOpen((o) => ({ ...o, [saved.output!.id]: true }));
     }
     setBusy(null);
-    setNotice(`${OUTPUT_LABEL[tipo]} gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : " · grátis"}.`);
+    setNotice(`${OUTPUT_LABEL[tipo]} gerada.`);
   }
 
   async function generateImage() {
@@ -155,7 +154,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     }
     setImagePrompt("");
     setBusy(null);
-    setNotice(`Imagem gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : ""}.`);
+    setNotice("Imagem gerada.");
   }
 
   async function patch(body: Record<string, unknown>) {
@@ -233,17 +232,17 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       {!hasReply && <button type="button" className="button button-primary button-small" disabled={busy !== null}
         onClick={() => void generate("sales_reply")}>
         {busy === "sales_reply" ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
-        Mensagem de abordagem{costs.sales_reply ? ` · ${costs.sales_reply}cr` : " · grátis"}
+        Mensagem de abordagem
       </button>}
       {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void generate("deep_strategy")}>
         {busy === "deep_strategy" ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-        Estratégia{costs.deep_strategy ? ` · ${costs.deep_strategy}cr` : ""}
+        Estratégia
       </button>}
       {canSite && <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void generate("generate_site")}>
         {busy === "generate_site" ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
-        Gerar site{costs.generate_site ? ` · ${costs.generate_site}cr` : ""}
+        Gerar site
       </button>}
       <button type="button" className="button button-glass button-small lead-delete" disabled={busy !== null}
         onClick={() => void removeLead()}>
@@ -268,7 +267,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         <button type="button" className="button button-primary button-small" disabled={busy !== null || !imagePrompt.trim()}
           onClick={() => void generateImage()}>
           {busy === "generate_image" ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
-          Gerar{costs.generate_image ? ` · ${costs.generate_image}cr` : ""}
+          Gerar
         </button>
       </div>
     </section>}
