@@ -143,6 +143,19 @@ a.seek-badge:hover { border-color: #a879d166; }
 .lead-pager button { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 999px; border: 1px solid #b387d133; background: #0d0816; color: #c9b6d7; font-size: 12px; font-weight: 650; cursor: pointer; }
 .lead-pager button:disabled { opacity: .4; cursor: default; }
 .lead-pager span { font-size: 12px; color: #77688a; }
+.lead-pager .button:disabled { opacity: .4; }
+
+/* Busca: barra de seleção em massa + checkboxes nos cards */
+.seek-bulkbar { display: flex; align-items: center; gap: 16px; margin: 14px 0 4px; padding: 10px 14px; border: 1px solid #ab7bcd22; border-radius: 12px; background: #a879d108; }
+.seek-check { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #c9b6d7; cursor: pointer; }
+.seek-check input { accent-color: #a177ff; width: 15px; height: 15px; cursor: pointer; }
+.seek-card { position: relative; }
+.seek-card.selected { border-color: #a177ff88; box-shadow: 0 0 0 1px #a177ff55, 0 0 24px #8648f022; }
+.seek-card-check { position: absolute; top: 10px; left: 10px; z-index: 3; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #ab7bcd55; background: #0d0816cc; color: #b8ffde; cursor: pointer; backdrop-filter: blur(4px); }
+.seek-check-dot { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #ab7bcd88; display: block; }
+.seek-card-check:hover .seek-check-dot { border-color: #a177ff; }
+.seek-running { display: inline-flex; align-items: center; gap: 8px; color: #c3a1ff; }
+.seek-site-note { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 1100px) { .lead-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 700px) { .lead-grid { grid-template-columns: 1fr; } }
 .lead-back { font-size: 12px; margin-bottom: 24px; }

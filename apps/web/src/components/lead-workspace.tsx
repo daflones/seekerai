@@ -58,6 +58,13 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const [notice, setNotice] = useState("");
 
   const canSite = enabledActions.includes("generate_site");
+  const siteCheck = (lead as LeadRow & {
+    dados?: { siteCheck?: { estado?: string; sinais?: string[] } | null } | null;
+  }).dados?.siteCheck ?? null;
+  const siteCheckLabel = siteCheck?.estado === "desatualizado" ? "Site desatualizado"
+    : siteCheck?.estado === "fora" ? "Site fora do ar"
+    : siteCheck?.estado === "bom" ? "Site bom"
+    : siteCheck?.estado === "ok" ? "Site comum" : null;
   const canImage = enabledActions.includes("generate_image");
   const waDigits = (lead.telefone ?? "").replace(/\D/g, "");
   const waLink = waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}` : null;
@@ -146,31 +153,6 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     setNotice(`Imagem gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : ""}.`);
   }
 
-  async function checkWhatsapp() {
-    if (busy || !lead.telefone) return;
-    setBusy("whatsapp");
-    setError("");
-    const res = await callAction<{ whatsapp?: boolean; creditosCobrados?: number }>(
-      "whatsapp-check",
-      {
-        phone: lead.telefone,
-        serviceSlug: lead.service_slug,
-        businessRef: lead.id,
-        requestRef: crypto.randomUUID(),
-      },
-    );
-    if (!res.ok) { setBusy(null); setError(res.error); return; }
-    const whatsapp = res.data.whatsapp ? "sim" : "nao";
-    await fetch(`/api/leads/${lead.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ whatsapp }),
-    });
-    setLead((l) => ({ ...l, whatsapp }));
-    setBusy(null);
-    setNotice(res.data.whatsapp ? "Esse número tem WhatsApp ativo." : "Esse número não está no WhatsApp.");
-  }
-
   async function patch(body: Record<string, unknown>) {
     await fetch(`/api/leads/${lead.id}`, {
       method: "PATCH",
@@ -231,6 +213,11 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           {lead.site
             ? <a className="seek-badge seek-badge-ok" href={lead.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />Site atual<ExternalLink size={10} /></a>
             : <span className="seek-badge seek-badge-gap">Sem site — oportunidade</span>}
+          {siteCheckLabel && <span
+            className={`seek-badge ${siteCheck!.estado === "bom" ? "seek-badge-ok" : siteCheck!.estado === "ok" ? "" : "seek-badge-gap"}`}
+            title={(siteCheck!.sinais ?? []).join(" · ")}>
+            {siteCheckLabel}
+          </span>}
           {lead.instagram && <a className="seek-badge" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{lead.instagram}</a>}
           {lead.maps_url && <a className="seek-badge" href={lead.maps_url} target="_blank" rel="noopener noreferrer"><MapPin size={11} />Maps<ExternalLink size={10} /></a>}
         </div>
@@ -252,11 +239,6 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         onClick={() => void generate("generate_site")}>
         {busy === "generate_site" ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
         Gerar site{costs.generate_site ? ` · ${costs.generate_site}cr` : ""}
-      </button>}
-      {lead.telefone && lead.whatsapp === null && <button type="button" className="button button-glass button-small" disabled={busy !== null}
-        onClick={() => void checkWhatsapp()}>
-        {busy === "whatsapp" ? <Loader2 size={14} className="spin" /> : <MessageCircle size={14} />}
-        Verificar WhatsApp · grátis
       </button>}
       <button type="button" className="button button-glass button-small lead-delete" disabled={busy !== null}
         onClick={() => void removeLead()}>

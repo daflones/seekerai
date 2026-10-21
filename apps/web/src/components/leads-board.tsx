@@ -134,24 +134,6 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
     notice(lead.id, `${label} gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : " · grátis"}`);
   }
 
-  async function checkWhats(lead: LeadRow) {
-    const key = `${lead.id}:whatsapp`;
-    if (busy || !lead.telefone) return;
-    setBusy(key);
-    setError("");
-    const res = await callAction<{ whatsapp?: boolean }>("whatsapp-check", {
-      phone: lead.telefone,
-      serviceSlug: lead.service_slug,
-      businessRef: lead.id,
-      requestRef: crypto.randomUUID(),
-    });
-    setBusy(null);
-    if (!res.ok) { setError(res.error); return; }
-    const v = res.data.whatsapp ? "sim" : "nao";
-    setLeads((list) => list.map((l) => l.id === lead.id ? { ...l, whatsapp: v } : l));
-    notice(lead.id, res.data.whatsapp ? "WhatsApp confirmado" : "Número sem WhatsApp");
-  }
-
   return <>
     <div className="lead-filters" role="tablist" aria-label="Filtrar por status">
       <button className={filter === "todos" ? "active" : ""} onClick={() => pick("todos")}>
@@ -215,15 +197,6 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
                   {label}{cost ? <small>{cost}cr</small> : null}
                 </button>;
               })}
-              {lead.telefone && lead.whatsapp !== "sim" && (
-                <button type="button" className="lead-action"
-                  disabled={busy !== null}
-                  title="Verificar se o número tem WhatsApp · grátis"
-                  onClick={() => void checkWhats(lead)}>
-                  {busy === `${lead.id}:whatsapp` ? <Loader2 size={13} className="spin" /> : <Phone size={13} />}
-                  WhatsApp?
-                </button>
-              )}
               <Link className="lead-open" href={`/app/leads/${lead.id}`}>Abrir <ArrowUpRight size={13} /></Link>
             </div>
             {notices[lead.id] && <p className="lead-notice"><CheckCircle2 size={12} />{notices[lead.id]} — <Link href={`/app/leads/${lead.id}`}>ver no lead</Link></p>}

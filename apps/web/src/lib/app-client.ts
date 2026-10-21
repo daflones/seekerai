@@ -53,6 +53,10 @@ export interface PlaceResult {
   lng: number | null;
   whatsapp: boolean | null;
   instagram: string | null;
+  siteCheck?: {
+    estado: "bom" | "ok" | "desatualizado" | "fora";
+    sinais: string[];
+  } | null;
 }
 
 export interface LeadRow {

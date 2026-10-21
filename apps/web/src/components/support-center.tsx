@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import { TicketChat, TICKET_STATUS_LABEL, ticketOpen } from "@/components/ticket-chat";
 
 export interface TicketRow {
@@ -18,7 +18,11 @@ export interface TicketRow {
 export function SupportCenter({ tickets: initial, admin = false }: { tickets: TicketRow[]; admin?: boolean }) {
   const [tickets, setTickets] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const open = tickets.find((t) => t.id === openId) ?? null;
+  const PAGE = 10;
+  const pages = Math.max(1, Math.ceil(tickets.length / PAGE));
+  const pageItems = tickets.slice((page - 1) * PAGE, page * PAGE);
 
   function patchStatus(id: string, status: string) {
     setTickets((list) => list.map((t) => (t.id === id ? { ...t, status } : t)));
@@ -27,7 +31,7 @@ export function SupportCenter({ tickets: initial, admin = false }: { tickets: Ti
   return <>
     <ul className="ticket-list">
       {tickets.length === 0 && <li className="dash-empty">Nenhum chamado ainda.</li>}
-      {tickets.map((t) => (
+      {pageItems.map((t) => (
         <li key={t.id}>
           <button type="button" className={`ticket-open ${openId === t.id ? "active" : ""}`} onClick={() => setOpenId(openId === t.id ? null : t.id)}>
             <div>
@@ -50,6 +54,12 @@ export function SupportCenter({ tickets: initial, admin = false }: { tickets: Ti
         </li>
       ))}
     </ul>
+
+    {pages > 1 && <nav className="lead-pager" aria-label="Páginas de chamados">
+      <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={14} /> Anterior</button>
+      <span>{page} / {pages}</span>
+      <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>Próxima <ChevronRight size={14} /></button>
+    </nav>}
   </>;
 }
 

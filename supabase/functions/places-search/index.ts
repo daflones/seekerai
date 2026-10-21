@@ -62,6 +62,12 @@ interface NormalizedPlace {
   lng: number | null;
   whatsapp: boolean | null;
   instagram: string | null;
+  siteCheck?: SiteCheck | null;
+}
+
+interface SiteCheck {
+  estado: "bom" | "ok" | "desatualizado" | "fora";
+  sinais: string[];
 }
 
 async function searchGooglePlaces(query: string, regionCode: string): Promise<NormalizedPlace[]> {
@@ -189,6 +195,108 @@ function extractInstagram(place: NormalizedPlace): void {
   }
 }
 
+/** Acessa o site do estabelecimento e extrai sinais de qualidade/atualização. */
+async function scanWebsite(site: string): Promise<SiteCheck> {
+  const url = site.startsWith("http") ? site : `https://${site}`;
+  let html = "";
+  let finalUrl = url;
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: { "User-Agent": "SeekerAiBot/1.0 (+https://seekerai.digital)" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    finalUrl = res.url;
+    if (res.status >= 400) {
+      return { estado: "fora", sinais: [`respondeu erro ${res.status}`] };
+    }
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.includes("html")) {
+      return { estado: "ok", sinais: ["responde, mas não é uma página comum"] };
+    }
+    const reader = res.body?.getReader();
+    if (reader) {
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      while (total < 180_000) {
+        const { done, value } = await reader.read();
+        if (done || !value) break;
+        chunks.push(value);
+        total += value.length;
+      }
+      reader.cancel().catch(() => {});
+      html = new TextDecoder().decode(
+        chunks.reduce((acc, c) => {
+          const next = new Uint8Array(acc.length + c.length);
+          next.set(acc); next.set(c, acc.length);
+          return next;
+        }, new Uint8Array(0)),
+      );
+    }
+  } catch {
+    return { estado: "fora", sinais: ["não respondeu — fora do ar ou bloqueou"] };
+  }
+
+  const sinais: string[] = [];
+  let penal = 0;
+  const lower = html.toLowerCase();
+
+  if (!finalUrl.startsWith("https://")) {
+    penal += 2;
+    sinais.push("sem cadeado de segurança (HTTP)");
+  }
+  if (!lower.includes('name="viewport"') && !lower.includes("name='viewport'")) {
+    penal += 2;
+    sinais.push("não é adaptado para celular");
+  }
+  if (!/<title[^>]*>[^<]{3,}<\/title>/i.test(html)) {
+    penal += 1;
+    sinais.push("sem título configurado");
+  }
+  const years = [...lower.matchAll(/(?:©|&copy;|copyright)\s*(?:\(c\)\s*)?(20\d{2})/g)]
+    .map((m) => Number(m[1]));
+  const currentYear = new Date().getFullYear();
+  const lastYear = years.length ? Math.max(...years) : null;
+  if (lastYear !== null && currentYear - lastYear >= 2) {
+    penal += 2;
+    sinais.push(`parado desde ${lastYear}`);
+  }
+  const generator = lower.match(/name=["']generator["'][^>]*content=["']([^"']+)/i)?.[1] ?? "";
+  if (/wordpress/i.test(generator)) sinais.push("feito em WordPress");
+  if (/(?:wix|weebly|sitebuilder)/i.test(generator)) {
+    penal += 1;
+    sinais.push("feito em construtor gratuito");
+  }
+  if (/facebook\.com|instagram\.com/.test(lower) === false && sinais.length === 0) {
+    sinais.push("sem links de redes sociais");
+  }
+
+  const estado: SiteCheck["estado"] = penal >= 4
+    ? "desatualizado"
+    : penal >= 2
+    ? "ok"
+    : "bom";
+  if (sinais.length === 0) sinais.push("site moderno e bem mantido");
+  return { estado, sinais };
+}
+
+/** Varre os sites em lotes para não estourar o tempo da function. */
+async function scanWebsites(places: NormalizedPlace[]): Promise<void> {
+  const comSite = places.filter((p) => p.site);
+  const batch = 6;
+  for (let i = 0; i < comSite.length; i += batch) {
+    await Promise.all(
+      comSite.slice(i, i + batch).map(async (p) => {
+        try {
+          p.siteCheck = await scanWebsite(p.site!);
+        } catch {
+          p.siteCheck = null;
+        }
+      }),
+    );
+  }
+}
+
 /** Verifica em lote quais números têm WhatsApp via Evolution API (grátis). */
 async function checkWhatsapps(places: NormalizedPlace[]): Promise<void> {
   const numbers = places
@@ -295,13 +403,18 @@ Deno.serve(async (req) => {
         : await searchGooglePlaces(query, regionCode);
 
       // Enriquecimento: Instagram separado + WhatsApp em lote (grátis) +
-      // ordenação priorizando quem tem contato direto.
+      // varredura dos sites + ordenação priorizando oportunidades.
       for (const place of resultados) extractInstagram(place);
-      await checkWhatsapps(resultados);
+      await Promise.all([
+        checkWhatsapps(resultados),
+        scanWebsites(resultados),
+      ]);
       resultados.sort((a, b) => {
         const score = (p: NormalizedPlace) =>
           (p.telefone ? 4 : 0) + (p.whatsapp === true ? 2 : 0) +
-          (p.status === "OPERATIONAL" ? 1 : 0) + (p.avaliacao ?? 0) / 10;
+          (p.status === "OPERATIONAL" ? 1 : 0) + (p.avaliacao ?? 0) / 10 +
+          (!p.site ? 3 : p.siteCheck?.estado === "fora" ? 2.5
+            : p.siteCheck?.estado === "desatualizado" ? 2 : 0);
         return score(b) - score(a);
       });
 
