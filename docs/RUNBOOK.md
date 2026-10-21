@@ -34,13 +34,20 @@ serviço Easypanel.
 
 1. App → Source GitHub `daflones/seekerai`, branch `main`, build `Dockerfile`.
 2. Porta interna 3000. O healthcheck já está na imagem (`/api/health`).
-3. Variáveis de ambiente (runtime; nenhuma é necessária no build):
-   `NEXT_PUBLIC_APP_URL` (https do domínio final), `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`,
-   `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`,
-   `APP_ENCRYPTION_KEY`, `AUTH_RATE_LIMIT_SECRET`, `INTERNAL_CRON_SECRET`,
-   `SUPABASE_AUTH_READY=true` e `TRUST_PROXY_HEADERS=true` (o Traefik do
-   Easypanel controla os headers de proxy).
+3. Variáveis de ambiente no serviço Easypanel:
+   - **Build-time** (o Dockerfile declara `ARG` e o Next embute no bundle):
+     `NEXT_PUBLIC_APP_URL` (https do domínio final), `NEXT_PUBLIC_SUPABASE_URL`,
+     `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+     `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+   - **Runtime-only** (o Dockerfile ignora como build-arg; valem no processo):
+     `SUPABASE_SECRET_KEY`, `TURNSTILE_SECRET_KEY`, `APP_ENCRYPTION_KEY`,
+     `AUTH_RATE_LIMIT_SECRET`, `INTERNAL_CRON_SECRET`, `SUPABASE_AUTH_READY=true`
+     e `TRUST_PROXY_HEADERS=true` (o Traefik do Easypanel controla os headers
+     de proxy).
+   - Atenção: o Easypanel repassa **todas** as variáveis do serviço como
+     `--build-arg`, então valores sensíveis aparecem no log de build. Isso não
+     os embute na imagem (só os `ARG` declarados entram), mas trate qualquer
+     segredo já exibido em log como comprometido e rotacione.
 4. No painel Cloudflare, o widget Turnstile precisa permitir o hostname do
    domínio de deploy; no Supabase Auth, registrar a URL e o callback
    `/auth/callback` desse mesmo domínio nas URLs permitidas.
