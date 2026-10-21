@@ -49,6 +49,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Busca real exige assinatura ativa. Admin (donos) burla para replay/testes.
+  if (parsed.data.funcao === "places-search" && profile.role !== "admin") {
+    const { data: sub } = await session.supabase
+      .from("subscriptions")
+      .select("status")
+      .eq("user_id", session.user.id)
+      .in("status", ["active"])
+      .maybeSingle();
+    if (!sub) {
+      return NextResponse.json(
+        { error: "A busca real exige um plano ativo. Assine para desbloquear o radar." },
+        { status: 403 },
+      );
+    }
+  }
+
   const { data: { session: authSession } } = await session.supabase.auth.getSession();
   const token = authSession?.access_token;
   const config = supabasePublicConfig();
@@ -74,9 +90,9 @@ export async function POST(request: NextRequest) {
   let data: unknown = null;
   try { data = JSON.parse(text); } catch { /* repassa como erro genérico abaixo */ }
   if (!upstream.ok) {
-    const message = data && typeof data === "object" && "error" in data
-      ? String((data as { error: unknown }).error)
-      : "A ação não pôde ser concluída.";
+    const obj = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+    const raw = obj?.error ?? obj?.erro;
+    const message = typeof raw === "string" && raw ? raw : "A ação não pôde ser concluída.";
     return NextResponse.json({ error: message }, { status: upstream.status });
   }
   return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });

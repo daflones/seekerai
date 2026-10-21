@@ -80,7 +80,11 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
     signal: AbortSignal.timeout(20_000),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) throw httpError(502, "Google Places indisponível no momento");
+  if (!res.ok) {
+    const detail = isRecord(data.error) ? asString(data.error.message, 300) : null;
+    console.error("[places-search] Google respondeu", res.status, detail ?? "");
+    throw httpError(502, "Google Places indisponível no momento");
+  }
   return (Array.isArray(data.places) ? data.places : []).map((p) => {
     const place = isRecord(p) ? p : {};
     return {

@@ -16,7 +16,7 @@ export async function edgeSecretNames(): Promise<string[] | null> {
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   if (!ref || !token) return null;
   try {
-    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/functions/secrets`, {
+    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/secrets`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
