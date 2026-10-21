@@ -23,6 +23,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign },
   { href: "/admin/chamados", label: "Chamados", icon: MessageCircle },
   { href: "/admin/planos", label: "Cards de plano", icon: PanelsTopLeft },
   { href: "/admin/integracoes", label: "Integrações", icon: ShieldCheck },

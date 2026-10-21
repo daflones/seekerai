@@ -49,6 +49,12 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
   }
 }
 
+const STALE_MS = 6 * 60_000;
+
+function stale(job: { status: string; created_at: string }) {
+  return job.status === "running" && Date.now() - new Date(job.created_at).getTime() > STALE_MS;
+}
+
 export async function GET(request: NextRequest) {
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
@@ -57,6 +63,15 @@ export async function GET(request: NextRequest) {
     const { data } = await session.supabase.from("search_jobs")
       .select("id,status,payload,result,erro,created_at")
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (data && stale(data)) {
+      const admin = createSupabaseAdminClient();
+      const erro = "A busca demorou demais e expirou. Tente novamente.";
+      await admin.from("search_jobs")
+        .update({ status: "error", erro, updated_at: new Date().toISOString() })
+        .eq("id", data.id).eq("status", "running");
+      return NextResponse.json({ job: { ...data, status: "error", erro } },
+        { headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json({ job: data ?? null }, { headers: { "Cache-Control": "no-store" } });
   }
   return NextResponse.json({ error: "Parâmetro inválido." }, { status: 400 });
@@ -116,11 +131,19 @@ export async function POST(request: NextRequest) {
   }
 
   // Um job por vez por usuário: se já existe um rodando, devolve ele.
+  // "Running" velho é órfão — expira e deixa a nova busca passar.
   const admin = createSupabaseAdminClient();
   const { data: running } = await admin.from("search_jobs")
-    .select("id").eq("user_id", session.user.id).eq("status", "running")
+    .select("id,created_at").eq("user_id", session.user.id).eq("status", "running")
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (running) return NextResponse.json({ jobId: running.id, resumed: true });
+  if (running && !stale({ status: "running", created_at: running.created_at })) {
+    return NextResponse.json({ jobId: running.id, resumed: true });
+  }
+  if (running) {
+    await admin.from("search_jobs")
+      .update({ status: "error", erro: "A busca demorou demais e expirou.", updated_at: new Date().toISOString() })
+      .eq("id", running.id).eq("status", "running");
+  }
 
   const { data: job, error } = await admin.from("search_jobs")
     .insert({ user_id: session.user.id, payload: parsed.data })

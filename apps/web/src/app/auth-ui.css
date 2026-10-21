@@ -532,3 +532,18 @@ a.seek-badge:hover { border-color: #a879d166; }
 .assist-send:disabled { opacity: .5; cursor: default; }
 .lead-wa-send { background: linear-gradient(100deg, #25d366, #1da851) !important; border: none !important; color: #062b17 !important; }
 @media (max-width: 640px) { .assist-panel { right: 12px; left: 12px; width: auto; bottom: 84px; } .assist-fab { right: 16px; bottom: 18px; } }
+
+/* Financeiro admin */
+.fin-saldo { border-color: #6fe3b344; }
+.fin-saldo strong { color: #6fe3b3; }
+.fin-saque-sub { color: #77688a; font-weight: 400; }
+.fin-status { font-size: 11px; font-weight: 700; }
+.fin-status.fin-concluido { color: #6fe3b3; }
+.fin-status.fin-pendente { color: #e8c98a; }
+.fin-status.fin-falhou { color: #f0a1a1; }
+.editor-block-label select { width: 100%; background: #0d0816; border: 1px solid #ab7bcd33; border-radius: 10px; padding: 10px 12px; color: #eadcf5; font-size: 13px; }
+.editor-block-label select:focus { outline: none; border-color: #a177ff; }
+
+.seek-confirm { width: min(420px, 100%); }
+.seek-confirm-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.seek-confirm-actions .button { justify-content: center; }

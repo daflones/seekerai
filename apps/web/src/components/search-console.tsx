@@ -71,6 +71,7 @@ export function SearchConsole({
   const [saving, setSaving] = useState<number | "all" | null>(null);
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Persistência: resultado e job ativo sobrevivem a troca de página/aba.
@@ -119,9 +120,22 @@ export function SearchConsole({
     }, 3000);
   }
 
-  async function search() {
-    const q = `${niche} em ${city}${refine.trim() ? `, ${refine.trim()}` : ""}`;
+  function search() {
     if (!canSearch || !service || busy) return;
+    // Resultados não salvos na tela: pergunta se quer guardar antes de sumir com eles.
+    const unsaved = results?.some((_, i) => !saved[i]);
+    if (unsaved) { setConfirming(true); return; }
+    void doSearch();
+  }
+
+  async function doSearch() {
+    const q = `${niche} em ${city}${refine.trim() ? `, ${refine.trim()}` : ""}`;
+    setConfirming(false);
+    setResults(null);
+    setMeta(null);
+    setSaved({});
+    setSelected(new Set());
+    setPage(1);
     setBusy(true);
     setError("");
     try {
@@ -209,10 +223,10 @@ export function SearchConsole({
     setSaved((s) => ({ ...s, [index]: data.lead!.id }));
   }
 
-  async function saveSelected() {
-    if (!results || saving !== null || selected.size === 0) return;
+  async function saveIndexes(indexes: number[]): Promise<boolean> {
+    if (!results || indexes.length === 0) return true;
     setSaving("all");
-    const items = [...selected].map((i) => results[i]).filter(Boolean);
+    const items = indexes.map((i) => results[i]).filter(Boolean);
     const res = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -223,17 +237,22 @@ export function SearchConsole({
     setSaving(null);
     if (!res.ok || !data?.leads) {
       setError(data?.error ?? "Não foi possível salvar os leads.");
-      return;
+      return false;
     }
     setSaved((s) => {
       const next = { ...s };
-      [...selected].forEach((idx, k) => {
+      indexes.forEach((idx, k) => {
         const id = data.leads![k];
         if (id) next[idx] = id;
       });
       return next;
     });
-    setSelected(new Set());
+    setSelected((cur) => { const next = new Set(cur); indexes.forEach((i) => next.delete(i)); return next; });
+    return true;
+  }
+
+  function unsavedIndexes(): number[] {
+    return (results ?? []).map((_, i) => i).filter((i) => !saved[i]);
   }
 
   const pageCount = results ? Math.max(1, Math.ceil(results.length / PAGE_SIZE)) : 1;
@@ -324,7 +343,7 @@ export function SearchConsole({
         <span>{selected.size === 0 ? "Selecionar todos" : `${selected.size} selecionado${selected.size === 1 ? "" : "s"}`}</span>
       </label>
       {selected.size > 0 && <button type="button" className="button button-primary button-small"
-        disabled={saving !== null} onClick={() => void saveSelected()}>
+        disabled={saving !== null} onClick={() => void saveIndexes([...selected])}>
         {saving === "all" ? <Loader2 size={13} className="spin" /> : <BookmarkPlus size={13} />}
         Salvar {selected.size} lead{selected.size === 1 ? "" : "s"}
       </button>}
@@ -387,5 +406,41 @@ export function SearchConsole({
         Próxima <ChevronRight size={14} />
       </button>
     </nav>}
+
+    {confirming && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label="Nova busca"
+      onClick={() => setConfirming(false)}>
+      <section className="pix-panel seek-confirm" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="pix-close" aria-label="Fechar" onClick={() => setConfirming(false)}>×</button>
+        <h2><Search size={18} /> Nova busca</h2>
+        <p className="seek-meta">
+          Você tem <strong>{unsavedIndexes().length}</strong> estabelecimento{unsavedIndexes().length === 1 ? "" : "s"} na tela
+          ainda não salvo{unsavedIndexes().length === 1 ? "" : "s"}. Uma nova busca limpa esses resultados —
+          salve os que interessam antes.
+        </p>
+        <div className="seek-confirm-actions">
+          {selected.size > 0 && <button type="button" className="button button-primary"
+            disabled={saving !== null}
+            onClick={() => void (async () => {
+              if (await saveIndexes([...selected])) void doSearch();
+            })()}>
+            {saving === "all" ? <Loader2 size={14} className="spin" /> : <BookmarkPlus size={14} />}
+            Salvar {selected.size} selecionado{selected.size === 1 ? "" : "s"} e buscar
+          </button>}
+          <button type="button" className="button button-primary"
+            disabled={saving !== null}
+            onClick={() => void (async () => {
+              if (await saveIndexes(unsavedIndexes())) void doSearch();
+            })()}>
+            {saving === "all" ? <Loader2 size={14} className="spin" /> : <BookmarkPlus size={14} />}
+            Salvar todos e buscar
+          </button>
+          <button type="button" className="button button-glass"
+            disabled={saving !== null}
+            onClick={() => void doSearch()}>
+            Buscar sem salvar
+          </button>
+        </div>
+      </section>
+    </div>}
   </div>;
 }
