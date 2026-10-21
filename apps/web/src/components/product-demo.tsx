@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowDownUp, ArrowRight, Bookmark, Check, ChevronDown, Copy, Globe, LayoutGrid, ListFilter, MapPin, Radar, Search, Sparkles, Star, X } from "lucide-react";
+import { ArrowDownUp, ArrowRight, Bookmark, Check, Copy, Globe, LayoutGrid, ListFilter, MapPin, Radar, Search, Sparkles, Star, X } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { cities, makeDemoLeads, niches, services, type DemoLead } from "@/lib/catalog";
+import { cityGroups, makeDemoLeads, nicheGroups, services, type DemoLead } from "@/lib/catalog";
 import { serviceCategories } from "@/lib/service-catalog";
 import { BusinessToolsPreview } from "./business-tools-preview";
+import { FancySelect } from "./fancy-select";
 
 export function ProductDemo({ full = false }: { full?: boolean }) {
   const [service, setService] = useState("sites");
@@ -67,9 +68,22 @@ export function ProductDemo({ full = false }: { full?: boolean }) {
             <span className="example-tag"><Sparkles size={12} /> Dados ilustrativos</span>
           </div>
           <form className="search-form" onSubmit={search}>
-            <label>Eu ofereço<div className="select-wrap"><select value={service} onChange={(event) => setService(event.target.value)}>{serviceCategories.map((category) => <optgroup key={category} label={category}>{services.filter((item) => item.category === category).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>)}</select><ChevronDown size={14} /></div></label>
-            <label>Quero encontrar<div className="select-wrap"><select value={niche} onChange={(event) => setNiche(event.target.value)}>{niches.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown size={14} /></div></label>
-            <label>Onde?<div className="select-wrap"><MapPin size={14} /><select value={city} onChange={(event) => setCity(event.target.value)}>{cities.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown size={14} /></div></label>
+            <label>Eu ofereço<FancySelect ariaLabel="Serviço que você oferece" value={service} onChange={setService}
+              groups={serviceCategories.map((category) => ({
+                label: category,
+                options: services.filter((item) => item.category === category)
+                  .map((item) => ({ value: item.id, label: item.label })),
+              }))} /></label>
+            <label>Quero encontrar<FancySelect ariaLabel="Tipo de estabelecimento" value={niche} onChange={setNiche}
+              groups={nicheGroups.map((group) => ({
+                label: group.label,
+                options: group.niches.map((item) => ({ value: item, label: item })),
+              }))} /></label>
+            <label>Onde?<FancySelect ariaLabel="Cidade ou estado" value={city} onChange={setCity} icon={<MapPin size={14} />}
+              groups={cityGroups.map((group) => ({
+                label: group.region,
+                options: group.cities.map((item) => ({ value: item.label, label: item.label, badge: item.potential })),
+              }))} /></label>
             <button className="button button-primary search-button" disabled={loading}><Search size={16} />{loading ? "Buscando..." : "Explorar exemplo"}</button>
           </form>
           <div className="results-toolbar">

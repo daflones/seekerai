@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BookmarkPlus, CheckCircle2, ExternalLink, Instagram, Loader2, MapPin, MessageCircle, Phone, Search, Star, Globe } from "lucide-react";
 import { callAction, type PlaceResult } from "@/lib/app-client";
+import { FancySelect } from "./fancy-select";
 
 interface SearchResponse {
   resultados: PlaceResult[];
@@ -14,7 +15,7 @@ interface SearchResponse {
   error?: string;
 }
 
-export function SearchConsole({ services }: { services: { slug: string; nome: string }[] }) {
+export function SearchConsole({ services }: { services: { slug: string; nome: string; categoria: string }[] }) {
   const [service, setService] = useState(services[0]?.slug ?? "");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[] | null>(null);
@@ -67,9 +68,12 @@ export function SearchConsole({ services }: { services: { slug: string; nome: st
     <form className="seek-form" onSubmit={(e) => { e.preventDefault(); void search(); }}>
       <label className="seek-field">
         <span>O que você vende</span>
-        <select value={service} onChange={(e) => setService(e.target.value)}>
-          {services.map((s) => <option key={s.slug} value={s.slug}>{s.nome}</option>)}
-        </select>
+        <FancySelect ariaLabel="Serviço que você vende" value={service} onChange={setService}
+          groups={[...new Set(services.map((s) => s.categoria))].map((categoria) => ({
+            label: categoria,
+            options: services.filter((s) => s.categoria === categoria)
+              .map((s) => ({ value: s.slug, label: s.nome })),
+          }))} />
       </label>
       <label className="seek-field seek-field-grow">
         <span>Nicho + cidade</span>

@@ -4,7 +4,7 @@ import { previewPlanCards } from "./plans/preview";
 
 describe("catálogo de demonstração", () => {
   it("adapta os exemplos ao nicho e serviço selecionados", () => {
-    const leads = makeDemoLeads("Clínicas", "automacao");
+    const leads = makeDemoLeads("Clínicas de estética", "automacao");
     expect(leads).toHaveLength(3);
     expect(leads[0].name).toBe("Clínica Bem Viver");
     expect(leads[0].issue).toBe("Atendimento a automatizar");

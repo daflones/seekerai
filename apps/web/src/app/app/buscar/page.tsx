@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Buscar oportunidades", robots: { ind
 export default async function BuscarPage() {
   const { supabase } = await requireSession("/app/buscar");
   const { data: services } = await supabase
-    .from("services_catalog").select("slug,nome").eq("ativo", true).order("nome");
+    .from("services_catalog").select("slug,nome,categoria").eq("ativo", true).order("nome");
 
   return <>
     <span className="eyebrow">RADAR DE OPORTUNIDADES</span>

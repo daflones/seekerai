@@ -179,3 +179,7 @@ a.seek-badge:hover { border-color: #a879d166; }
 .lead-output-image { display: flex; flex-direction: column; gap: 12px; }
 .lead-output-image .button { align-self: flex-start; }
 @media (max-width: 680px) { .lead-image-row { flex-direction: column; } }
+
+/* FancySelect dentro do formulário de busca do app */
+.seek-field .fancy-trigger { height: 44px; margin-top: 0; font-size: 14px; border: 1px solid #b387d133; background: #0d0816; border-radius: 8px; color: #e7dbee; }
+.seek-field .fancy-panel li button { font-size: 12px; }
