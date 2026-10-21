@@ -70,11 +70,26 @@ Deno.serve(async (req) => {
         }
         const { data: payment } = await db
           .from("payments")
-          .select("id, amount_cents, status, provider")
+          .select("id, amount_cents, status, provider, metadata")
           .eq("provider", "mercosulpay")
           .eq("provider_ref", reference)
           .maybeSingle();
         if (!payment) throw httpError(404, "Pagamento desconhecido");
+
+        // Pacote avulso de créditos — soma no saldo, sem assinatura.
+        if (isRecord(payment.metadata) && payment.metadata.kind === "credit_pack") {
+          if (String(data.status ?? "") !== "completed") {
+            await finish(db, deliveryId, `charge_status:${data.status}`);
+            return json({ received: true, result: { status: "ignored" } });
+          }
+          const { data: result, error } = await db.rpc("confirm_credit_pack_payment", {
+            p_provider: "mercosulpay",
+            p_provider_ref: reference,
+          });
+          if (error) throw httpError(500, `confirm_credit_pack_payment: ${error.message}`);
+          await finish(db, deliveryId, null);
+          return json({ received: true, result });
+        }
 
         const paidCents = typeof data.amount === "number"
           ? Math.round(data.amount * 100)

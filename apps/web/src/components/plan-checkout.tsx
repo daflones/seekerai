@@ -45,7 +45,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug }: {
     setPix(null);
     const res = await callAction<{ checkoutUrl?: string } & PixResult>(
       "billing-checkout",
-      { planSlug, method },
+      planSlug === "credit-pack" ? { creditPack: true, method } : { planSlug, method },
     );
     setBusy(null);
     if (!res.ok) { setError(res.error); return; }
@@ -101,14 +101,32 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug }: {
       })}
     </div>
 
+    {hasSubscription && <article className="plan-card-checkout credit-pack">
+      <h3>Pacote de créditos</h3>
+      <p className="plan-price">{brl(2000)}<small> avulso</small></p>
+      <p className="plan-tagline">+50 créditos somados ao seu saldo — pra quando a cota do mês acabar antes da renovação.</p>
+      <div className="plan-actions">
+        <button type="button" className="button button-primary button-small" disabled={busy !== null}
+          onClick={() => void checkout("credit-pack", "card")}>
+          {busy === "credit-pack:card" ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
+          Cartão
+        </button>
+        <button type="button" className="button button-glass button-small" disabled={busy !== null}
+          onClick={() => void checkout("credit-pack", "pix")}>
+          {busy === "credit-pack:pix" ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
+          PIX
+        </button>
+      </div>
+    </article>}
+
     {error && <p role="alert" className="auth-error">{error}</p>}
 
     {pix && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label="Pagamento PIX"
       onClick={() => setPix(null)}>
       <section className="pix-panel pix-modal" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="pix-close" aria-label="Fechar" onClick={() => setPix(null)}>×</button>
-        <h2><QrCode size={18} /> PIX — {plans.find((p) => p.slug === pix.plan)?.name}</h2>
-        <p className="plan-price pix-price">{brl(plans.find((p) => p.slug === pix.plan)?.priceCents ?? 0)}<small>/mês</small></p>
+        <h2><QrCode size={18} /> PIX — {pix.plan === "credit-pack" ? "+50 créditos" : plans.find((p) => p.slug === pix.plan)?.name}</h2>
+        <p className="plan-price pix-price">{brl(pix.plan === "credit-pack" ? 2000 : plans.find((p) => p.slug === pix.plan)?.priceCents ?? 0)}{pix.plan !== "credit-pack" && <small>/mês</small>}</p>
         {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code do PIX" width={210} height={210} unoptimized />}
         {pix.qrCode && <div className="pix-code">
           <code>{pix.qrCode}</code>

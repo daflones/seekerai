@@ -213,6 +213,12 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
         prompt,
+        context: {
+          nome: lead.nome,
+          categoria: lead.categoria,
+          cidade: lead.cidade,
+          uf: lead.uf,
+        },
       },
     );
     const url = res.ok ? res.data.imagens?.[0] : null;

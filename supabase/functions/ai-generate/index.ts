@@ -109,6 +109,37 @@ async function nvidiaImage(prompt: string): Promise<string | null> {
   return b64 ? `data:image/jpeg;base64,${b64}` : null;
 }
 
+/** Traduz/melhora o pedido do usuário para um prompt de imagem em inglês. */
+async function enhanceImagePrompt(
+  userPrompt: string,
+  context: Record<string, unknown>,
+): Promise<string> {
+  const nome = asString(context.nome) ?? "";
+  const categoria = asString(context.categoria) ?? "";
+  const cidade = [asString(context.cidade), asString(context.uf)].filter(Boolean).join(" - ");
+  const res = await nvidiaChat(
+    [
+      "You are a senior art director writing text-to-image prompts for FLUX.",
+      "Rewrite the user's request (Portuguese) as ONE optimized English image prompt.",
+      "Photorealistic commercial/editorial quality; describe scene, lighting and composition explicitly.",
+      nome
+        ? `Business: ${nome}${categoria ? ` (${categoria})` : ""}${cidade ? ` — ${cidade}, Brazil` : ""}. Weave the real business identity into the scene (products, signage, colors); never invent another business.`
+        : categoria ? `Business category: ${categoria}.` : "",
+      "If the user asked for a promo post/ad with text, include the EXACT short headline to render inside double quotes (keep it in Portuguese, max 5 words, spelled correctly). If not asked for, end with 'no text, no letters, no words'.",
+      "Reply with ONLY the image prompt — no explanations.",
+    ].filter(Boolean).join("\n"),
+    userPrompt,
+    500,
+  ).catch(() => null);
+  const choices = res && Array.isArray(res.choices) ? res.choices : [];
+  const content = isRecord(choices[0]) && isRecord(choices[0].message)
+    ? choices[0].message.content
+    : null;
+  return typeof content === "string" && content.trim().length > 20
+    ? content.trim()
+    : userPrompt;
+}
+
 interface GenerateBody {
   action?: string;
   businessRef?: string;
@@ -271,8 +302,11 @@ Deno.serve(async (req) => {
         if (faltando > 0) {
           const prompts = imagePromptsFor(context);
           // Paralelo — senão cada imagem soma ~30-60s e estoura o tempo da function.
+          const enhanced = await Promise.all(
+            prompts.slice(0, faltando).map((p) => enhanceImagePrompt(p, context)),
+          );
           const generated = await Promise.all(
-            prompts.slice(0, faltando).map((p) => generateSiteImage(apiKey, p)),
+            enhanced.map((p) => generateSiteImage(apiKey, p)),
           );
           imageUrls.push(...generated.filter((u): u is string => typeof u === "string"));
         }
@@ -284,12 +318,18 @@ Deno.serve(async (req) => {
           ? SITE_MODEL
           : TEXT_MODEL;
 
+      // Imagem avulsa: o pedido do usuário vira prompt em inglês otimizado
+      // com a identidade do estabelecimento embutida.
+      const enhancedImagePrompt = action === "generate_image"
+        ? await enhanceImagePrompt(prompt, context)
+        : null;
+
       const userContent = action === "generate_site"
         ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}\n\n` +
           `URLs de imagem disponíveis (use TODAS nos <img> apropriados — hero primeiro):\n` +
           imageUrls.map((u, i) => `${i + 1}. ${u}`).join("\n")
         : action === "generate_image"
-          ? prompt
+          ? enhancedImagePrompt!
         : body.context
           ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
           : prompt;

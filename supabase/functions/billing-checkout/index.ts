@@ -22,6 +22,69 @@ const MERCOSUL_API_URL = "https://mercosulpay.com/api/public/v1";
 interface CheckoutBody {
   planSlug?: string;
   method?: string;
+  creditPack?: boolean;
+}
+
+// Pacote avulso: +50 créditos por R$20 (somam no saldo — não é assinatura).
+const CREDIT_PACK = { credits: 50, amountCents: 2000, label: "SeekerAi — +50 créditos" };
+
+async function createStripePackSession(
+  userId: string,
+  email: string | null,
+): Promise<{ id: string; url: string }> {
+  const params = new URLSearchParams({
+    mode: "payment",
+    "line_items[0][price_data][currency]": "brl",
+    "line_items[0][price_data][unit_amount]": String(CREDIT_PACK.amountCents),
+    "line_items[0][price_data][product_data][name]": CREDIT_PACK.label,
+    "line_items[0][quantity]": "1",
+    client_reference_id: userId,
+    "metadata[user_id]": userId,
+    "metadata[kind]": "credit_pack",
+    success_url: `${APP_URL}/app?checkout=creditos`,
+    cancel_url: `${APP_URL}/app/planos?checkout=cancelado`,
+  });
+  if (email) params.set("customer_email", email);
+  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await requireSecret("STRIPE_SECRET_KEY")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) {
+    console.error("[stripe] pack checkout falhou:", res.status);
+    throw httpError(502, "Stripe recusou a criação do checkout");
+  }
+  const url = typeof data.url === "string" ? data.url : null;
+  const id = typeof data.id === "string" ? data.id : null;
+  if (!url || !id) throw httpError(502, "Resposta inesperada do Stripe");
+  return { id, url };
+}
+
+async function createMercosulPackPix(internalRef: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: CREDIT_PACK.amountCents / 100,
+      currency: "BRL",
+      description: CREDIT_PACK.label,
+      reference_id: internalRef,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    console.error("[mercosulpay] pack PIX falhou:", res.status);
+    throw httpError(502, "MercosulPay recusou a criação do PIX");
+  }
+  return isRecord(data.data) ? data.data : data;
 }
 
 async function createStripeSession(
@@ -110,11 +173,54 @@ Deno.serve(async (req) => {
     const user = await requireUser(req);
     const body = await readJson<CheckoutBody>(req);
 
-    const planSlug = typeof body.planSlug === "string" ? body.planSlug.trim() : "";
     const method = body.method === "pix" ? "pix" : body.method === "card" ? "card" : null;
-    if (!planSlug || !method) throw httpError(400, "Informe planSlug e method (card|pix)");
-
+    if (!method) throw httpError(400, "Informe method (card|pix)");
     const db = serviceClient();
+
+    // Pacote avulso de créditos — só para quem já tem assinatura ativa.
+    if (body.creditPack === true) {
+      const { data: sub } = await db.from("subscriptions")
+        .select("id").eq("user_id", user.id)
+        .in("status", ["active", "past_due"]).limit(1).maybeSingle();
+      if (!sub) throw httpError(403, "Pacote de créditos disponível só para assinantes");
+      const internalRef = crypto.randomUUID();
+      const { error } = await db.from("payments").insert({
+        user_id: user.id,
+        plan_id: null,
+        provider: method === "card" ? "stripe" : "mercosulpay",
+        provider_ref: internalRef,
+        method,
+        amount_cents: CREDIT_PACK.amountCents,
+        status: "pending",
+        metadata: { kind: "credit_pack", credits: CREDIT_PACK.credits },
+      });
+      if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
+
+      if (method === "card") {
+        // provider_ref do Stripe precisa ser o id da sessão — o webhook casa por ele.
+        const session = await createStripePackSession(user.id, null);
+        await db.from("payments")
+          .update({ provider_ref: session.id })
+          .eq("provider", "stripe").eq("provider_ref", internalRef);
+        return json({ provider: "stripe", method, checkoutUrl: session.url });
+      }
+      try {
+        const charge = await createMercosulPackPix(internalRef);
+        return json({
+          provider: "mercosulpay", method, reference: internalRef,
+          qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste"]),
+          qrCodeImage: pickDeep(charge, ["qr_code_image", "qrCodeBase64"]),
+          expiresAt: pickDeep(charge, ["expires_at", "expiration", "expiresAt"]),
+        });
+      } catch (err) {
+        await db.from("payments").update({ status: "failed" })
+          .eq("provider", "mercosulpay").eq("provider_ref", internalRef);
+        throw err;
+      }
+    }
+
+    const planSlug = typeof body.planSlug === "string" ? body.planSlug.trim() : "";
+    if (!planSlug) throw httpError(400, "Informe planSlug");
     const { data: plan, error: planError } = await db
       .from("plans")
       .select("id, slug, nome, preco_centavos, ativo")

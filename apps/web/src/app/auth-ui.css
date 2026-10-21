@@ -547,3 +547,6 @@ a.seek-badge:hover { border-color: #a879d166; }
 .seek-confirm { width: min(420px, 100%); }
 .seek-confirm-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .seek-confirm-actions .button { justify-content: center; }
+
+.credit-pack { margin-top: 18px; max-width: 420px; border-color: #e8c98a44; }
+.credit-pack h3 { color: #e8c98a; }
