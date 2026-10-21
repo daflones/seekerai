@@ -29,29 +29,39 @@
 - Vitest 4 e `overrides` de PostCSS: advisories de tinypool/mocker e do pin
   aninhado `postcss@8.4.31` do Next resolvidos.
 
+## Produto no app (entregue)
+
+- `/app/buscar`: busca real via `places-search` (Apify/Places, replay admin),
+  cards com sinal de oportunidade ("sem site"), salvar lead em um clique.
+- `/app/leads` + `/app/leads/[id]`: CRM com pipeline (novo→ganho/perdido),
+  notas, verificação de WhatsApp, geração de mensagem/estratégia/site com IA
+  persistida em `lead_outputs`, abrir/baixar o HTML do site.
+- `/app/planos`: checkout real — cartão via Stripe Checkout ou PIX MercosulPay
+  com QR/copia-e-cola na tela.
+- `/api/actions`: proxy autenticado que injeta o JWT do usuário nas edge
+  functions; `/api/leads`: CRUD do CRM. Migration 012 (`leads`, `lead_outputs`)
+  com RLS por dono.
+
 ## Não concluído
 
-- Fase 1: validar SQL/RLS em Supabase local com Auth real, link e push Git.
 - Teste manual de captcha/SMTP no domínio; Google OAuth e exportação/exclusão LGPD.
-- Pagamentos: espinha pronta (`billing-checkout`, webhooks Stripe/MercosulPay
-  com dedup e RPCs service-only); falta cadastrar os endpoints nos provedores,
-  registrar `*_WEBHOOK_SECRET` e testar cobrança real em sandbox.
-- Busca Places oficial via edge function pronta; falta `GOOGLE_PLACES_API_KEY`
-  no Supabase secrets, enriquecimento, score real, filtros completos e mapa.
-- IA (estratégia/mensagem/site/imagem) via edge function pronta; OpenRouter
-  está com saldo baixo — a primeira tentativa de imagem retornou 402.
-- Verificação WhatsApp via Evolution pronta; faltam `EVOLUTION_*` nos secrets
-  e habilitar custo de `whatsapp_check` no admin.
+- Pagamentos: webhooks cadastrados e secrets configurados; falta testar
+  cobrança real de ponta a ponta (sandbox Stripe + PIX MercosulPay).
+- Enriquecimento/score composto, filtros completos e mapa nos resultados.
+- IA: `generate_image` sem tela própria; OpenRouter com saldo baixo — a
+  geração de imagem do pipeline de site só foi testada com saldo insuficiente.
+- Custos de `sales_reply` (1), `deep_strategy` (3) e `whatsapp_check` (1)
+  ativados no remoto; reajustáveis em `/admin/integracoes`.
 - Conectar o catálogo persistido ao app; completar nichos e seed IBGE.
 - Cidades em alta e cron.
-- IA de análise/abordagem, sites publicados e streaming.
+- Sites publicados (hospedagem dos HTMLs gerados) e streaming.
 - Captura consentida/STT/copiloto em tempo real e agente.
-- CRM persistente, exportação CSV e portfólio público.
-- Admin de integrações/chaves no banco, testes de conexão e auditoria da UI.
+- Exportação CSV de leads e portfólio público.
 - Storage e catálogo persistido de imagens geradas.
-- Rate limiting, CSP/HSTS, observabilidade e revisão de segurança.
+- CSP/HSTS, observabilidade e revisão de segurança.
 - SEO com domínio definitivo, sitemap, robots, OG final e analytics consentidos.
-- Deploy Easypanel e validação Lighthouse.
+- Deploy Easypanel validado (build do lightningcss corrigido; pendente
+  redeploy + DNS + Turnstile hostname) e Lighthouse.
 
 ## Bloqueios externos
 

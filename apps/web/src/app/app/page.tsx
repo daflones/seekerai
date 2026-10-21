@@ -1,19 +1,45 @@
 import Link from "next/link";
-import { ArrowUpRight, CircleDollarSign, Compass, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, CircleDollarSign, Compass, ShieldCheck, Users } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 
-export default async function AppPage() {
+export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+  const params = await searchParams;
   const { supabase, user, profile } = await requireSession();
-  const { data: wallet, error } = await supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).single();
+  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }] = await Promise.all([
+    supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "novo"),
+    supabase.from("subscriptions").select("status").eq("user_id", user.id)
+      .in("status", ["active", "past_due"]).limit(1),
+  ]);
+
   return <>
-    <span className="eyebrow">SEU ESPAÇO DE NOVAS POSSIBILIDADES</span>
+    <span className="eyebrow">SEU RADAR DE VENDAS</span>
     <h1>Bem-vindo, {profile.nome || "vamos começar"}<span className="gradient-text">.</span></h1>
-    <p className="private-intro">Sua conta está protegida. Agora vamos preparar seus próximos passos.</p>
+    <p className="private-intro">
+      {params.checkout === "sucesso"
+        ? "Pagamento confirmado — quando o provedor concluir, seus créditos entram sozinhos."
+        : "Encontre estabelecimentos que precisam do que você vende, salve os leads e deixe a IA preparar a abordagem."}
+    </p>
     <div className="private-cards">
-      <section><CircleDollarSign size={24} /><span>SEUS CRÉDITOS</span><h2>{error || !wallet ? "Indisponível" : wallet.saldo}</h2><p>Saldo real da sua carteira. As regras de uso ficam aqui dentro da plataforma.</p></section>
-      <section><ShieldCheck size={24} /><span>SUA CONTA</span><h2>Acesso verificado</h2><p>E-mail confirmado, sessão via Supabase e perfil separado dos demais usuários.</p></section>
-      <section><Compass size={24} /><span>CONHEÇA O FLUXO</span><h2>Seu novo radar</h2><p>A busca real e as ferramentas de geração ainda estão em construção.</p><Link href="/explorar" className="text-link">Abrir demonstração <ArrowUpRight size={15} /></Link></section>
+      <section><Compass size={24} /><span>PRÓXIMA OPORTUNIDADE</span>
+        <h2>Rodar o radar</h2>
+        <p>Busque por nicho e cidade. Salve quem tem sinal de oportunidade — sem site, poucas avaliações, presença fraca.</p>
+        <Link href="/app/buscar" className="text-link">Buscar agora <ArrowUpRight size={15} /></Link></section>
+      <section><Users size={24} /><span>PIPELINE</span>
+        <h2>{leadsTotal ?? 0} lead{(leadsTotal ?? 0) === 1 ? "" : "s"}</h2>
+        <p>{leadsNovos ? `${leadsNovos} ainda não contatado${leadsNovos === 1 ? "" : "s"}. ` : ""}
+          Abra um lead para gerar mensagem, estratégia ou site com IA.</p>
+        <Link href="/app/leads" className="text-link">Ver pipeline <ArrowUpRight size={15} /></Link></section>
+      <section><CircleDollarSign size={24} /><span>SEUS CRÉDITOS</span>
+        <h2>{wallet?.saldo ?? "—"}</h2>
+        <p>{subs?.length
+          ? "Assinatura ativa — os créditos do plano entram a cada ciclo."
+          : "Créditos da sua carteira. Assine um plano para receber todo mês."}</p>
+        <Link href="/app/planos" className="text-link">Ver planos <ArrowUpRight size={15} /></Link></section>
     </div>
-    <p className="private-disclaimer">Nenhuma busca paga ou geração de IA é executada nesta tela.</p>
+    <p className="private-disclaimer">
+      <ShieldCheck size={13} /> Buscas e gerações consomem créditos conforme a regra de cada ação.
+    </p>
   </>;
 }

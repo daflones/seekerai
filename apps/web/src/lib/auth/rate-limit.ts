@@ -8,9 +8,14 @@ export async function authRateLimit(action: string, account: string, headers: He
   const ip = process.env.TRUST_PROXY_HEADERS === "true"
     ? headers.get("x-forwarded-for")?.split(",")[0].trim().slice(0, 64) || "unknown"
     : "shared";
+  const accountLimit = action === "login" ? 10
+    : action === "admin-plan" ? 30
+    : action === "app-action" ? 90
+    : 5;
+  const ipLimit = ip === "shared" ? 120 : action === "app-action" ? 90 : 30;
   const rules = [
-    { scope: `account:${account.toLowerCase()}`, limit: action === "login" ? 10 : action === "admin-plan" ? 30 : 5, window: 900 },
-    { scope: `ip:${ip}`, limit: ip === "shared" ? 120 : 30, window: 900 },
+    { scope: `account:${account.toLowerCase()}`, limit: accountLimit, window: 900 },
+    { scope: `ip:${ip}`, limit: ipLimit, window: 900 },
   ];
   const admin = createSupabaseAdminClient();
   for (const rule of rules) {
