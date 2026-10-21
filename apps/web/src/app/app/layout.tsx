@@ -7,5 +7,14 @@ export const metadata: Metadata = { title: "Minha plataforma", robots: { index: 
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
-  return <PrivateShell admin={session.profile.role === "admin"}>{children}</PrivateShell>;
+  const { data: wallet } = await session.supabase
+    .from("credit_wallets").select("saldo").eq("user_id", session.user.id).maybeSingle();
+  return (
+    <PrivateShell
+      admin={session.profile.role === "admin"}
+      name={session.profile.nome}
+      email={session.user.email ?? ""}
+      credits={wallet?.saldo ?? null}
+    >{children}</PrivateShell>
+  );
 }

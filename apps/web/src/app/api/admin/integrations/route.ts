@@ -4,6 +4,7 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { encryptSecret } from "@/lib/security/encryption";
+import { edgeSecretNames, secretsStatus } from "@/lib/admin/edge-secrets";
 
 const secretName = z.string().regex(/^[A-Z][A-Z0-9_]{1,60}$/, "Nome inválido.");
 const reason = z.string().trim().min(5, "Descreva o motivo (5-300).").max(300);
@@ -44,14 +45,21 @@ async function requireAdmin() {
 export async function GET() {
   const { session, error } = await requireAdmin();
   if (error) return error;
-  const [secrets, settings, runs] = await Promise.all([
+  const [secrets, settings, runs, edge] = await Promise.all([
     session.supabase.rpc("list_integration_secrets"),
     session.supabase.from("app_settings").select("key,value"),
     session.supabase.rpc("list_search_runs"),
+    edgeSecretNames(),
   ]);
   if (secrets.error) return NextResponse.json({ error: "Não foi possível listar integrações." }, { status: 500 });
   return NextResponse.json(
-    { secrets: secrets.data ?? [], settings: settings.data ?? [], runs: runs.data ?? [] },
+    {
+      secrets: secrets.data ?? [],
+      settings: settings.data ?? [],
+      runs: runs.data ?? [],
+      secretsStatus: secretsStatus(edge, (secrets.data ?? []).map((s: { nome: string }) => s.nome)),
+      secretsSource: edge === null ? "indisponivel" : "supabase",
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

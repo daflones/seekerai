@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookmarkPlus, CheckCircle2, ExternalLink, Instagram, Loader2, MapPin, MessageCircle, Phone, Search, Star, Globe } from "lucide-react";
+import { BookmarkPlus, CheckCircle2, ExternalLink, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone, Search, Star, Globe } from "lucide-react";
 import { callAction, type PlaceResult } from "@/lib/app-client";
+import { cityGroups, formatPotential, nicheGroups } from "@/lib/catalog";
 import { FancySelect } from "./fancy-select";
 
 interface SearchResponse {
@@ -15,9 +16,17 @@ interface SearchResponse {
   error?: string;
 }
 
-export function SearchConsole({ services }: { services: { slug: string; nome: string; categoria: string }[] }) {
+export function SearchConsole({
+  services,
+  canSearch = true,
+}: {
+  services: { slug: string; nome: string; categoria: string }[];
+  canSearch?: boolean;
+}) {
   const [service, setService] = useState(services[0]?.slug ?? "");
-  const [query, setQuery] = useState("");
+  const [niche, setNiche] = useState("Barbearias");
+  const [city, setCity] = useState("São Paulo, SP");
+  const [refine, setRefine] = useState("");
   const [results, setResults] = useState<PlaceResult[] | null>(null);
   const [meta, setMeta] = useState<{ provedor?: string; replay?: boolean; creditos?: number } | null>(null);
   const [saved, setSaved] = useState<Record<number, string>>({});
@@ -26,8 +35,8 @@ export function SearchConsole({ services }: { services: { slug: string; nome: st
   const [error, setError] = useState("");
 
   async function search() {
-    const q = query.trim();
-    if (!q || !service || busy) return;
+    const q = `${niche} em ${city}${refine.trim() ? `, ${refine.trim()}` : ""}`;
+    if (!canSearch || !service || busy) return;
     setBusy(true);
     setError("");
     setSaved({});
@@ -75,20 +84,51 @@ export function SearchConsole({ services }: { services: { slug: string; nome: st
               .map((s) => ({ value: s.slug, label: s.nome })),
           }))} />
       </label>
+      <label className="seek-field">
+        <span>Nicho</span>
+        <FancySelect ariaLabel="Tipo de estabelecimento" value={niche} onChange={setNiche}
+          groups={nicheGroups.map((group) => ({
+            label: group.label,
+            options: group.niches.map((item) => ({ value: item, label: item })),
+          }))} />
+      </label>
       <label className="seek-field seek-field-grow">
-        <span>Nicho + cidade</span>
+        <span>Cidade</span>
+        <FancySelect ariaLabel="Cidade" value={city} onChange={setCity} icon={<MapPin size={14} />}
+          groups={cityGroups.map((group) => ({
+            label: group.region,
+            options: group.cities.map((item) => ({
+              value: item.label,
+              label: item.label,
+              badge: formatPotential(item, niche, service),
+            })),
+          }))} />
+      </label>
+      <label className="seek-field seek-field-refine">
+        <span>Refinar <em>(opcional)</em></span>
         <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ex.: clínicas de estética em Moema, São Paulo"
-          maxLength={300}
+          value={refine}
+          onChange={(e) => setRefine(e.target.value)}
+          placeholder="Ex.: bairro Moema"
+          maxLength={120}
         />
       </label>
-      <button type="submit" className="button button-primary" disabled={busy || !query.trim()}>
-        {busy ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
-        {busy ? "Buscando…" : "Buscar"}
-      </button>
+      {canSearch
+        ? <button type="submit" className="button button-primary" disabled={busy}>
+            {busy ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
+            {busy ? "Buscando…" : "Buscar"}
+          </button>
+        : <Link href="/app/planos" className="button button-primary"><Lock size={15} />Assinar para buscar</Link>}
     </form>
+
+    {!canSearch && <div className="seek-locked" role="note">
+      <Lock size={18} />
+      <div>
+        <strong>A busca de empresas faz parte dos planos pagos.</strong>
+        <p>Assinando, o radar traz estabelecimentos reais com WhatsApp verificado, sinais de oportunidade e a mensagem pronta.</p>
+        <Link href="/app/planos" className="text-link">Ver planos <ExternalLink size={12} /></Link>
+      </div>
+    </div>}
 
     {error && <p role="alert" className="auth-error">{error}</p>}
 

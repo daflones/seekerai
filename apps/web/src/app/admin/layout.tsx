@@ -6,6 +6,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Administração", robots: { index: false, follow: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireSession("/admin", { admin: true });
-  return <PrivateShell admin>{children}</PrivateShell>;
+  const session = await requireSession("/admin", { admin: true });
+  return (
+    <PrivateShell admin adminArea name={session.profile.nome} email={session.user.email ?? ""}>
+      {children}
+    </PrivateShell>
+  );
 }

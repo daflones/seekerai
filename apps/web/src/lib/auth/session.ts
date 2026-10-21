@@ -11,7 +11,7 @@ export const verifiedSession = cache(async () => {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user || !user.email_confirmed_at) return null;
   const { data: profile } = await supabase.from("profiles")
-    .select("id,nome,role,consentimento_em,terms_version,onboarding_concluido").eq("id", user.id).single();
+    .select("id,nome,role,consentimento_em,terms_version,onboarding_concluido,onboarding_visto_em").eq("id", user.id).single();
   return { supabase, user, profile };
 });
 
