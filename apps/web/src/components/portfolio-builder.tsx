@@ -61,6 +61,8 @@ export function PortfolioBuilder({ initial, pro, appUrl }: { initial: PortfolioD
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // Quem já tem portfólio vê o resumo dele primeiro — o wizard só abre ao editar.
+  const [editing, setEditing] = useState(!initial);
 
   const set = <K extends keyof PortfolioData>(key: K, value: PortfolioData[K]) => setData((d) => ({ ...d, [key]: value }));
   const initials = data.nome.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "S";
@@ -84,6 +86,7 @@ export function PortfolioBuilder({ initial, pro, appUrl }: { initial: PortfolioD
       if (!res.ok) { setError(out?.error ?? "Não foi possível salvar."); setSaving(false); return; }
       setData((d) => ({ ...d, slug: out?.slug ?? d.slug, publicado }));
       setDone(true);
+      setEditing(false);
     } catch {
       setError("Sem conexão. Tente novamente.");
     }
@@ -105,7 +108,7 @@ export function PortfolioBuilder({ initial, pro, appUrl }: { initial: PortfolioD
     {data.publicado && publicUrl && <code className="pf-url">{publicUrl}</code>}
     <div className="pf-done-actions">
       {data.publicado && publicUrl && <Link className="button button-primary" href={`/p/${data.slug}`} target="_blank">Abrir página <ExternalLink size={14} /></Link>}
-      <button className="button button-glass" onClick={() => { setDone(false); setStep(8); }}>Editar na tela</button>
+      <button className="button button-glass" onClick={() => { setDone(false); setEditing(true); setStep(8); }}>Editar na tela</button>
       {!data.publicado && <button className="button button-primary" onClick={() => void save(true)}>Publicar agora</button>}
       <Link className="text-link" href="/app">Voltar ao painel</Link>
     </div>
@@ -114,7 +117,33 @@ export function PortfolioBuilder({ initial, pro, appUrl }: { initial: PortfolioD
   const next = () => setStep((s) => Math.min(s + 1, STEP_COUNT - 1));
   const back = () => setStep((s) => Math.max(s - 1, 0));
 
+  // Portfólio já criado: mostra o card dele com status, link e ações.
+  if (!editing) return <div className="pf-existing">
+    <div className="pf-existing-head">
+      <span className="pf-photo-avatar">{data.foto_url ? <img src={data.foto_url} alt="" /> : initials}</span>
+      <div>
+        <h2>{data.nome || "Seu portfólio"}</h2>
+        <p className="pf-hint">{data.profissao || "Sem descrição ainda"}</p>
+        <span className={`pf-status ${data.publicado ? "pf-status-on" : ""}`}>
+          {data.publicado ? "Publicado" : "Rascunho"}
+        </span>
+      </div>
+    </div>
+    {data.publicado && publicUrl && <code className="pf-url">{publicUrl}</code>}
+    <div className="pf-existing-preview">{preview}</div>
+    <div className="pf-done-actions">
+      {data.publicado && publicUrl && <Link className="button button-primary" href={`/p/${data.slug}`} target="_blank">Abrir página <ExternalLink size={14} /></Link>}
+      <button className="button button-glass" onClick={() => { setEditing(true); setStep(0); }}>Editar portfólio</button>
+      {!data.publicado && <button className="button button-primary" onClick={() => void save(true)} disabled={saving}>
+        {saving ? "Publicando…" : "Publicar agora"}
+      </button>}
+    </div>
+  </div>;
+
   return <div className="pf-wizard">
+    {initial && (
+      <button type="button" className="text-link pf-back" onClick={() => setEditing(false)}>← Ver meu portfólio</button>
+    )}
     <div className="pf-progress"><i style={{ width: `${((step + 1) / STEP_COUNT) * 100}%` }} /><span>{step + 1} / {STEP_COUNT}</span></div>
 
     {step < 8 ? <div className="pf-step">

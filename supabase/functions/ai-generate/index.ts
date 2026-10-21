@@ -89,9 +89,10 @@ async function nvidiaImage(prompt: string): Promise<string | null> {
     },
     body: JSON.stringify({
       prompt: prompt.slice(0, 10_000),
-      mode: "Image Generation",
       width: 1024, height: 1024,
-      cfg_scale: 0, samples: 1, seed: 0, steps: 4,
+      cfg_scale: 1, samples: 1,
+      seed: Math.floor(Math.random() * 2_147_483_647),
+      steps: 4,
     }),
     signal: AbortSignal.timeout(120_000),
   }).catch(() => null);

@@ -423,6 +423,18 @@ a.seek-badge:hover { border-color: #a879d166; }
 .pf-url { display: inline-block; background: #0d0816; border: 1px solid #a879d124; border-radius: 9px; padding: 10px 16px; color: #c9a8ec; font-size: 14px; margin-bottom: 18px; }
 .pf-done-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; }
 
+/* ── Portfólio existente ── */
+.pf-existing { max-width: 560px; margin: 0 auto; }
+.pf-existing-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.pf-existing-head h2 { font-size: 20px; color: #f0e8fa; margin: 0; }
+.pf-existing-head .pf-hint { margin: 2px 0 6px; }
+.pf-status { display: inline-block; font-size: 10.5px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; padding: 4px 11px; border-radius: 999px; background: #f59e0b1c; color: #fbbf24; }
+.pf-status-on { background: #6be3cc1c; color: #70efdc; }
+.pf-existing .pf-url { display: block; width: fit-content; margin: 0 0 14px; }
+.pf-existing-preview { border: 1px solid #a879d124; border-radius: 14px; overflow: hidden; margin-bottom: 18px; max-height: 320px; overflow-y: auto; }
+.pf-back { background: none; border: none; cursor: pointer; font-size: 12.5px; margin-bottom: 10px; padding: 0; }
+.pf-back:hover { color: #eadcf5; }
+
 /* ── Página pública do portfólio ── */
 .pf-public { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; background: radial-gradient(ellipse at top, #1c1230 0%, #0b0814 65%); }
 .pf-public .pf-view { width: min(430px, 100%); box-shadow: 0 30px 80px #00000070; }
