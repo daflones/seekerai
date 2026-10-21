@@ -21,8 +21,13 @@ const mutationSchema = z.discriminatedUnion("acao", [
   }),
   z.object({
     acao: z.literal("definir-setting"),
-    chave: z.literal("search_provider"),
-    valor: z.enum(["google_places", "apify"]),
+    chave: z.enum(["search_provider", "search_replay"]),
+    valor: z.enum(["google_places", "apify", "on", "off"]),
+    motivo: reason,
+  }),
+  z.object({
+    acao: z.literal("remover-run"),
+    runId: z.string().uuid(),
     motivo: reason,
   }),
 ]);
@@ -39,13 +44,14 @@ async function requireAdmin() {
 export async function GET() {
   const { session, error } = await requireAdmin();
   if (error) return error;
-  const [secrets, settings] = await Promise.all([
+  const [secrets, settings, runs] = await Promise.all([
     session.supabase.rpc("list_integration_secrets"),
     session.supabase.from("app_settings").select("key,value"),
+    session.supabase.rpc("list_search_runs"),
   ]);
   if (secrets.error) return NextResponse.json({ error: "Não foi possível listar integrações." }, { status: 500 });
   return NextResponse.json(
-    { secrets: secrets.data ?? [], settings: settings.data ?? [] },
+    { secrets: secrets.data ?? [], settings: settings.data ?? [], runs: runs.data ?? [] },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -103,6 +109,15 @@ export async function POST(request: NextRequest) {
     });
     if (error) return NextResponse.json({ error: "Não foi possível remover." }, { status: 400 });
     return NextResponse.json({ message: `${body.nome} removida.` }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  if (body.acao === "remover-run") {
+    const { error } = await session.supabase.rpc("delete_search_run", {
+      p_run: body.runId,
+      p_reason: body.motivo,
+    });
+    if (error) return NextResponse.json({ error: "Não foi possível remover a run." }, { status: 400 });
+    return NextResponse.json({ message: "Run removida." }, { headers: { "Cache-Control": "no-store" } });
   }
 
   const { error } = await session.supabase.rpc("configure_app_setting", {

@@ -168,11 +168,40 @@ Deno.serve(async (req) => {
       throw httpError(400, "Informe query, serviceSlug e requestRef");
     }
 
-    const provider = await getSetting("search_provider", "google_places");
+    const db = serviceClient();
+    const [{ data: profile }, replay, provider] = await Promise.all([
+      db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+      getSetting("search_replay", "off"),
+      getSetting("search_provider", "google_places"),
+    ]);
+    const isAdmin = profile?.role === "admin";
+
+    // Replay de demonstração: somente para admin, sem chamar API nem cobrar.
+    if (replay === "on" && isAdmin) {
+      const { data: runs } = await db
+        .from("search_runs")
+        .select("id, query, provider, results, created_at")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      const list = runs ?? [];
+      const match = list.find((r) => r.query.toLowerCase().trim() === query.toLowerCase())
+        ?? list[0];
+      if (!match) {
+        throw httpError(404,
+          "Replay ativo, mas nenhuma busca foi salva ainda. Desative o replay ou rode uma busca real.");
+      }
+      return json({
+        resultados: match.results,
+        provedor: match.provider,
+        replay: true,
+        runOriginal: match.query,
+        creditosCobrados: 0,
+      });
+    }
+
     const inputHash = await sha256Hex(
       JSON.stringify({ query, regionCode, service, provider }),
     );
-    const db = serviceClient();
     const reservation = await reserveAction(db, {
       userId: user.id,
       action: "search",
@@ -187,6 +216,18 @@ Deno.serve(async (req) => {
         ? await searchApify(query)
         : await searchGooglePlaces(query, regionCode);
       await settleAction(db, user.id, requestRef, "completed");
+
+      // Buscas reais feitas por admin ficam salvas para replay (upsert por query).
+      if (isAdmin && resultados.length > 0) {
+        await db.from("search_runs").upsert({
+          query,
+          provider,
+          results: resultados,
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+        }, { onConflict: "query_norm" });
+      }
+
       return json({ resultados, provedor: provider, creditosCobrados: reservation.cost });
     } catch (err) {
       await settleAction(db, user.id, requestRef, "refunded");

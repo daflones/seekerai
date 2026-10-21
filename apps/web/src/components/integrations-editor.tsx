@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, KeyRound, Save, Search, Trash2 } from "lucide-react";
+import { CheckCircle2, Clapperboard, KeyRound, Save, Search, Trash2 } from "lucide-react";
 
 interface SecretRow {
   provedor: string;
   nome: string;
   ultimos4: string;
   updated_at: string;
+}
+
+interface SearchRun {
+  id: string;
+  query: string;
+  provider: string;
+  resultados: number;
+  created_at: string;
 }
 
 const KNOWN_KEYS: { nome: string; descricao: string }[] = [
@@ -29,12 +37,18 @@ const KNOWN_KEYS: { nome: string; descricao: string }[] = [
 export function IntegrationsEditor({
   initialSecrets,
   initialProvider,
+  initialReplay,
+  initialRuns,
 }: {
   initialSecrets: SecretRow[];
   initialProvider: "google_places" | "apify";
+  initialReplay: boolean;
+  initialRuns: SearchRun[];
 }) {
   const [secrets, setSecrets] = useState<SecretRow[]>(initialSecrets);
   const [provider, setProvider] = useState(initialProvider);
+  const [replay, setReplay] = useState(initialReplay);
+  const [runs, setRuns] = useState<SearchRun[]>(initialRuns);
   const [values, setValues] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -85,6 +99,18 @@ export function IntegrationsEditor({
     }
   }
 
+  async function saveReplay(next: boolean) {
+    if (await send({ acao: "definir-setting", chave: "search_replay", valor: next ? "on" : "off" }, "replay")) {
+      setReplay(next);
+    }
+  }
+
+  async function removeRun(id: string) {
+    if (await send({ acao: "remover-run", runId: id }, `run-${id}`)) {
+      setRuns((current) => current.filter((r) => r.id !== id));
+    }
+  }
+
   return <div className="plan-editor">
     <form className="editor-form" onSubmit={(e) => e.preventDefault()}>
       <fieldset disabled={busy !== null}>
@@ -100,6 +126,35 @@ export function IntegrationsEditor({
               onChange={() => saveProvider("apify")} />
             Apify <small>(actor compass~crawler-google-places, precisa de APIFY_API_TOKEN)</small>
           </label>
+        </div>
+      </fieldset>
+
+      <fieldset disabled={busy !== null}>
+        <legend><Clapperboard size={15} /> Replay de busca (demonstração)</legend>
+        <p className="editor-hint">
+          Com o replay ativo, buscas feitas por <strong>contas admin</strong> retornam a run salva
+          — sem chamar a API e sem cobrar créditos. Usuários comuns continuam na busca real.
+          Ideal para gravar vídeos sem gastar tokens. Buscas reais feitas por admin ficam salvas aqui.
+        </p>
+        <div className="editor-checks">
+          <label>
+            <input type="checkbox" checked={replay}
+              onChange={(e) => saveReplay(e.target.checked)} />
+            Replay ativo {replay && <strong>(ligado — suas buscas não chamam a API)</strong>}
+          </label>
+        </div>
+        <div className="editor-features">
+          {runs.length === 0 && <p className="editor-hint">Nenhuma run salva. Faça uma busca real com a conta admin para gravar a primeira.</p>}
+          {runs.map((run) => <div className="editor-feature" key={run.id}>
+            <div>
+              <strong>{run.query}</strong>
+              <small>{run.provider === "apify" ? "Apify" : "Google Places"} · {run.resultados} resultados · {new Date(run.created_at).toLocaleString("pt-BR")}</small>
+            </div>
+            <button type="button" className="editor-remove" disabled={busy !== null}
+              onClick={() => removeRun(run.id)}>
+              <Trash2 size={15} />{busy === `run-${run.id}` ? "Removendo..." : "Remover"}
+            </button>
+          </div>)}
         </div>
       </fieldset>
 

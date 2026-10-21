@@ -88,7 +88,11 @@ configurado, o webhook responde 500/401 — comportamento esperado.
 
 O provedor de busca (`google_places` ou `apify` actor
 `compass~crawler-google-places`) é escolhido em `/admin/integracoes` via
-`app_settings.search_provider`. Contrato MercosulPay segue o projeto iastetic:
+`app_settings.search_provider`. O toggle `search_replay` ativa o modo de
+demonstração: buscas de contas **admin** retornam a última run salva (match por
+query, senão a mais recente) sem chamar API nem cobrar créditos; buscas reais
+de admin são gravadas em `search_runs` para replay. Usuários comuns nunca
+recebem replay. Contrato MercosulPay segue o projeto iastetic:
 `POST /api/public/v1/pix/charges` + assinatura
 `x-mercosulpay-signature: sha256=hmac(secret, ts.body)` com dedup por
 `x-mercosulpay-delivery`.

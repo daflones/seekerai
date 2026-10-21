@@ -3,11 +3,13 @@ import { IntegrationsEditor } from "@/components/integrations-editor";
 
 export default async function IntegrationsAdminPage() {
   const { supabase } = await requireSession("/admin/integracoes", { admin: true });
-  const [secrets, settings] = await Promise.all([
+  const [secrets, settings, runs] = await Promise.all([
     supabase.rpc("list_integration_secrets"),
     supabase.from("app_settings").select("key,value"),
+    supabase.rpc("list_search_runs"),
   ]);
   const provider = (settings.data ?? []).find((s) => s.key === "search_provider");
+  const replay = (settings.data ?? []).find((s) => s.key === "search_replay");
 
   return <>
     <span className="eyebrow">INTEGRAÇÕES</span>
@@ -17,6 +19,8 @@ export default async function IntegrationsAdminPage() {
       <IntegrationsEditor
         initialSecrets={secrets.data ?? []}
         initialProvider={provider?.value === "apify" ? "apify" : "google_places"}
+        initialReplay={replay?.value === "on"}
+        initialRuns={runs.data ?? []}
       />
     )}
   </>;
