@@ -53,7 +53,17 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const [notas, setNotas] = useState(initialLead.notas ?? "");
   const [imagePrompt, setImagePrompt] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const [busy, setBusy] = useState<string | null>(null);
+  // Uma flag por ação — site pode gerar em background enquanto a pessoa
+  // gera imagem, estratégia ou mensagem ao mesmo tempo.
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const isBusy = (k: string) => busy.has(k);
+  function setBusyKey(k: string, on: boolean) {
+    setBusy((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(k); else next.delete(k);
+      return next;
+    });
+  }
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -86,13 +96,13 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         if (data.job.status === "done") {
           if (sitePoller.current) clearInterval(sitePoller.current);
           sitePoller.current = null;
-          setBusy(null);
+          setBusyKey("generate_site", false);
           setNotice("Site gerado e salvo abaixo.");
           router.refresh();
         } else if (data.job.status === "error") {
           if (sitePoller.current) clearInterval(sitePoller.current);
           sitePoller.current = null;
-          setBusy(null);
+          setBusyKey("generate_site", false);
           setError(data.job.erro ?? "A geração do site falhou. Tente novamente.");
         }
       })();
@@ -105,7 +115,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       const res = await fetch(`/api/ai-jobs?leadId=${lead.id}`, { cache: "no-store" }).catch(() => null);
       const data = res ? (await res.json().catch(() => null)) as { job?: { id: string; status: string } | null } | null : null;
       if (data?.job?.status === "running") {
-        setBusy("generate_site");
+        setBusyKey("generate_site", true);
         pollSiteJob(data.job.id);
       }
     })();
@@ -114,8 +124,8 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }, []);
 
   async function generateSite() {
-    if (busy) return;
-    setBusy("generate_site");
+    if (isBusy("generate_site")) return;
+    setBusyKey("generate_site", true);
     setError("");
     setNotice("");
     const res = await fetch("/api/ai-jobs", {
@@ -144,7 +154,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     }).catch(() => null);
     const data = res ? (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null : null;
     if (!res?.ok || !data?.jobId) {
-      setBusy(null);
+      setBusyKey("generate_site", false);
       setError(data?.error ?? "Não foi possível iniciar a geração do site.");
       return;
     }
@@ -153,8 +163,8 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
 
   async function generate(tipo: "sales_reply" | "deep_strategy") {
-    if (busy) return;
-    setBusy(tipo);
+    if (isBusy(tipo)) return;
+    setBusyKey(tipo, true);
     setError("");
     setNotice("");
     const res = await callAction<{ conteudo?: string; modelo?: string; creditosCobrados?: number }>(
@@ -181,7 +191,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       },
     );
     if (!res.ok || !res.data.conteudo) {
-      setBusy(null);
+      setBusyKey(tipo, false);
       setError(res.ok ? "A IA não devolveu conteúdo." : res.error);
       return;
     }
@@ -195,14 +205,14 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setOutputs((list) => [{ ...saved.output!, conteudo: res.data.conteudo! }, ...list]);
       setOpen((o) => ({ ...o, [saved.output!.id]: true }));
     }
-    setBusy(null);
+    setBusyKey(tipo, false);
     setNotice(`${OUTPUT_LABEL[tipo]} gerada.`);
   }
 
   async function generateImage() {
     const prompt = imagePrompt.trim();
-    if (busy || !prompt) return;
-    setBusy("generate_image");
+    if (isBusy("generate_image") || !prompt) return;
+    setBusyKey("generate_image", true);
     setError("");
     setNotice("");
     const res = await callAction<{ imagens?: string[]; modelo?: string; creditosCobrados?: number }>(
@@ -223,7 +233,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     );
     const url = res.ok ? res.data.imagens?.[0] : null;
     if (!res.ok || !url) {
-      setBusy(null);
+      setBusyKey("generate_image", false);
       setError(res.ok ? "A IA não devolveu imagem." : res.error);
       return;
     }
@@ -238,7 +248,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setOpen((o) => ({ ...o, [saved.output!.id]: true }));
     }
     setImagePrompt("");
-    setBusy(null);
+    setBusyKey("generate_image", false);
     setNotice("Imagem gerada.");
   }
 
@@ -251,11 +261,11 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
 
   async function removeLead() {
-    if (busy || !confirm(`Remover o lead "${lead.nome}" e tudo que foi gerado para ele?`)) return;
-    setBusy("delete");
+    if (isBusy("delete") || !confirm(`Remover o lead "${lead.nome}" e tudo que foi gerado para ele?`)) return;
+    setBusyKey("delete", true);
     const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
     if (res.ok) router.replace("/app/leads");
-    else { setBusy(null); setError("Não foi possível remover."); }
+    else { setBusyKey("delete", false); setError("Não foi possível remover."); }
   }
 
   function openSite(html: string) {
@@ -314,22 +324,22 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </header>
 
     <section className="lead-actions">
-      {!hasReply && <button type="button" className="button button-primary button-small" disabled={busy !== null}
+      {!hasReply && <button type="button" className="button button-primary button-small" disabled={isBusy("sales_reply")}
         onClick={() => void generate("sales_reply")}>
-        {busy === "sales_reply" ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
+        {isBusy("sales_reply") ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
         Mensagem de abordagem
       </button>}
-      {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={busy !== null}
+      {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={isBusy("deep_strategy")}
         onClick={() => void generate("deep_strategy")}>
-        {busy === "deep_strategy" ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
+        {isBusy("deep_strategy") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
         Estratégia
       </button>}
-      {canSite && <button type="button" className="button button-glass button-small" disabled={busy !== null}
+      {canSite && <button type="button" className="button button-glass button-small" disabled={isBusy("generate_site")}
         onClick={() => void generateSite()}>
-        {busy === "generate_site" ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
+        {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
         Gerar site
       </button>}
-      <button type="button" className="button button-glass button-small lead-delete" disabled={busy !== null}
+      <button type="button" className="button button-glass button-small lead-delete" disabled={isBusy("delete")}
         onClick={() => void removeLead()}>
         <Trash2 size={14} />Remover
       </button>
@@ -349,9 +359,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           onChange={(e) => setImagePrompt(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generateImage(); } }}
         />
-        <button type="button" className="button button-primary button-small" disabled={busy !== null || !imagePrompt.trim()}
+        <button type="button" className="button button-primary button-small" disabled={isBusy("generate_image") || !imagePrompt.trim()}
           onClick={() => void generateImage()}>
-          {busy === "generate_image" ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
+          {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
           Gerar
         </button>
       </div>
@@ -402,7 +412,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         onChange={(e) => setNotas(e.target.value)}
       />
       <button type="button" className="button button-glass button-small"
-        disabled={busy !== null || notas === (lead.notas ?? "")}
+        disabled={notas === (lead.notas ?? "")}
         onClick={() => { void patch({ notas }); setLead((l) => ({ ...l, notas })); setNotice("Notas salvas."); }}>
         Salvar notas
       </button>
