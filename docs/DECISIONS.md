@@ -114,3 +114,30 @@ como substituto do serviço de fotógrafo.
 Testes com PGlite validam migrations reais, grants e RLS com Auth simulado,
 sem depender do Docker indisponível. Isso não substitui testes Supabase/GoTrue
 com sessões e webhooks reais antes do release.
+
+## Autenticação e captcha nativo
+
+Auth usa Supabase SSR, sem SDK de sessão no browser. Cookies podem ser HttpOnly
+porque todos os acessos autenticados acontecem no servidor. O captcha de
+login/cadastro/recuperação é validado uma única vez pelo GoTrue nativo; validação
+apenas no Next deixaria a API pública do provedor contornável.
+
+O widget/script compartilha configuração entre login e cadastro, mas tokens
+single-use não persistem. Ações autenticadas sem captcha nativo usam Siteverify
+com hostname/action. Rate limit usa HMAC e banco, sem fallback em memória que
+falharia em múltiplas instâncias.
+
+Admin é uma role no perfil, não uma lista de e-mails no frontend. Bootstrap é
+service-only, auditado e idempotente, não altera senha de conta existente e não
+aceita Termos pelo titular. Os dados de bootstrap só entram no ambiente temporário
+do processo depois da autorização. O provisionamento remoto foi executado com
+autorização: migrations sem destruição, captcha nativo e role confirmada no banco.
+
+`SUPABASE_AUTH_READY` falha fechado até confirmar schema e captcha no provedor.
+SDK/cookies são testados ponta a ponta com provedor local isolado; isso não
+substitui validação no domínio Cloudflare e entrega real do e-mail.
+
+Em dev, o `NextURL` do Next normaliza `127.0.0.1` para `localhost` ao montar
+`request.nextUrl` e reescreve redirects de middleware para esse host. Cookies
+HttpOnly host-only não atravessam entre os dois hosts, então testes e uso local
+devem usar `localhost` consistentemente. Ver `docs/AUTH.md`.

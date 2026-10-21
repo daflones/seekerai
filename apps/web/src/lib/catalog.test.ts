@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { makeDemoLeads, plans } from "./catalog";
+import { makeDemoLeads } from "./catalog";
+import { previewPlanCards } from "./plans/preview";
 
 describe("catálogo de demonstração", () => {
   it("adapta os exemplos ao nicho e serviço selecionados", () => {
@@ -13,7 +14,7 @@ describe("catálogo de demonstração", () => {
     expect(makeDemoLeads("desconhecido", "desconhecido")[0].issue).toBe("Sem site próprio");
   });
   it("mantém os quatro planos e slugs únicos", () => {
-    expect(plans).toHaveLength(4);
-    expect(new Set(plans.map((plan) => plan.id)).size).toBe(4);
+    expect(previewPlanCards).toHaveLength(4);
+    expect(new Set(previewPlanCards.map((plan) => plan.slug)).size).toBe(4);
   });
 });

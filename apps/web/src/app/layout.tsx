@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/sora";
 import "./globals.css";
+import "./auth-ui.css";
+import "./pricing-ui.css";
 
 export const metadata: Metadata = {
   title: { default: "SeekerAi — Sua próxima venda começa aqui.", template: "%s | SeekerAi" },

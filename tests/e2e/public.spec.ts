@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("https://challenges.cloudflare.com/turnstile/v0/api.js?*", (route) => route.fulfill({
+    contentType: "application/javascript", body: "window.turnstile={render:()=> 'local-public-test',remove:()=>{}};",
+  }));
+});
+
 test("landing responsiva sem overflow, erros ou falsas integrações", async ({ page }) => {
   const errors: string[] = [];
   const failedAssets: string[] = [];
@@ -56,8 +62,8 @@ test("planos preservam interesse sem iniciar checkout", async ({ page }) => {
   await page.getByRole("link", { name: "Quero o SeekerAi Pro" }).click();
   await expect(page).toHaveURL(/cadastro\?plano=pro&metodo=card/);
   await expect(page.getByText("Plano de interesse:")).toContainText("Pro");
-  await expect(page.getByText(/O cadastro ainda não está habilitado/)).toBeVisible();
-  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+  await expect(page.getByLabel("Seu nome", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Criar minha conta", exact: true })).toBeDisabled();
 });
 
 test("menu mobile, páginas legais e healthcheck", async ({ page, request }, testInfo) => {
@@ -69,9 +75,9 @@ test("menu mobile, páginas legais e healthcheck", async ({ page, request }, tes
     await expect(page.locator("#mobile-menu")).not.toBeVisible();
   }
   await page.goto("/privacidade");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Privacidade da demonstração");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Política de Privacidade");
   await page.goto("/termos");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Termos da demonstração");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Termos de Uso");
   const health = await request.get("/api/health");
   expect(health.status()).toBe(200);
   expect(await health.json()).toEqual({ status: "ok", service: "seekerai-web" });

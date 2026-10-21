@@ -4,6 +4,7 @@ import { Brand } from "@/components/brand";
 import { Navigation } from "@/components/navigation";
 import { Pricing } from "@/components/pricing";
 import { ProductDemo } from "@/components/product-demo";
+import { publicPlanCards } from "@/lib/plans/server";
 
 const faqs = [
   ["O SeekerAi funciona na minha cidade?", "A busca real está planejada para cidades brasileiras atendidas pela API oficial do Google Places. A quantidade de oportunidades depende dos dados disponíveis em cada região. A demonstração atual usa somente negócios fictícios."],
@@ -14,7 +15,8 @@ const faqs = [
   ["O copiloto consegue ouvir uma ligação no meu celular?", "Não diretamente. Os modos previstos são áudio compartilhado no computador, microfone em viva-voz ou texto. Gravação e transcrição exigem aviso e consentimento apropriados. O recurso ainda não está conectado nesta demonstração."],
 ];
 
-export default function Home() {
+export default async function Home() {
+  const pricing = await publicPlanCards();
   return (
     <>
       <Navigation />
@@ -74,7 +76,7 @@ export default function Home() {
 
         <section className="section toolkit-section light-section"><div className="container"><div className="section-heading centered"><span className="eyebrow">DO PRIMEIRO SINAL AO PRÓXIMO PASSO</span><h2>Um lugar. Um fluxo.<br /><span className="muted-heading">Muito mais direção.</span></h2></div><div className="toolkit-grid">{[{ icon: Search, title: "Radar de clientes", text: "Encontre negócios por serviço, nicho e região." }, { icon: Radar, title: "Análise de oportunidades", text: "Entenda os sinais antes de fazer sua oferta." }, { icon: MessageCircle, title: "Abordagens com contexto", text: "Troque mensagens genéricas por boas conversas." }, { icon: AudioLines, title: "Copiloto de vendas", text: "Encontre caminhos para continuar uma negociação." }, { icon: Bookmark, title: "Seu CRM, sem complicar", text: "Organize leads e acompanhe os próximos passos." }, { icon: Globe, title: "Seu portfólio no ar", text: "Mostre o valor do trabalho que você já entrega." }].map(({ icon: Icon, title, text }) => <article key={title}><span><Icon size={21} /></span><h3>{title}</h3><p>{text}</p></article>)}</div><p className="roadmap-footnote">Visão do produto. Nesta primeira versão, explore a busca demonstrativa; integrações e demais recursos estão em construção.</p></div></section>
 
-        <div className="container"><Pricing /></div>
+        <div className="container"><Pricing plans={pricing.plans} source={pricing.source} /></div>
 
         <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">PODE PERGUNTAR</span><h2>Boas decisões<br />começam sem dúvidas.</h2><p>Transparência também faz parte<br />de uma boa parceria.</p></div><div className="faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
 

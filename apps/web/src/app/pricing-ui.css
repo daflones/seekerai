@@ -1,0 +1,103 @@
+.pricing-section { position: relative; background: radial-gradient(ellipse at 50% 55%, #6f378325, transparent 70%); }
+.pricing-section .section-heading p { color: #b39ac3; font-size: 14px; }
+.pricing-section .payment-toggle { margin-bottom: 43px; }
+.plans-grid { gap: 16px; align-items: stretch; }
+.plan-card { --plan-accent: #d3b5ee; --plan-text: #d3c0df; --plan-dim: #a48bb5; --plan-line: #d6b6ef1c; position: relative; display: flex; flex-direction: column; min-height: 590px; padding: 25px 21px 22px; border-radius: 19px; overflow: hidden; border-color: #b28bc62b; box-shadow: 0 18px 40px #00000015; }
+.plan-theme-cream { --plan-accent: #8255af; --plan-text: #584366; --plan-dim: #8b779d; --plan-line: #9775b52b; background: linear-gradient(150deg, #fffcff, #ede5f4); color: #2d1d3b; border-color: #e6d8ef; }
+.plan-theme-teal { --plan-accent: #7ee8d4; --plan-text: #c1ded8; --plan-dim: #8cafaa; --plan-line: #8bcdbd24; background: radial-gradient(ellipse at 110% 95%, #52297066, transparent 53%), linear-gradient(150deg, #123b39, #0b141b 75%); border-color: #649f8d55; }
+.plan-theme-violet { --plan-accent: #e1c6ff; --plan-text: #e1ccf2; --plan-dim: #b69aca; --plan-line: #d3acff2e; background: radial-gradient(ellipse at 25% -10%, #a75cff60, transparent 70%), linear-gradient(150deg, #7131c9 0%, #47206f 48%, #110c1c 100%); border-color: #ab6de29c; }
+.plan-theme-gold { --plan-accent: #eed28d; --plan-text: #dfd0b2; --plan-dim: #b4a180; --plan-line: #d6b67425; background: radial-gradient(ellipse at 0% 90%, #4e26523d, transparent 60%), linear-gradient(140deg, #3e2d17, #100d16 65%); border-color: #b99a5952; }
+.plan-featured { box-shadow: 0 0 0 1px #b47ae728, 0 5px 50px #7f3cc52e, inset 0 1px #dab3ff66; }
+.plan-card .plan-tag { display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 5px 8px; margin-bottom: 0; font-size: 7px; font-weight: 750; letter-spacing: .035em; line-height: 1.4; max-width: 100%; white-space: normal; color: var(--plan-accent); border: 1px solid var(--plan-line); background: #ffffff07; border-radius: 99px; }
+.plan-theme-cream .plan-tag { background: #9261c00a; }
+.plan-title-row { display: flex; align-items: center; gap: 10px; margin-top: 22px; }
+.plan-card .plan-title-row h3 { margin: 0; font-size: 21px; color: var(--plan-accent); letter-spacing: -.04em; }
+.plan-orbit-dot { width: 5px; height: 5px; border-radius: 50%; background: #e8d7ff; box-shadow: 0 0 15px #d3a8ff88; }
+.plan-card .plan-price { margin-block: 15px 13px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; font-size: clamp(32px, 3.1vw, 43px); font-weight: 600; letter-spacing: -.07em; line-height: 1.1; color: inherit; }
+.plan-card .plan-price > span { font-size: 13px; color: var(--plan-accent); letter-spacing: -.02em; margin-right: 2px; }
+.plan-card .plan-price > small { color: var(--plan-dim); font-size: 8px; font-weight: 400; margin-left: 1px; letter-spacing: 0; }
+.plan-card .plan-description { min-height: 47px; margin-top: 0; font-size: 11px; line-height: 1.85; color: var(--plan-dim); }
+.plan-card .plan-divider { background: var(--plan-line); margin-block: 20px 21px; }
+.plan-card ul { display: grid; gap: 15px; margin: 0; }
+.plan-card li { display: flex; align-items: flex-start; gap: 8px; padding: 0; font-size: 11px; line-height: 1.8; color: var(--plan-text); }
+.plan-card .plan-benefit-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 20px; height: 20px; margin-top: 0; border-radius: 50%; color: var(--plan-accent); background: #ffffff09; border: 1px solid var(--plan-line); }
+.plan-card .plan-benefit-icon svg { width: 11px; height: 11px; margin: 0; color: inherit; }
+.plan-theme-cream .plan-benefit-icon { background: #9364bd0a; }
+.plan-card .plan-benefit-highlight { margin-inline: -8px; padding: 9px 8px; border: 1px solid var(--plan-line); border-radius: 10px; background: #ffffff0a; font-weight: 700; color: var(--plan-accent); }
+.plan-theme-cream .plan-benefit-highlight { background: #9564c20c; }
+.plan-theme-violet .plan-benefit-highlight { background: linear-gradient(110deg, #d0a4ff25, #bc8bf212); border-color: #d9b6ff3b; }
+.plan-card-bottom { margin-top: auto; padding-top: 31px; }
+.plan-card .plan-cta { min-height: 44px; width: 100%; padding: 11px 10px; border-radius: 99px; font-size: 11px; gap: 7px; }
+.plan-card .cta-solid { color: #132e2a; background: #74e4ca; border: 1px solid #a7f4e25c; box-shadow: 0 7px 20px #00000020; }
+.plan-theme-gold .cta-solid { color: #34260c; background: #efce74; border-color: #fce7a257; }
+.plan-theme-violet .cta-solid { color: #fff; background: #9a62e6; border-color: #c19beb66; }
+.plan-theme-cream .cta-solid { color: #fff; background: #8255af; border-color: #a67ecf55; }
+.plan-card .cta-light { color: #69349e; background: #fcf8ff; border: 1px solid #fff; box-shadow: 0 5px 25px #ddaaff18; }
+.plan-card .cta-outline { color: var(--plan-accent); background: transparent; border: 1px solid var(--plan-line); }
+.plan-theme-cream .cta-outline { background: #faf4ff80; border-color: #cbb3e0; }
+.plan-card-microcopy { display: block; text-align: center; font-size: 7px; margin-top: 11px; color: var(--plan-dim); }
+.plans-unavailable { padding: 45px 25px; text-align: center; font-size: 14px; color: #b59bc5; border: 1px solid #ac77c831; border-radius: 15px; }
+.pricing-note { color: #ad96bc; line-height: 1.9; }
+.plan-editor { margin-top: 35px; }
+.editor-plan-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 30px; }
+.editor-plan-tabs button { padding: 14px; text-align: left; font-size: 13px; background: #9e6bc409; color: #c6a8da; border: 1px solid #b17bc52b; border-radius: 10px; }
+.editor-plan-tabs button[aria-pressed="true"] { color: #eedaff; background: #9c67ce20; border-color: #b77ce36b; }
+.editor-plan-tabs small { display: block; font-size: 8px; color: #9375a6; margin-top: 6px; }
+.editor-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(270px, 1fr); gap: 40px; align-items: start; }
+.editor-form { min-width: 0; }
+.editor-form fieldset { margin: 0 0 25px; padding: 22px; border: 1px solid #b07bcb2b; border-radius: 12px; min-width: 0; }
+.editor-form legend { padding-inline: 8px; color: #d2b4e6; font-size: 13px; font-weight: 600; }
+.editor-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.editor-fields label, .editor-block-label { display: flex; flex-direction: column; gap: 8px; color: #baa0cd; font-size: 11px; }
+.editor-block-label { margin-top: 18px; }
+.editor-form input:not([type="checkbox"]), .editor-form textarea, .editor-form select { min-width: 0; width: 100%; padding: 10px 11px; color: #dfc7ee; background: #100b18; border: 1px solid #ad7dca30; border-radius: 7px; font-size: 12px; line-height: 1.7; }
+.editor-form textarea { resize: vertical; }
+.editor-checks { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 20px; }
+.editor-checks label, .editor-feature label { display: inline-flex; align-items: center; gap: 6px; color: #ac8fbf; font-size: 10px; white-space: nowrap; }
+.editor-form input[type="checkbox"] { accent-color: #ab78de; width: 15px; height: 15px; flex-shrink: 0; }
+.editor-hint { color: #90729f; font-size: 10px; line-height: 1.9; margin-block: 9px 17px; }
+.editor-features { display: grid; gap: 12px; }
+.editor-feature { background: #a573ca06; border: 1px solid #a573ca1c; padding: 11px; border-radius: 9px; }
+.editor-feature > div { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.editor-feature > div > select { width: auto; padding: 5px 7px; font-size: 9px; flex-grow: 1; }
+.editor-feature button { display: flex; padding: 5px; background: transparent; color: #b08cca; border: 1px solid #ac76c323; border-radius: 5px; }
+.editor-feature button:disabled { opacity: .25; cursor: not-allowed; }
+.editor-add { display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px; margin-top: 15px; color: #c19ade; background: #9f6bbe0c; border: 1px solid #a371c62c; border-radius: 7px; font-size: 11px; }
+.editor-saved { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: #94d6b9; margin-block: 20px; line-height: 1.8; }
+.editor-preview { position: sticky; top: 25px; }
+.editor-preview > span { display: flex; align-items: center; gap: 7px; margin-bottom: 16px; font-size: 8px; letter-spacing: .12em; color: #a586b9; }
+.editor-preview > p { margin-top: 15px; text-align: center; font-size: 9px; color: #8b6d9e; }
+.editor-preview .plan-card { min-height: 590px; padding: 27px; }
+.editor-preview .plan-card .plan-price { font-size: 44px; }
+.editor-preview .plan-card .plan-price > small { font-size: 10px; }
+.editor-preview .plan-card li { font-size: 12px; }
+.editor-preview .plan-card .plan-tag { font-size: 8px; }
+.editor-preview .plan-card .plan-cta:disabled { cursor: default; opacity: 1; transform: none; }
+@media (min-width: 681px) and (max-width: 1000px) {
+  .plans-grid { grid-template-columns: 1fr 1fr; gap: 21px; }
+  .plan-card { padding: 28px; min-height: 590px; }
+  .plan-card .plan-price { font-size: 42px; }
+  .plan-card li { font-size: 12px; }
+  .plan-card .plan-tag { font-size: 8px; }
+  .editor-layout { grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); gap: 25px; }
+  .editor-fields { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .plans-grid { grid-template-columns: 1fr; gap: 23px; max-width: 390px; margin-inline: auto; }
+  .plan-card { min-height: 0; padding: 27px 25px 23px; }
+  .plan-card .plan-tag { font-size: 8px; }
+  .plan-card .plan-title-row h3 { font-size: 25px; }
+  .plan-card .plan-price { font-size: 44px; margin-top: 16px; }
+  .plan-card .plan-price > small { font-size: 10px; }
+  .plan-card .plan-description { font-size: 13px; min-height: 0; }
+  .plan-card li { font-size: 12px; gap: 9px; }
+  .plan-card .plan-benefit-icon { width: 22px; height: 22px; }
+  .plan-card .plan-cta { font-size: 12px; min-height: 47px; }
+  .plan-card-microcopy { font-size: 8px; }
+  .pricing-section .section-heading p { font-size: 13px; }
+  .editor-plan-tabs { grid-template-columns: 1fr 1fr; }
+  .editor-layout { grid-template-columns: 1fr; gap: 35px; }
+  .editor-fields { gap: 16px; }
+  .editor-form fieldset { padding: 16px; }
+  .editor-preview { position: static; max-width: 390px; width: 100%; margin-inline: auto; }
+}

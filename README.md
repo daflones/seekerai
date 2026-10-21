@@ -6,9 +6,10 @@ conversa com contexto.
 ## Estado real
 
 Fundação local e primeira experiência visual. **Não é um SaaS pronto para
-produção.** A busca é demonstrativa, com negócios fictícios. Não há autenticação,
-busca Places, IA de vendas, pagamentos, envio de mensagens ou portfólio publicado.
-As telas de acesso informam isso e não coletam senhas.
+produção.** A busca é demonstrativa, com negócios fictícios. Autenticação Supabase
+e Turnstile estão implementados localmente, com envios bloqueados até provisionar
+o projeto remoto. Busca Places, IA de vendas, pagamentos, mensagens e portfólios
+públicos ainda não estão integrados.
 
 Implementado:
 - Next.js 15, React 19, TypeScript estrito e Tailwind 4.
@@ -25,6 +26,9 @@ Implementado:
 - AES-256-GCM com autenticação de contexto e testes unitários.
 - Docker multi-stage, CI de qualidade e detecção de segredos.
 - Script de imagens de baixo custo, prompts detalhados e proteção contra retry.
+- Login, cadastro, confirmação, recuperação, senha e onboarding com Turnstile.
+- Sessão SSR HttpOnly e rotas privadas com verificação de role admin no servidor.
+- Rate limit persistente, CSRF, consentimento e bootstrap administrativo auditado.
 
 ## Rodar
 
@@ -51,9 +55,9 @@ sem baixar outro navegador. CI deve instalar Chromium e definir `CI=true`.
 
 Use `.env.example` como lista de nomes. `.env.local` fica na raiz, ignorado por
 Git e Docker. **Nunca** copiar chaves para código, docs, mensagens ou builds.
-Next não carrega automaticamente o env da raiz do monorepo; o protótipo não
-consome integrações. Ao habilitá-las, exporte o ambiente no processo ou configure
-o ambiente do serviço. Não duplique secrets em arquivos de frontend.
+A configuração do Next carrega o env da raiz do monorepo usando `@next/env`.
+No deploy, configure as variáveis no serviço; não copie `.env.local` para a imagem.
+Não duplique secrets em arquivos de frontend.
 
 No Node 22+, o script de imagens pode ler o arquivo local explicitamente:
 
@@ -80,3 +84,4 @@ Docker Desktop precisa estar em execução para testar o container e Supabase lo
 Veja `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/RUNBOOK.md` e
 `docs/STATUS.md` para decisões, pendências e próximos marcos.
 Regras revisadas do produto: `docs/CREDITOS-E-GERACAO.md`.
+Auth, captcha e criação segura de admin: `docs/AUTH.md`.
