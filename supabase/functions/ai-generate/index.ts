@@ -1,9 +1,14 @@
 // Geração com IA via OpenRouter — deep_strategy, sales_reply, generate_site,
 // generate_image. Chave fica como secret do Supabase; consome créditos.
+//
+// generate_site é um pipeline: usa imagens reais do contexto (Apify/Places)
+// e, se faltar material visual, gera imagens dedicadas via modelo de imagem
+// antes de montar o HTML — sem emojis, visual high-end.
 
 import {
   asString,
   fail,
+  HttpError,
   httpError,
   isRecord,
   json,
@@ -28,6 +33,7 @@ const ACTIONS = new Set([
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
 const IMAGE_MODEL = optionalEnv("AI_IMAGE_MODEL") ?? "google/gemini-2.5-flash-image";
 const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "anthropic/claude-sonnet-4.5";
+const MAX_SITE_IMAGES = 3;
 
 interface GenerateBody {
   action?: string;
@@ -45,7 +51,20 @@ function systemPromptFor(action: string): string {
     case "sales_reply":
       return "Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em pt-BR para o estabelecimento descrito. Sem emojis excessivos, sem promessas irreais.";
     case "generate_site":
-      return "Você é um desenvolvedor front-end sênior. Gere um site institucional completo em um único arquivo HTML autocontido (CSS inline), visual moderno em pt-BR, baseado nas informações do estabelecimento. Responda apenas com o código HTML.";
+      return [
+        "Você é um diretor de arte e desenvolvedor front-end premiado (nível Awwwards).",
+        "Gere um site institucional completo em um único arquivo HTML autocontido, em pt-BR.",
+        "REGRAS VISUAIS OBRIGATÓRIAS:",
+        "- Use EXCLUSIVAMENTE as URLs de imagem fornecidas no contexto para toda fotografia (hero, galeria, seções). Nunca placeholders, nunca unplash/picsum.",
+        "- PROIBIDO emojis em qualquer lugar — use ícones SVG inline discretos (lucide-style, stroke 1.5px) quando necessário.",
+        "- Tipografia editorial: Google Fonts (uma serif display + uma sans para corpo), hierarquia clara, tracking refinado.",
+        "- Paleta sofisticada derivada do negócio; fundos com profundidade (gradientes sutis, texturas), não cores chapadas.",
+        "- Layout com respiro: whitespace generoso, grid assimétrico, seções alternando claro/escuro.",
+        "- Micro-interações CSS puras (hover, reveal on scroll via IntersectionObserver em JS inline mínimo).",
+        "- Botão de contato/WhatsApp com link real quando telefone disponível.",
+        "- Responsivo mobile-first, HTML semântico e acessível (alt real, aria onde preciso).",
+        "Responda APENAS com o código HTML, sem comentários fora do código.",
+      ].join("\n");
     case "generate_image":
       return "Gere uma imagem profissional e atraente a partir da descrição.";
     default:
@@ -53,11 +72,79 @@ function systemPromptFor(action: string): string {
   }
 }
 
+/** Coleta URLs de imagem já presentes no contexto (resultado Apify/Places). */
+function contextImages(context: Record<string, unknown> | undefined): string[] {
+  if (!context) return [];
+  const images = new Set<string>();
+  for (const key of ["imagens", "images", "photos"]) {
+    const value = context[key];
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string" && item.startsWith("http")) images.add(item);
+        else if (isRecord(item) && typeof item.url === "string" && item.url.startsWith("http")) {
+          images.add(item.url);
+        }
+      }
+    }
+  }
+  const single = context.imagem ?? context.imageUrl;
+  if (typeof single === "string" && single.startsWith("http")) images.add(single);
+  return [...images].slice(0, MAX_SITE_IMAGES);
+}
+
+/** Gera imagem via modelo de imagem do OpenRouter; retorna data URL ou null. */
+async function generateSiteImage(
+  apiKey: string,
+  imagePrompt: string,
+): Promise<string | null> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+      "X-Title": "SeekerAi",
+    },
+    body: JSON.stringify({
+      model: IMAGE_MODEL,
+      modalities: ["image", "text"],
+      messages: [{ role: "user", content: imagePrompt }],
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    console.error("[site-image] falhou:", res.status);
+    return null;
+  }
+  const choices = Array.isArray(data.choices) ? data.choices : [];
+  const message = isRecord(choices[0]) && isRecord(choices[0].message)
+    ? choices[0].message
+    : {};
+  if (Array.isArray(message.images)) {
+    for (const img of message.images) {
+      const url = isRecord(img) && isRecord(img.image_url) ? img.image_url.url : null;
+      if (typeof url === "string") return url;
+    }
+  }
+  return null;
+}
+
+function imagePromptsFor(context: Record<string, unknown> | undefined): string[] {
+  const nome = asString(context?.nome) ?? "estabelecimento local";
+  const categoria = asString(context?.categoria) ?? "negócio local";
+  return [
+    `Fotografia profissional de alta qualidade da fachada/ambiente de ${nome}, ${categoria} brasileiro. Luz natural quente, composição editorial, estilo fotografia comercial premium, sem texto ou marcas.`,
+    `Fotografia de detalhe do produto/serviço de ${nome} (${categoria}). Close-up apetitoso e elegante, fundo desfocado, iluminação de estúdio suave, estilo editorial premium, sem texto.`,
+    `Fotografia do interior/atendimento de ${nome}, ${categoria}. Ambiente acolhedor e sofisticado, pessoas desfocadas ao fundo, luz ambiente quente, estilo revista, sem texto.`,
+  ];
+}
+
 Deno.serve(async (req) => {
   try {
     requirePost(req);
     const user = await requireUser(req);
-    const body = await readJson<GenerateBody>(req, 200_000);
+    const body = await readJson<GenerateBody>(req, 300_000);
 
     const action = asString(body.action, 40);
     const service = asString(body.serviceSlug, 60);
@@ -81,67 +168,94 @@ Deno.serve(async (req) => {
       requestRef,
     });
 
-    const model = action === "generate_image"
-      ? IMAGE_MODEL
-      : action === "generate_site"
-        ? SITE_MODEL
-        : TEXT_MODEL;
+    try {
+      const apiKey = await requireSecret("OPENROUTER_API_KEY");
+      const context = isRecord(body.context) ? body.context : {};
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await requireSecret("OPENROUTER_API_KEY")}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
-        "X-Title": "SeekerAi",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPromptFor(action) },
-          {
-            role: "user",
-            content: body.context
-              ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(body.context)}`
-              : prompt,
-          },
-        ],
-      }),
-    });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) {
-      await settleAction(db, user.id, requestRef, "refunded");
-      const reason = isRecord(data.error) ? String(data.error.message ?? "") : "";
-      if (res.status === 402) {
-        throw httpError(503, "Geração de IA temporariamente indisponível");
+      // Pipeline de imagens para generate_site: reais do scrape + geradas se faltar.
+      const imageUrls: string[] = [];
+      if (action === "generate_site") {
+        imageUrls.push(...contextImages(context));
+        const faltando = Math.min(2, MAX_SITE_IMAGES - imageUrls.length);
+        if (faltando > 0) {
+          const prompts = imagePromptsFor(context);
+          for (let i = 0; i < faltando; i++) {
+            const url = await generateSiteImage(apiKey, prompts[i]);
+            if (url) imageUrls.push(url);
+          }
+        }
       }
-      console.error("[openrouter] falhou:", res.status, reason);
+
+      const model = action === "generate_image"
+        ? IMAGE_MODEL
+        : action === "generate_site"
+          ? SITE_MODEL
+          : TEXT_MODEL;
+
+      const userContent = action === "generate_site"
+        ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}\n\n` +
+          `URLs de imagem disponíveis (use TODAS nos <img> apropriados — hero primeiro):\n` +
+          imageUrls.map((u, i) => `${i + 1}. ${u}`).join("\n")
+        : body.context
+          ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
+          : prompt;
+
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+          "X-Title": "SeekerAi",
+        },
+        body: JSON.stringify({
+          model,
+          modalities: action === "generate_image" ? ["image", "text"] : undefined,
+          max_tokens: action === "generate_site" ? 16000 : undefined,
+          messages: [
+            { role: "system", content: systemPromptFor(action) },
+            { role: "user", content: userContent },
+          ],
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) {
+        await settleAction(db, user.id, requestRef, "refunded");
+        if (res.status === 402) {
+          throw httpError(503, "Geração de IA temporariamente indisponível");
+        }
+        console.error("[openrouter] falhou:", res.status);
+        throw httpError(502, "Provedor de IA indisponível no momento");
+      }
+      await settleAction(db, user.id, requestRef, "completed");
+
+      const choices = Array.isArray(data.choices) ? data.choices : [];
+      const message = isRecord(choices[0]) && isRecord(choices[0].message)
+        ? choices[0].message
+        : {};
+      const images = Array.isArray(message.images)
+        ? message.images
+          .map((img) => (isRecord(img) && isRecord(img.image_url) ? img.image_url.url : null))
+          .filter((u): u is string => typeof u === "string")
+        : [];
+
+      let conteudo = typeof message.content === "string" ? message.content : null;
+      if (conteudo && action === "generate_site") {
+        conteudo = conteudo.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim();
+      }
+
+      return json({
+        conteudo,
+        imagens: images.length > 0 ? images : undefined,
+        imagensUsadas: action === "generate_site" ? imageUrls : undefined,
+        modelo: model,
+        creditosCobrados: reservation.cost,
+      });
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      console.error("[ai-generate] erro:", err instanceof Error ? err.message : err);
       throw httpError(502, "Provedor de IA indisponível no momento");
     }
-    await settleAction(db, user.id, requestRef, "completed");
-
-    const choices = Array.isArray(data.choices) ? data.choices : [];
-    const message = isRecord(choices[0]) && isRecord(choices[0].message)
-      ? choices[0].message
-      : {};
-    const images = Array.isArray(message.images)
-      ? message.images
-        .map((img) => (isRecord(img) && isRecord(img.image_url) ? img.image_url.url : null))
-        .filter((u): u is string => typeof u === "string")
-      : [];
-
-    let conteudo = typeof message.content === "string" ? message.content : null;
-    if (conteudo && action === "generate_site") {
-      // Modelos costumam embrulhar HTML em fence de markdown — remove.
-      conteudo = conteudo.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim();
-    }
-
-    return json({
-      conteudo,
-      imagens: images.length > 0 ? images : undefined,
-      modelo: model,
-      creditosCobrados: reservation.cost,
-    });
   } catch (err) {
     return fail(err);
   }
