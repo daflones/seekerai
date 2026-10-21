@@ -48,6 +48,7 @@ async function nvidiaChat(
   system: string,
   userContent: string,
   maxTokens?: number,
+  timeoutMs?: number,
 ): Promise<Record<string, unknown> | null> {
   const key = await getSecret("NVIDIA_API_KEY");
   if (!key) return null;
@@ -68,7 +69,8 @@ async function nvidiaChat(
         { role: "user", content: userContent },
       ],
     }),
-    signal: AbortSignal.timeout(120_000),
+    // Site leva minutos num provedor gratuito — timeout vem de fora.
+    signal: AbortSignal.timeout(timeoutMs ?? 120_000),
   }).catch(() => null);
   if (!res?.ok) {
     console.error("[nvidia] chat falhou:", res?.status ?? "network");
@@ -294,6 +296,7 @@ Deno.serve(async (req) => {
 
       // Cadeia de provedores: OpenRouter primeiro; NVIDIA como fallback
       // gratuito quando o principal falha (rede, 402, 5xx) ou não devolve imagem.
+      const t0 = Date.now();
       let data: Record<string, unknown> | null = null;
       let modelo = model;
       const systemPrompt = systemPromptFor(action);
@@ -308,14 +311,15 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model,
           modalities: action === "generate_image" ? ["image", "text"] : undefined,
-          max_tokens: action === "generate_site" ? 16000 : action === "lead_assist" ? 1200 : undefined,
+          max_tokens: action === "generate_site" ? 12000 : action === "lead_assist" ? 1200 : undefined,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
           ],
         }),
-        // Sem timeout o OpenRouter pode segurar a conexão até o 524 do gateway.
-        signal: AbortSignal.timeout(action === "generate_site" ? 95_000 : 60_000),
+        // Sem timeout o OpenRouter pode segurar a conexão até o gateway cortar.
+        // Site precisa de mais tempo: o HTML completo são milhares de tokens.
+        signal: AbortSignal.timeout(action === "generate_site" ? 200_000 : 60_000),
       }).catch(() => null);
       const orStatus = res?.status ?? 0;
       if (res?.ok) {
@@ -342,11 +346,16 @@ Deno.serve(async (req) => {
           }
         }
       } else if (!data) {
-        const nv = await nvidiaChat(
-          systemPrompt,
-          userContent,
-          action === "generate_site" ? 16000 : action === "lead_assist" ? 1200 : undefined,
-        );
+        // Sem orçamento pra NVIDIA se o OpenRouter já comeu o tempo da function.
+        const elapsed = Date.now() - t0;
+        const nv = elapsed < 120_000
+          ? await nvidiaChat(
+            systemPrompt,
+            userContent,
+            action === "generate_site" ? 12000 : action === "lead_assist" ? 1200 : undefined,
+            action === "generate_site" ? 200_000 : 120_000,
+          )
+          : null;
         if (nv) {
           data = nv;
           modelo = NVIDIA_TEXT_MODEL;

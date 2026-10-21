@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -72,8 +72,87 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}?text=${encodeURIComponent(text)}` : null;
   const hasReply = outputs.some((o) => o.tipo === "sales_reply");
   const hasStrategy = outputs.some((o) => o.tipo === "deep_strategy");
+  const sitePoller = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function generate(tipo: "sales_reply" | "deep_strategy" | "generate_site") {
+  // Site completo leva minutos quando o provedor principal falha e o
+  // fallback gratuito assume — roda como job no servidor, com polling.
+  function pollSiteJob(jobId: string) {
+    if (sitePoller.current) clearInterval(sitePoller.current);
+    sitePoller.current = setInterval(() => {
+      void (async () => {
+        const res = await fetch(`/api/ai-jobs/${jobId}`, { cache: "no-store" }).catch(() => null);
+        const data = res ? (await res.json().catch(() => null)) as { job?: { status: string; erro?: string | null } } | null : null;
+        if (!data?.job) return;
+        if (data.job.status === "done") {
+          if (sitePoller.current) clearInterval(sitePoller.current);
+          sitePoller.current = null;
+          setBusy(null);
+          setNotice("Site gerado e salvo abaixo.");
+          router.refresh();
+        } else if (data.job.status === "error") {
+          if (sitePoller.current) clearInterval(sitePoller.current);
+          sitePoller.current = null;
+          setBusy(null);
+          setError(data.job.erro ?? "A geração do site falhou. Tente novamente.");
+        }
+      })();
+    }, 4000);
+  }
+
+  // Ao voltar na página com uma geração em andamento, retoma o polling.
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch(`/api/ai-jobs?leadId=${lead.id}`, { cache: "no-store" }).catch(() => null);
+      const data = res ? (await res.json().catch(() => null)) as { job?: { id: string; status: string } | null } | null : null;
+      if (data?.job?.status === "running") {
+        setBusy("generate_site");
+        pollSiteJob(data.job.id);
+      }
+    })();
+    return () => { if (sitePoller.current) clearInterval(sitePoller.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function generateSite() {
+    if (busy) return;
+    setBusy("generate_site");
+    setError("");
+    setNotice("");
+    const res = await fetch("/api/ai-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: lead.id,
+        tipo: "generate_site",
+        serviceSlug: lead.service_slug,
+        requestRef: crypto.randomUUID(),
+        prompt: promptFor("generate_site", lead, serviceName),
+        context: {
+          nome: lead.nome,
+          categoria: lead.categoria,
+          endereco: lead.endereco,
+          cidade: lead.cidade,
+          uf: lead.uf,
+          telefone: lead.telefone,
+          site: lead.site,
+          avaliacao: lead.avaliacao,
+          totalAvaliacoes: lead.total_avaliacoes,
+          imagem: lead.imagem,
+          mapsUrl: lead.maps_url,
+        },
+      }),
+    }).catch(() => null);
+    const data = res ? (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null : null;
+    if (!res?.ok || !data?.jobId) {
+      setBusy(null);
+      setError(data?.error ?? "Não foi possível iniciar a geração do site.");
+      return;
+    }
+    setNotice("Gerando o site em segundo plano — pode sair da página, ele aparece aqui quando ficar pronto.");
+    pollSiteJob(data.jobId);
+  }
+
+  async function generate(tipo: "sales_reply" | "deep_strategy") {
     if (busy) return;
     setBusy(tipo);
     setError("");
@@ -240,7 +319,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         Estratégia
       </button>}
       {canSite && <button type="button" className="button button-glass button-small" disabled={busy !== null}
-        onClick={() => void generate("generate_site")}>
+        onClick={() => void generateSite()}>
         {busy === "generate_site" ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
         Gerar site
       </button>}
