@@ -39,7 +39,7 @@ const MAX_SITE_IMAGES = 3;
 
 // Fallback NVIDIA (build.nvidia.com) — gratuito, OpenAI-compatible.
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
-const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "meta/llama-3.3-70b-instruct";
+const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "z-ai/glm-5.3-flash";
 const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-labs/flux.2-klein-4b";
 
 /** Chat de texto na NVIDIA — mesmo formato OpenAI. Retorna o JSON ou null. */
@@ -57,6 +57,11 @@ async function nvidiaChat(
       model: NVIDIA_TEXT_MODEL,
       stream: false,
       max_tokens: maxTokens ?? 4096,
+      // GLM "thinking" desligado — resposta direta, latência menor.
+      ...(NVIDIA_TEXT_MODEL.includes("glm") ? {
+        reasoning_effort: "low",
+        chat_template_kwargs: { clear_thinking: true, enable_thinking: false },
+      } : {}),
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
