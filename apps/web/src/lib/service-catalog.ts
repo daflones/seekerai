@@ -24,9 +24,9 @@ export const services = [
   { id: "consultoria_marketing", label: "Consultoria de marketing", category: "Marketing e vendas", opportunity: "Estratégia de marketing a aprofundar", actions: [] },
   { id: "design", label: "Design gráfico", category: "Design e audiovisual", opportunity: "Materiais visuais a desenvolver", actions: ["generate_image"] },
   { id: "branding", label: "Branding e identidade visual", category: "Design e audiovisual", opportunity: "Identidade visual a desenvolver", actions: ["generate_image"] },
-  { id: "edicao_video", label: "Edição de vídeo", category: "Design e audiovisual", opportunity: "Conteúdo em vídeo a aprimorar", actions: [] },
-  { id: "gravacao_video", label: "Gravação e produção de vídeo", category: "Design e audiovisual", opportunity: "Produção audiovisual a explorar", actions: [] },
-  { id: "fotografia", label: "Fotografia comercial", category: "Design e audiovisual", opportunity: "Fotografia profissional a avaliar", actions: [] },
+  { id: "edicao_video", label: "Edição de vídeo", category: "Design e audiovisual", opportunity: "Conteúdo em vídeo a aprimorar", actions: ["generate_image"] },
+  { id: "gravacao_video", label: "Gravação e produção de vídeo", category: "Design e audiovisual", opportunity: "Produção audiovisual a explorar", actions: ["generate_image"] },
+  { id: "fotografia", label: "Fotografia comercial", category: "Design e audiovisual", opportunity: "Fotografia profissional a avaliar", actions: ["generate_image"] },
   { id: "motion_design", label: "Motion design e animação", category: "Design e audiovisual", opportunity: "Comunicação em movimento a explorar", actions: ["generate_image"] },
   { id: "producao_conteudo", label: "Produção de conteúdo e UGC", category: "Design e audiovisual", opportunity: "Conteúdo de marca a planejar", actions: ["generate_image"] },
 ] as const satisfies readonly ServiceDefinition[];

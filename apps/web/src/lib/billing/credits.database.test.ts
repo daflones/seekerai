@@ -137,12 +137,12 @@ describe("migrations de créditos em PostgreSQL embarcado", () => {
   it("respeita compatibilidade de ferramentas e mantém catálogo SQL/TypeScript alinhado", async () => {
     const id = await user();
     await expect(reserve(id, "site-para-video", "generate_site", "place:a", "edicao_video")).rejects.toThrow("Action incompatible");
-    await expect(reserve(id, "foto-sintetica", "generate_image", "place:a", "fotografia")).rejects.toThrow("Action incompatible");
+    await expect(reserve(id, "foto-sintetica", "generate_image", "place:a", "automacao")).rejects.toThrow("Action incompatible");
     const rows = (await db.query<{ slug: string; enabled_actions: string[] }>("select slug, enabled_actions from public.services_catalog")).rows;
     expect(rows.map((row) => row.slug).sort()).toEqual(services.map((service) => service.id).sort());
     for (const service of services) {
       expect(rows.find((row) => row.slug === service.id)?.enabled_actions.sort()).toEqual(
-        ["search", "deep_strategy", "sales_reply", ...service.actions].sort(),
+        ["search", "deep_strategy", "sales_reply", "whatsapp_check", ...service.actions].sort(),
       );
     }
   });

@@ -41,6 +41,8 @@ export interface PlaceResult {
   imagem: string | null;
   lat: number | null;
   lng: number | null;
+  whatsapp: boolean | null;
+  instagram: string | null;
 }
 
 export interface LeadRow {
@@ -59,6 +61,7 @@ export interface LeadRow {
   categoria: string | null;
   maps_url: string | null;
   imagem: string | null;
+  instagram: string | null;
   status: "novo" | "contatado" | "respondeu" | "proposta" | "ganho" | "perdido";
   whatsapp: "sim" | "nao" | null;
   notas: string | null;

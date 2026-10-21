@@ -64,6 +64,7 @@ export function LeadsBoard({ initialLeads, serviceNames }: {
             {!lead.site && <span className="seek-badge seek-badge-gap">Sem site</span>}
             {lead.site && <span className="seek-badge seek-badge-ok"><Globe size={10} />Site</span>}
             {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok">WhatsApp</span>}
+            {lead.instagram && <span className="seek-badge">{lead.instagram}</span>}
           </p>
         </div>
         <div className="lead-row-side">

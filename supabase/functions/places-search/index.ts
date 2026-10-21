@@ -59,6 +59,8 @@ interface NormalizedPlace {
   imagem: string | null;
   lat: number | null;
   lng: number | null;
+  whatsapp: boolean | null;
+  instagram: string | null;
 }
 
 async function searchGooglePlaces(query: string, regionCode: string): Promise<NormalizedPlace[]> {
@@ -101,6 +103,8 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
       imagem: null,
       lat: null,
       lng: null,
+      whatsapp: null,
+      instagram: null,
     };
   });
 }
@@ -150,8 +154,71 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
       imagem: asString(p.imageUrl, 800),
       lat: typeof loc.lat === "number" ? loc.lat : null,
       lng: typeof loc.lng === "number" ? loc.lng : null,
+      whatsapp: null,
+      instagram: asString(p.instagramUrl ?? p.instagram, 300) ?? null,
     };
   });
+}
+
+/** Instagram vira campo próprio; perfil de Instagram não conta como site. */
+function extractInstagram(place: NormalizedPlace): void {
+  const existing = place.instagram;
+  if (existing) {
+    const match = existing.match(/instagram\.com\/([A-Za-z0-9._%]+)/i);
+    const handle = match ? match[1] : existing.replace(/^@/, "").replace(/\/+$/, "");
+    if (/^[A-Za-z0-9._%]{1,60}$/.test(handle)) place.instagram = `@${handle}`;
+  }
+  if (place.site && /instagram\.com\//i.test(place.site)) {
+    const match = place.site.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]+)/i);
+    if (match && !["explore", "reel", "reels", "stories", "p", "tv"]
+      .includes(match[1].toLowerCase())) {
+      if (!place.instagram) place.instagram = `@${match[1]}`;
+    }
+    place.site = null;
+  }
+}
+
+/** Verifica em lote quais números têm WhatsApp via Evolution API (grátis). */
+async function checkWhatsapps(places: NormalizedPlace[]): Promise<void> {
+  const numbers = places
+    .map((p) => p.telefone?.replace(/\D/g, "") ?? "")
+    .filter((d) => d.length >= 10 && d.length <= 15)
+    .map((d) => (d.startsWith("55") ? d : `55${d}`));
+  if (numbers.length === 0) return;
+  try {
+    const base = (await requireSecret("EVOLUTION_API_URL")).replace(/\/+$/, "");
+    const instance = await requireSecret("EVOLUTION_INSTANCE");
+    const res = await fetch(`${base}/chat/whatsappNumbers/${instance}`, {
+      method: "POST",
+      headers: {
+        apikey: await requireSecret("EVOLUTION_API_KEY"),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ numbers }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!res.ok) {
+      console.error("[whatsapp-batch] evolution respondeu", res.status);
+      return;
+    }
+    const data = (await res.json().catch(() => [])) as unknown;
+    const exists = new Map<string, boolean>();
+    if (Array.isArray(data)) {
+      for (const entry of data) {
+        if (!isRecord(entry)) continue;
+        const raw = asString(entry.number) ?? asString(entry.jid)?.split("@")[0] ?? null;
+        if (raw) exists.set(raw.replace(/\D/g, ""), entry.exists === true);
+      }
+    }
+    for (const place of places) {
+      const digits = place.telefone?.replace(/\D/g, "") ?? "";
+      const phone = digits.startsWith("55") ? digits : `55${digits}`;
+      place.whatsapp = exists.get(phone) ?? null;
+    }
+  } catch (err) {
+    // Evolution indisponível não derruba a busca — whatsapp fica nulo.
+    console.error("[whatsapp-batch] falhou:", err instanceof Error ? err.message : err);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -215,6 +282,18 @@ Deno.serve(async (req) => {
       const resultados = provider === "apify"
         ? await searchApify(query)
         : await searchGooglePlaces(query, regionCode);
+
+      // Enriquecimento: Instagram separado + WhatsApp em lote (grátis) +
+      // ordenação priorizando quem tem contato direto.
+      for (const place of resultados) extractInstagram(place);
+      await checkWhatsapps(resultados);
+      resultados.sort((a, b) => {
+        const score = (p: NormalizedPlace) =>
+          (p.telefone ? 4 : 0) + (p.whatsapp === true ? 2 : 0) +
+          (p.status === "OPERATIONAL" ? 1 : 0) + (p.avaliacao ?? 0) / 10;
+        return score(b) - score(a);
+      });
+
       await settleAction(db, user.id, requestRef, "completed");
 
       // Buscas reais feitas por admin ficam salvas para replay (upsert por query).

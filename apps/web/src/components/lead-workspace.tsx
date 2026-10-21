@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
-  Copy, Download, ExternalLink, Eye, Loader2, MapPin, MessageSquareText,
-  Phone, Sparkles, Star, Trash2, Globe, MessageCircle, FileText, MonitorSmartphone,
+  Copy, Download, ExternalLink, Eye, ImagePlus, Instagram, Loader2, MapPin,
+  MessageSquareText, Phone, Sparkles, Star, Trash2, Globe, MessageCircle,
+  FileText, MonitorSmartphone,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, type LeadRow } from "@/lib/app-client";
 
@@ -49,12 +51,14 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const [lead, setLead] = useState(initialLead);
   const [outputs, setOutputs] = useState(initialOutputs);
   const [notas, setNotas] = useState(initialLead.notas ?? "");
+  const [imagePrompt, setImagePrompt] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   const canSite = enabledActions.includes("generate_site");
+  const canImage = enabledActions.includes("generate_image");
   const waDigits = (lead.telefone ?? "").replace(/\D/g, "");
   const waLink = waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}` : null;
 
@@ -102,7 +106,44 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setOpen((o) => ({ ...o, [saved.output!.id]: true }));
     }
     setBusy(null);
-    setNotice(`${OUTPUT_LABEL[tipo]} gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : ""}.`);
+    setNotice(`${OUTPUT_LABEL[tipo]} gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : " · grátis"}.`);
+  }
+
+  async function generateImage() {
+    const prompt = imagePrompt.trim();
+    if (busy || !prompt) return;
+    setBusy("generate_image");
+    setError("");
+    setNotice("");
+    const res = await callAction<{ imagens?: string[]; modelo?: string; creditosCobrados?: number }>(
+      "ai-generate",
+      {
+        action: "generate_image",
+        serviceSlug: lead.service_slug,
+        businessRef: lead.id,
+        requestRef: crypto.randomUUID(),
+        prompt,
+      },
+    );
+    const url = res.ok ? res.data.imagens?.[0] : null;
+    if (!res.ok || !url) {
+      setBusy(null);
+      setError(res.ok ? "A IA não devolveu imagem." : res.error);
+      return;
+    }
+    const save = await fetch(`/api/leads/${lead.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "generate_image", conteudo: url, modelo: res.data.modelo ?? null }),
+    });
+    const saved = (await save.json().catch(() => null)) as { output?: OutputRow } | null;
+    if (saved?.output) {
+      setOutputs((list) => [{ ...saved.output!, conteudo: url }, ...list]);
+      setOpen((o) => ({ ...o, [saved.output!.id]: true }));
+    }
+    setImagePrompt("");
+    setBusy(null);
+    setNotice(`Imagem gerada${res.data.creditosCobrados ? ` · ${res.data.creditosCobrados} créditos` : ""}.`);
   }
 
   async function checkWhatsapp() {
@@ -190,6 +231,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           {lead.site
             ? <a className="seek-badge seek-badge-ok" href={lead.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />Site atual<ExternalLink size={10} /></a>
             : <span className="seek-badge seek-badge-gap">Sem site — oportunidade</span>}
+          {lead.instagram && <a className="seek-badge" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{lead.instagram}</a>}
           {lead.maps_url && <a className="seek-badge" href={lead.maps_url} target="_blank" rel="noopener noreferrer"><MapPin size={11} />Maps<ExternalLink size={10} /></a>}
         </div>
       </div>
@@ -199,7 +241,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       <button type="button" className="button button-primary button-small" disabled={busy !== null}
         onClick={() => void generate("sales_reply")}>
         {busy === "sales_reply" ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
-        Mensagem de abordagem{costs.sales_reply ? ` · ${costs.sales_reply}cr` : ""}
+        Mensagem de abordagem{costs.sales_reply ? ` · ${costs.sales_reply}cr` : " · grátis"}
       </button>
       <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void generate("deep_strategy")}>
@@ -211,10 +253,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         {busy === "generate_site" ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
         Gerar site{costs.generate_site ? ` · ${costs.generate_site}cr` : ""}
       </button>}
-      {lead.telefone && <button type="button" className="button button-glass button-small" disabled={busy !== null}
+      {lead.telefone && lead.whatsapp === null && <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void checkWhatsapp()}>
         {busy === "whatsapp" ? <Loader2 size={14} className="spin" /> : <MessageCircle size={14} />}
-        Verificar WhatsApp{costs.whatsapp_check ? ` · ${costs.whatsapp_check}cr` : ""}
+        Verificar WhatsApp · grátis
       </button>}
       <button type="button" className="button button-glass button-small lead-delete" disabled={busy !== null}
         onClick={() => void removeLead()}>
@@ -225,6 +267,25 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     {error && <p role="alert" className="auth-error">{error}</p>}
     {notice && <p role="status" className="editor-saved"><Sparkles size={14} />{notice}</p>}
 
+    {canImage && <section className="lead-image-gen">
+      <h2><ImagePlus size={17} /> Criar imagem</h2>
+      <p className="seek-meta">Descreva a imagem que você precisa — a direção de arte profissional é aplicada automaticamente.</p>
+      <div className="lead-image-row">
+        <input
+          value={imagePrompt}
+          maxLength={2000}
+          placeholder="Ex.: post de feed anunciando combo de corte + barba, tons escuros, estilo premium"
+          onChange={(e) => setImagePrompt(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generateImage(); } }}
+        />
+        <button type="button" className="button button-primary button-small" disabled={busy !== null || !imagePrompt.trim()}
+          onClick={() => void generateImage()}>
+          {busy === "generate_image" ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
+          Gerar{costs.generate_image ? ` · ${costs.generate_image}cr` : ""}
+        </button>
+      </div>
+    </section>}
+
     <section className="lead-outputs">
       <h2>Gerado para este lead</h2>
       {outputs.length === 0 && <p className="seek-empty">Nada gerado ainda — comece pela mensagem de abordagem.</p>}
@@ -234,15 +295,21 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           <small>{new Date(o.created_at).toLocaleString("pt-BR")}{o.modelo ? ` · ${o.modelo}` : ""}</small>
         </button>
         {open[o.id] && <div className="lead-output-body">
-          {o.tipo === "generate_site"
-            ? <div className="lead-output-actions">
-                <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />Abrir site</button>
-                <button type="button" className="button button-glass button-small" onClick={() => downloadSite(o.conteudo)}><Download size={14} />Baixar HTML</button>
-              </div>
-            : <>
-                <pre className="lead-output-text">{o.conteudo}</pre>
-                <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />Copiar</button>
-              </>}
+          {o.tipo === "generate_site" && <div className="lead-output-actions">
+            <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />Abrir site</button>
+            <button type="button" className="button button-glass button-small" onClick={() => downloadSite(o.conteudo)}><Download size={14} />Baixar HTML</button>
+          </div>}
+          {o.tipo === "generate_image" && <div className="lead-output-image">
+            <Image src={o.conteudo} alt="Imagem gerada por IA" width={640} height={640} unoptimized
+              style={{ width: "100%", height: "auto", borderRadius: 10 }} />
+            <a className="button button-glass button-small" href={o.conteudo} download={`imagem-${o.id.slice(0, 8)}.png`} target="_blank" rel="noopener noreferrer">
+              <Download size={14} />Baixar imagem
+            </a>
+          </div>}
+          {(o.tipo === "sales_reply" || o.tipo === "deep_strategy") && <>
+            <pre className="lead-output-text">{o.conteudo}</pre>
+            <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />Copiar</button>
+          </>}
         </div>}
       </article>)}
     </section>

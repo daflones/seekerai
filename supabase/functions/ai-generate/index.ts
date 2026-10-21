@@ -66,7 +66,13 @@ function systemPromptFor(action: string): string {
         "Responda APENAS com o código HTML, sem comentários fora do código.",
       ].join("\n");
     case "generate_image":
-      return "Gere uma imagem profissional e atraente a partir da descrição.";
+      return [
+        "Você é um diretor de arte e fotógrafo comercial premiado.",
+        "Crie UMA imagem de altíssima qualidade atendendo fielmente ao pedido do usuário.",
+        "Direção de arte obrigatória: acabamento profissional/editorial, iluminação estudada e realista,",
+        "composição intencional, cores coesas e sofisticadas, nitidez de produto premium.",
+        "Sem texto na imagem a menos que o usuário peça explicitamente. Sem marcas d'água, sem emojis.",
+      ].join("\n");
     default:
       return "Responda em pt-BR.";
   }
@@ -196,6 +202,8 @@ Deno.serve(async (req) => {
         ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}\n\n` +
           `URLs de imagem disponíveis (use TODAS nos <img> apropriados — hero primeiro):\n` +
           imageUrls.map((u, i) => `${i + 1}. ${u}`).join("\n")
+        : action === "generate_image"
+          ? prompt
         : body.context
           ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
           : prompt;

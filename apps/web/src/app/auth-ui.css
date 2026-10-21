@@ -170,3 +170,12 @@ a.seek-badge:hover { border-color: #a879d166; }
   .lead-row { flex-direction: column; align-items: flex-start; }
   .lead-row-side { flex-direction: row; align-items: center; width: 100%; justify-content: space-between; }
 }
+
+.lead-image-gen { margin-top: 28px; border: 1px solid #ab7bcd22; border-radius: 13px; padding: 20px; background: #ffffff04; }
+.lead-image-gen > h2 { display: flex; align-items: center; gap: 9px; font-size: 16px; color: #d8bcec; margin-bottom: 8px; }
+.lead-image-row { display: flex; gap: 10px; margin-top: 12px; }
+.lead-image-row input { flex: 1; min-height: 44px; padding: 10px 12px; border: 1px solid #b387d133; background: #0d0816; color: #e7dbee; border-radius: 8px; font-size: 13px; }
+.lead-image-row input::placeholder { color: #786286; }
+.lead-output-image { display: flex; flex-direction: column; gap: 12px; }
+.lead-output-image .button { align-self: flex-start; }
+@media (max-width: 680px) { .lead-image-row { flex-direction: column; } }

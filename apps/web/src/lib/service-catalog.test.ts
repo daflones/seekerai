@@ -16,7 +16,8 @@ describe("catálogo de serviços", () => {
     expect(supportsAction("design", "generate_image")).toBe(true);
     expect(supportsAction("design", "generate_site")).toBe(false);
     expect(supportsAction("edicao_video", "generate_site")).toBe(false);
-    expect(supportsAction("fotografia", "generate_image")).toBe(false);
+    expect(supportsAction("fotografia", "generate_image")).toBe(true);
+    expect(supportsAction("automacao", "generate_image")).toBe(false);
     expect(supportsAction("desconhecido", "generate_site")).toBe(false);
   });
 });

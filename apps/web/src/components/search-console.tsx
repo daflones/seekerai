@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookmarkPlus, CheckCircle2, ExternalLink, Loader2, MapPin, Phone, Search, Star, Globe } from "lucide-react";
+import { BookmarkPlus, CheckCircle2, ExternalLink, Instagram, Loader2, MapPin, MessageCircle, Phone, Search, Star, Globe } from "lucide-react";
 import { callAction, type PlaceResult } from "@/lib/app-client";
 
 interface SearchResponse {
@@ -114,6 +114,9 @@ export function SearchConsole({ services }: { services: { slug: string; nome: st
             {p.site
               ? <a className="seek-badge seek-badge-ok" href={p.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />Tem site</a>
               : <span className="seek-badge seek-badge-gap">Sem site — oportunidade</span>}
+            {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />WhatsApp ativo</span>}
+            {p.whatsapp === false && p.telefone && <span className="seek-badge">Sem WhatsApp</span>}
+            {p.instagram && <a className="seek-badge" href={`https://instagram.com/${p.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{p.instagram}</a>}
             {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">Fechado</span>}
           </div>
           <div className="seek-card-actions">
