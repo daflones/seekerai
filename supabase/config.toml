@@ -27,6 +27,11 @@ additional_redirect_urls = ["http://localhost:3000/auth/callback"]
 enable_signup = true
 minimum_password_length = 8
 
+[auth.captcha]
+enabled = true
+provider = "turnstile"
+secret = "env(TURNSTILE_SECRET_KEY)"
+
 [auth.email]
 enable_signup = true
 enable_confirmations = true

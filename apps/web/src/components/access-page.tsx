@@ -1,9 +1,30 @@
 import Link from "next/link";
-import { ArrowUpRight, Check, Construction, ShieldCheck, Sparkles } from "lucide-react";
+import { Check, ShieldCheck, Sparkles } from "lucide-react";
 import { InnerHeader } from "./inner-header";
-import { plans } from "@/lib/catalog";
+import { publicPlanCards } from "@/lib/plans/server";
+import { formatPlanPrice } from "@/lib/plans/model";
+import { authReady } from "@/lib/auth/config";
+import { AuthForm, type AuthMode } from "./auth-form";
 
-export function AccessPage({ login = false, plan }: { login?: boolean; plan?: string }) {
-  const selected = plans.find((item) => item.id === plan);
-  return <div className="inner-page"><InnerHeader /><main id="conteudo" className="container auth-layout"><div className="auth-story"><span className="eyebrow">SEU PRÓXIMO PASSO COMEÇA AQUI</span><h1>Mais direção.<br />Mais boas conversas.<br /><span className="gradient-text">Novas possibilidades.</span></h1><p>Seu talento já existe. Estamos construindo uma forma melhor de conectar você às empresas que precisam dele.</p><ul className="check-list"><li><Check />Prospecção com contexto</li><li><Check />Uma abordagem mais humana</li><li><Check />Seu trabalho no centro da conversa</li></ul><div className="auth-story-note"><ShieldCheck size={21} /><span>Sem promessas de faturamento. Sem dados inventados. Ferramentas para você construir seu próprio caminho.</span></div></div><section className="auth-panel" aria-label={login ? "Estado do acesso à plataforma" : "Estado do cadastro"}><span className="eyebrow">ACESSO ANTECIPADO</span><h2>{login ? "Sua próxima fase está chegando." : "Estamos preparando sua chegada."}</h2><p>O SeekerAi está em construção. Você já pode explorar o fluxo da plataforma, sem criar conta e sem informar dados pessoais.</p>{selected && <div className="selected-plan"><Sparkles size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 7 }} />Plano de interesse: <strong>{selected.name}</strong> · R$ {selected.price}{selected.id !== "gratis" ? "/mês" : ""}</div>}<div className="auth-notice"><Construction size={18} /><span>{login ? "Login e recuperação de senha ainda não estão habilitados." : "O cadastro ainda não está habilitado."} A autenticação será conectada com confirmação de e-mail e proteção antispam. Não solicitamos senha nesta versão.</span></div><Link href="/explorar" className="button button-primary">Explorar a demonstração <ArrowUpRight size={17} /></Link><Link href="/#planos" className="button button-outline">Conhecer os planos</Link><p className="secondary-auth-link"><Link href="/privacidade">Como vamos cuidar dos seus dados</Link></p></section></main></div>;
+export async function AccessPage({ login = false, mode, plan, next, state, email }: {
+  login?: boolean; mode?: AuthMode; plan?: string; next?: string; state?: string; email?: string;
+}) {
+  const selected = plan ? (await publicPlanCards()).plans.find((item) => item.slug === plan) : undefined;
+  const activeMode = mode || (login ? "login" : "signup");
+  const copy = {
+    login: ["BOM TER VOCÊ DE VOLTA", "Entre no seu radar.", "Suas oportunidades e próximos passos, em um só lugar."],
+    signup: ["SEU PRÓXIMO PASSO", "Crie sua conta.", "Comece a construir novas possibilidades para o seu negócio."],
+    recover: ["VAMOS RESOLVER", "Recupere seu acesso.", "Enviaremos as instruções para o e-mail da sua conta."],
+    password: ["UM NOVO COMEÇO", "Escolha uma nova senha.", "Use uma senha única para proteger seu próximo passo."],
+    onboarding: ["FALTA POUCO", "Complete sua chegada.", "Confirme seus dados e o aceite para acessar a plataforma."],
+  }[activeMode];
+  return <div className="inner-page"><InnerHeader /><main id="conteudo" className="container auth-layout">
+    <div className="auth-story"><span className="eyebrow">SEU PRÓXIMO PASSO COMEÇA AQUI</span><h1>Mais direção.<br />Mais boas conversas.<br /><span className="gradient-text">Novas possibilidades.</span></h1><p>Seu talento já existe. Estamos construindo uma forma melhor de conectar você às empresas que precisam dele.</p><ul className="check-list"><li><Check />Prospecção com contexto</li><li><Check />Uma abordagem mais humana</li><li><Check />Seu trabalho no centro da conversa</li></ul><div className="auth-story-note"><ShieldCheck size={21} /><span>Sua senha e sessão são tratadas pelo Supabase. O acesso administrativo é verificado no servidor, nunca por uma opção no navegador.</span></div></div>
+    <section className="auth-panel" aria-label="Acesso à conta"><span className="eyebrow">{copy[0]}</span><h2>{copy[1]}</h2><p>{copy[2]}</p>
+      {selected && <div className="selected-plan"><Sparkles size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 7 }} />Plano de interesse: <strong>{selected.name}</strong> · R$ {formatPlanPrice(selected.priceCents)}{selected.slug !== "gratis" ? "/mês" : ""}</div>}
+      {state === "link-expirado" && <p className="auth-error" role="alert">Este link expirou ou já foi utilizado. Solicite outro link de recuperação.</p>}
+      {state === "perfil-pendente" && <p className="auth-error" role="alert">O perfil da sua conta ainda não está disponível. O provisionamento do banco precisa ser concluído.</p>}
+      <AuthForm mode={activeMode} available={authReady()} siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""} next={next} plan={selected?.slug} email={email} />
+      <Link className="auth-demo-link" href="/explorar">Prefere conhecer primeiro? Explore a demonstração.</Link>
+    </section></main></div>;
 }

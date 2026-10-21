@@ -5,6 +5,7 @@ node_modules
 **/.env*
 **/.next
 **/.next-dev
+**/.next-auth-test
 referencias
 .cache
 coverage

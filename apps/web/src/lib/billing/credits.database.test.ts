@@ -4,6 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { services } from "../service-catalog";
+import { defaultCardContent } from "../plans/preview";
 
 let db: PGlite;
 const hash = "a".repeat(64);
@@ -184,5 +185,94 @@ describe("migrations de créditos em PostgreSQL embarcado", () => {
     expect(await balance(id)).toBe(200);
     await db.query("select * from public.grant_plan_allowance($1, $2, 'stripe:invoice:proximo')", [id, planId]);
     expect(await balance(id)).toBe(400);
+  });
+
+  it("limita tentativas de autenticação atomicamente e não expõe os buckets", async () => {
+    const key = "b".repeat(64);
+    const call = () => db.query<{ allowed: boolean }>("select * from public.check_auth_rate_limit($1, 2, 900)", [key]);
+    expect((await call()).rows[0].allowed).toBe(true);
+    expect((await call()).rows[0].allowed).toBe(true);
+    expect((await call()).rows[0].allowed).toBe(false);
+    const id = await user();
+    await expect(authenticated(id, (tx) => tx.exec("select * from public.auth_rate_limits"))).rejects.toThrow("permission denied");
+    await expect(authenticated(id, (tx) => tx.query("select * from public.check_auth_rate_limit($1, 100, 1)", [key]))).rejects.toThrow("permission denied");
+  });
+
+  it("registra consentimento pelo servidor sem permitir sobrescrita por cadastro repetido", async () => {
+    const id = await user();
+    await db.query("select public.record_registration_consent($1, 'Nome aceito', '(11) 99999-9999', false)", [id]);
+    await db.query("select public.record_registration_consent($1, 'Nome substituído', '(11) 88888-8888', true)", [id]);
+    const profile = (await db.query<{ nome: string; terms_version: string; marketing_consent: boolean }>(
+      "select nome, terms_version, marketing_consent from public.profiles where id = $1", [id],
+    )).rows[0];
+    expect(profile).toEqual({ nome: "Nome aceito", terms_version: "2026-10-21", marketing_consent: false });
+    await expect(authenticated(id, (tx) => tx.query("select public.record_registration_consent($1, 'Fraude', '(11) 99999-9999', true)", [id]))).rejects.toThrow("permission denied");
+  });
+
+  it("onboarding altera somente o próprio perfil, exige termos e não muda role", async () => {
+    const a = await user();
+    const b = await user();
+    await expect(authenticated(a, (tx) => tx.exec("select public.complete_own_profile('Conta A', '(11) 99999-9999', false, false)"))).rejects.toThrow("Profile and consent required");
+    await authenticated(a, (tx) => tx.exec("select public.complete_own_profile('Conta A', '(11) 99999-9999', true, false)"));
+    const rows = (await db.query<{ id: string; role: string; onboarding_concluido: boolean }>(
+      "select id, role, onboarding_concluido from public.profiles where id in ($1, $2)", [a, b],
+    )).rows;
+    expect(rows.find((row) => row.id === a)).toMatchObject({ role: "user", onboarding_concluido: true });
+    expect(rows.find((row) => row.id === b)).toMatchObject({ role: "user", onboarding_concluido: false });
+    await expect(authenticated(a, (tx) => tx.exec("update public.profiles set consentimento_em = now()"))).rejects.toThrow("permission denied");
+    expect(await balance(a)).toBe(50);
+  });
+
+  it("bootstrap de admin é service-only, auditado e não aceita termos pelo usuário", async () => {
+    const id = await user();
+    await expect(authenticated(id, (tx) => tx.query("select public.grant_admin_access($1)", [id]))).rejects.toThrow("permission denied");
+    await db.query("select public.grant_admin_access($1)", [id]);
+    await db.query("select public.grant_admin_access($1)", [id]);
+    const row = (await db.query<{ role: string; consentimento_em: string | null }>(
+      "select role, consentimento_em from public.profiles where id = $1", [id],
+    )).rows[0];
+    expect(row).toEqual({ role: "admin", consentimento_em: null });
+    expect((await db.query("select id from public.audit_log where ator = $1 and acao = 'admin.bootstrap'", [id])).rows).toHaveLength(1);
+  });
+
+  it("publica cards por RPC admin, sem liberar cobrança ou expor franquia ao anônimo", async () => {
+    const admin = await user(true);
+    const id = randomUUID();
+    const content = defaultCardContent("pro");
+    await db.query("insert into public.plans (id,slug,nome,preco_centavos,creditos_mensais,ativo) values ($1,'pro','Pro',4990,300,false)", [id]);
+    await authenticated(admin, (tx) => tx.query(
+      "select public.configure_plan_card($1,'Pro',5990,2,true,true,$2::jsonb,0,'Revisão de oferta')", [id, JSON.stringify(content)],
+    ));
+    expect((await db.query<{ ativo: boolean; creditos_mensais: number }>("select ativo,creditos_mensais from public.plans where id=$1", [id])).rows[0]).toEqual({ ativo: false, creditos_mensais: 300 });
+    await db.transaction(async (tx) => {
+      await tx.exec("set local role anon");
+      const cards = await tx.query<{ preco_centavos: number }>("select preco_centavos from public.public_plan_cards where id=$1", [id]);
+      expect(cards.rows).toEqual([{ preco_centavos: 5990 }]);
+    });
+    await expect(db.transaction(async (tx) => {
+      await tx.exec("set local role anon");
+      return tx.exec("select creditos_mensais from public.plans");
+    })).rejects.toThrow("permission denied");
+    await expect(authenticated(admin, (tx) => tx.query(
+      "select public.configure_plan_card($1,'Pro',6990,2,true,true,$2::jsonb,0,'Revisão repetida')", [id, JSON.stringify(content)],
+    ))).rejects.toThrow("modified by another request");
+  });
+
+  it("cards não podem ser editados por usuário nem publicar créditos ou uso ilimitado", async () => {
+    const ordinary = await user();
+    const admin = await user(true);
+    const id = randomUUID();
+    const content = defaultCardContent("essencial");
+    await db.query("insert into public.plans (id,slug,nome,preco_centavos) values ($1,'essencial','Essencial',2490)", [id]);
+    const call = (who: string, card: unknown) => authenticated(who, (tx) => tx.query(
+      "select public.configure_plan_card($1,'Essencial',2490,1,false,true,$2::jsonb,0,'Revisão do card')", [id, JSON.stringify(card)],
+    ));
+    await expect(call(ordinary, content)).rejects.toThrow("Admin access required");
+    await expect(call(admin, { ...content, description: "150 créditos por mês" })).rejects.toThrow("Invalid plan card configuration");
+    await expect(call(admin, { ...content, features: [{ ...content.features[0], text: "Agente ilimitado" }] })).rejects.toThrow("Invalid plan card configuration");
+    await db.transaction(async (tx) => {
+      await tx.exec("set local role anon");
+      expect((await tx.query("select id from public.public_plan_cards where id=$1", [id])).rows).toHaveLength(0);
+    });
   });
 });
