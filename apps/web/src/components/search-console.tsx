@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { BookmarkPlus, CheckCircle2, ExternalLink, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone, Search, Star, Globe } from "lucide-react";
-import { callAction, type PlaceResult } from "@/lib/app-client";
+import { callAction, placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { cityGroups, formatPotential, nicheGroups } from "@/lib/catalog";
 import { FancySelect } from "./fancy-select";
 
@@ -144,7 +144,7 @@ export function SearchConsole({
     <div className="seek-grid">
       {(results ?? []).map((p, i) => <article key={p.id ?? i} className="seek-card">
         {p.imagem
-          ? <div className="seek-card-img" style={{ backgroundImage: `url(${p.imagem})` }} role="img" aria-label={p.nome ?? "Estabelecimento"} />
+          ? <div className="seek-card-img" style={{ backgroundImage: `url(${placeImageSrc(p.imagem)})` }} role="img" aria-label={p.nome ?? "Estabelecimento"} />
           : <div className="seek-card-img seek-card-img-empty" aria-hidden><MapPin size={22} /></div>}
         <div className="seek-card-body">
           <div className="seek-card-top">

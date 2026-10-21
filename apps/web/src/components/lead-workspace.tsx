@@ -8,7 +8,7 @@ import {
   MessageSquareText, Phone, Sparkles, Star, Trash2, Globe, MessageCircle,
   FileText, MonitorSmartphone,
 } from "lucide-react";
-import { callAction, LEAD_STATUS, type LeadRow } from "@/lib/app-client";
+import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 
 interface OutputRow {
   id: string;
@@ -208,7 +208,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
 
   return <>
     <header className="lead-head">
-      {lead.imagem && <div className="lead-photo" style={{ backgroundImage: `url(${lead.imagem})` }} role="img" aria-label={lead.nome} />}
+      {placeImageSrc(lead.imagem) && <div className="lead-photo" style={{ backgroundImage: `url(${placeImageSrc(lead.imagem)})` }} role="img" aria-label={lead.nome} />}
       <div className="lead-head-main">
         <div className="lead-head-top">
           <h1>{lead.nome}</h1>

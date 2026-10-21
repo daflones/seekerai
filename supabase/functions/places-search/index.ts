@@ -31,6 +31,7 @@ const FIELD_MASK = [
   "places.businessStatus",
   "places.primaryTypeDisplayName",
   "places.regularOpeningHours.openNow",
+  "places.photos",
 ].join(",");
 
 const APIFY_ACTOR = "compass~crawler-google-places";
@@ -104,7 +105,13 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
         ? asString(place.primaryTypeDisplayName.text)
         : null,
       mapsUrl: null,
-      imagem: null,
+      // Referência da foto (places/.../photos/...) — resolvida via /api/place-photo,
+      // assim a chave do Google nunca chega ao navegador.
+      imagem: (() => {
+        const photos = Array.isArray(place.photos) ? place.photos : [];
+        const name = isRecord(photos[0]) ? asString(photos[0].name, 500) : null;
+        return name ? `gphoto:${name}` : null;
+      })(),
       lat: null,
       lng: null,
       whatsapp: null,

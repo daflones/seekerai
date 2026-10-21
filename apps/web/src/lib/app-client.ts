@@ -23,6 +23,16 @@ export async function callAction<T = Record<string, unknown>>(
   }
 }
 
+// Fotos do Google chegam como "gphoto:places/.../photos/..." — resolvemos via
+// proxy autenticado para não expor a chave da API no navegador.
+export function placeImageSrc(imagem: string | null | undefined): string | null {
+  if (!imagem) return null;
+  if (imagem.startsWith("gphoto:")) {
+    return `/api/place-photo?ref=${encodeURIComponent(imagem.slice(7))}`;
+  }
+  return imagem;
+}
+
 // Resultado normalizado de places-search.
 export interface PlaceResult {
   id: string | null;
