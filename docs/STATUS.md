@@ -33,8 +33,15 @@
 
 - Fase 1: validar SQL/RLS em Supabase local com Auth real, link e push Git.
 - Teste manual de captcha/SMTP no domínio; Google OAuth e exportação/exclusão LGPD.
-- Pagamentos sandbox, webhooks assinados e idempotentes.
-- Busca Places oficial, enriquecimento, score real, filtros completos e mapa.
+- Pagamentos: espinha pronta (`billing-checkout`, webhooks Stripe/MercosulPay
+  com dedup e RPCs service-only); falta cadastrar os endpoints nos provedores,
+  registrar `*_WEBHOOK_SECRET` e testar cobrança real em sandbox.
+- Busca Places oficial via edge function pronta; falta `GOOGLE_PLACES_API_KEY`
+  no Supabase secrets, enriquecimento, score real, filtros completos e mapa.
+- IA (estratégia/mensagem/site/imagem) via edge function pronta; OpenRouter
+  está com saldo baixo — a primeira tentativa de imagem retornou 402.
+- Verificação WhatsApp via Evolution pronta; faltam `EVOLUTION_*` nos secrets
+  e habilitar custo de `whatsapp_check` no admin.
 - Conectar o catálogo persistido ao app; completar nichos e seed IBGE.
 - Cidades em alta e cron.
 - IA de análise/abordagem, sites publicados e streaming.
@@ -51,7 +58,8 @@
 - OpenRouter Image API retornou 402 na primeira tentativa, sem imagem.
 - Docker Desktop daemon não está disponível nesta sessão.
 - Nenhum remote Git/Easypanel fornecido.
-- Faltam Google Places, Evolution, webhooks e STT.
+- Faltam secrets `GOOGLE_PLACES_API_KEY`, `EVOLUTION_*` e `*_WEBHOOK_SECRET`
+  (Stripe/MercosulPay) no Supabase; STT ainda não integrado.
 - Segredos internos foram gerados localmente; nunca publicados.
 - Identificação legal e canal de privacidade precisam ser definidos.
 - `braces` (dev, via eslint) tem advisory sem versão corrigida na linha 3.x.

@@ -141,3 +141,21 @@ Em dev, o `NextURL` do Next normaliza `127.0.0.1` para `localhost` ao montar
 `request.nextUrl` e reescreve redirects de middleware para esse host. Cookies
 HttpOnly host-only não atravessam entre os dois hosts, então testes e uso local
 devem usar `localhost` consistentemente. Ver `docs/AUTH.md`.
+
+## Edge Functions e secrets de provedores
+
+Chamadas a provedores pagos (Stripe, MercosulPay, Google Places, OpenRouter,
+Evolution) passam por Supabase Edge Functions, e os secrets ficam em
+`supabase secrets` — o Easypanel só carrega variáveis do app. Racional: os
+provedores chamam nossa infra por webhooks que não podem carregar JWT, então a
+função pública se autentica pela assinatura HMAC do provedor (`verify_jwt =
+false` apenas nos webhooks); funções chamadas pelo app exigem JWT e validam o
+usuário no servidor.
+
+Toda mutação de pagamento acontece em RPCs `security definer` service-only:
+`confirm_plan_payment` lê `user_id`/`plan_id` da linha `payments` criada no
+checkout — o payload do provedor nunca escolhe beneficiário. Idempotência por
+`webhook_events (provider, event_id)` e `payments (provider, provider_ref)`.
+Para PIX da MercosulPay, `provider_ref` é a referência interna gerada por nós,
+ecoada pelo webhook via `external_reference` — evita depender do formato de ID
+do provedor.

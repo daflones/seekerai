@@ -35,3 +35,23 @@ secret = "env(TURNSTILE_SECRET_KEY)"
 [auth.email]
 enable_signup = true
 enable_confirmations = true
+
+# Webhooks de provedores: sem JWT — autenticação é a assinatura do provedor.
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.mercosulpay-webhook]
+verify_jwt = false
+
+# Chamadas do app: exigem JWT do usuário autenticado.
+[functions.billing-checkout]
+verify_jwt = true
+
+[functions.places-search]
+verify_jwt = true
+
+[functions.ai-generate]
+verify_jwt = true
+
+[functions.whatsapp-check]
+verify_jwt = true

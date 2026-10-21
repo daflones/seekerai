@@ -50,6 +50,46 @@ serviço Easypanel.
 Subdomínios de demos `*.demo.<dominio>` só devem ser ativados após implementar
 publicação, isolamento, sandbox, DNS wildcard e certificado correspondente.
 
+## Edge Functions e secrets de provedores
+
+Secrets de provedores (Stripe, MercosulPay, Google Places, OpenRouter,
+Evolution) ficam no Supabase — **não** no Easypanel. Sincronize e faça deploy:
+
+```sh
+node scripts/deploy-edge.mjs            # secrets + functions
+node scripts/deploy-edge.mjs --secrets  # só secrets
+```
+
+O script lê `.env.local`, grava `supabase/.env.edge` (gitignored) e executa
+`supabase secrets set` + `supabase functions deploy` no projeto remoto.
+
+| Function            | Auth                  | Uso                                    |
+| ------------------- | --------------------- | -------------------------------------- |
+| `stripe-webhook`    | assinatura Stripe     | confirma/renova/cancela assinatura     |
+| `mercosulpay-webhook` | assinatura Mercosul | confirma pagamento PIX                 |
+| `billing-checkout`  | JWT do usuário        | cria checkout Stripe ou cobrança PIX   |
+| `places-search`     | JWT do usuário        | Google Places (consome `search`)       |
+| `ai-generate`       | JWT do usuário        | OpenRouter (estratégia/mensagem/site/imagem) |
+| `whatsapp-check`    | JWT do usuário        | Evolution (verificação de número)      |
+
+Webhooks a cadastrar nos provedores (apontam para `functions/v1/<nome>`):
+
+- Stripe → `https://<project-ref>.supabase.co/functions/v1/stripe-webhook`
+  (eventos: `checkout.session.completed`, `invoice.paid`,
+  `customer.subscription.deleted`)
+- MercosulPay → `https://<project-ref>.supabase.co/functions/v1/mercosulpay-webhook`
+
+Após cadastrar, copie os webhook secrets para `.env.local`
+(`STRIPE_WEBHOOK_SECRET`, `MERCOSULPAY_WEBHOOK_SECRET`) e rode
+`node scripts/deploy-edge.mjs --secrets` de novo. Enquanto o secret não estiver
+configurado, o webhook responde 500/401 — comportamento esperado.
+
+Dedup de eventos é garantido por `webhook_events (provider, event_id)`; evento
+com falha anterior é reprocessado (status `retry`). Mutações só via RPCs
+service_role (`confirm_plan_payment`, `record_renewal_payment`,
+`cancel_provider_subscription`) — o payload do provedor nunca decide quem
+recebe créditos.
+
 ## Geração de imagens
 
 Inspecione os prompts sem custo:
