@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.git
+.env*
+**/.env*
+**/.next
+**/.next-dev
+referencias
+.cache
+coverage
+test-results
+playwright-report
+*.log
