@@ -173,6 +173,9 @@ a.seek-badge:hover { border-color: #a879d166; }
 .plan-card-checkout { position: relative; border: 1px solid #ab7bcd2c; border-radius: 15px; padding: 26px; background: linear-gradient(135deg, #a879d10d, #a879d103); display: flex; flex-direction: column; gap: 10px; }
 .plan-card-checkout.featured { border-color: #a177ff66; box-shadow: 0 0 40px #8648f018; }
 .plan-flag { position: absolute; top: -11px; left: 24px; font-size: 8px; font-weight: 750; letter-spacing: .12em; color: #0d0816; background: linear-gradient(100deg, #c3a1ff, #9b8eff); padding: 5px 12px; border-radius: 999px; }
+.plan-flag-current { background: linear-gradient(100deg, #6fe3b3, #4dc79a); }
+.plan-card-checkout.current { border-color: #6fe3b355; box-shadow: 0 0 30px #6fe3b311; }
+.plan-current-note { font-size: 12px; color: #8f84a8; margin-top: auto; padding-top: 8px; }
 .plan-card-checkout h3 { font-size: 19px; color: #eadcf5; }
 .plan-price { font-size: 30px; font-weight: 750; color: #d8bcec; }
 .plan-price small { font-size: 12px; font-weight: 500; color: #9980ac; }
@@ -181,7 +184,12 @@ a.seek-badge:hover { border-color: #a879d166; }
 .plan-features li { color: #b9a2cd; font-size: 11px; line-height: 1.7; padding-left: 17px; position: relative; }
 .plan-features li::before { content: ""; position: absolute; left: 0; top: 7px; width: 7px; height: 7px; border-radius: 50%; background: #a177ff66; }
 .plan-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 16px; }
+.pix-overlay { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 20px; background: #06040cd9; backdrop-filter: blur(8px); }
 .pix-panel { margin-top: 30px; border: 1px solid #3d9d7433; border-radius: 15px; padding: 26px; background: #2f8f6a08; }
+.pix-modal { position: relative; margin-top: 0; width: min(400px, 100%); max-height: 90vh; overflow-y: auto; background: #140d22f5; border-color: #6fe3b344; box-shadow: 0 30px 80px #000000aa, 0 0 60px #6fe3b318; }
+.pix-close { position: absolute; top: 14px; right: 16px; width: 32px; height: 32px; border: 1px solid #ab7bcd33; border-radius: 50%; background: transparent; color: #8f84a8; font-size: 18px; line-height: 1; cursor: pointer; }
+.pix-close:hover { color: #eadcf5; border-color: #ab7bcd77; }
+.pix-price { margin: -8px 0 14px; }
 
 .pix-panel h2 { display: flex; align-items: center; gap: 10px; font-size: 18px; color: #bfe8d4; margin-bottom: 18px; }
 .pix-qr { width: 210px; height: 210px; border-radius: 10px; background: #fff; padding: 10px; margin-bottom: 16px; }

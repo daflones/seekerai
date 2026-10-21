@@ -28,9 +28,10 @@ function brl(cents: number) {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function PlanCheckout({ plans, hasSubscription }: {
+export function PlanCheckout({ plans, hasSubscription, currentPlanSlug }: {
   plans: PlanItem[];
   hasSubscription: boolean;
+  currentPlanSlug: string | null;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -61,54 +62,66 @@ export function PlanCheckout({ plans, hasSubscription }: {
     setTimeout(() => setCopied(false), 2500);
   }
 
-  if (hasSubscription) {
-    return <p className="auth-success" role="status">
-      <CheckCircle2 size={18} /> Você já possui uma assinatura em andamento. Os créditos do plano
-      entram automaticamente a cada ciclo.
-    </p>;
-  }
-
   return <>
+    {hasSubscription && <p className="auth-success" role="status">
+      <CheckCircle2 size={18} /> Você possui uma assinatura em andamento. Para trocar de plano,
+      escolha uma das opções abaixo — os créditos entram a cada ciclo.
+    </p>}
+
     <div className="plan-grid">
-      {plans.map((plan) => <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}`}>
-        {plan.featured && <span className="plan-flag">MAIS ESCOLHIDO</span>}
-        <h3>{plan.name}</h3>
-        <p className="plan-price">{brl(plan.priceCents)}<small>/mês</small></p>
-        {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
-        {plan.content.features && <ul className="plan-features">
-          {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}
-        </ul>}
-        <div className="plan-actions">
-          <button type="button" className="button button-primary button-small" disabled={busy !== null}
-            onClick={() => void checkout(plan.slug, "card")}>
-            {busy === `${plan.slug}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-            Cartão
-          </button>
-          <button type="button" className="button button-glass button-small" disabled={busy !== null}
-            onClick={() => void checkout(plan.slug, "pix")}>
-            {busy === `${plan.slug}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
-            PIX
-          </button>
-        </div>
-      </article>)}
+      {plans.map((plan) => {
+        const isCurrent = plan.slug === currentPlanSlug;
+        const isFree = plan.priceCents === 0;
+        return <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}${isCurrent ? " current" : ""}`}>
+          {isCurrent && <span className="plan-flag plan-flag-current">SEU PLANO ATUAL</span>}
+          {!isCurrent && plan.featured && <span className="plan-flag">MAIS ESCOLHIDO</span>}
+          <h3>{plan.name}</h3>
+          <p className="plan-price">{isFree ? "Grátis" : brl(plan.priceCents)}{!isFree && <small>/mês</small>}</p>
+          {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
+          {plan.content.features && <ul className="plan-features">
+            {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}
+          </ul>}
+          {isCurrent
+            ? <p className="plan-current-note">É o plano ativo na sua conta.</p>
+            : isFree
+              ? <p className="plan-current-note">Plano base — incluído em toda conta.</p>
+              : <div className="plan-actions">
+                <button type="button" className="button button-primary button-small" disabled={busy !== null}
+                  onClick={() => void checkout(plan.slug, "card")}>
+                  {busy === `${plan.slug}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
+                  Cartão
+                </button>
+                <button type="button" className="button button-glass button-small" disabled={busy !== null}
+                  onClick={() => void checkout(plan.slug, "pix")}>
+                  {busy === `${plan.slug}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
+                  PIX
+                </button>
+              </div>}
+        </article>;
+      })}
     </div>
 
     {error && <p role="alert" className="auth-error">{error}</p>}
 
-    {pix && <section className="pix-panel">
-      <h2><QrCode size={18} /> PIX gerado — {plans.find((p) => p.slug === pix.plan)?.name}</h2>
-      {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code do PIX" width={210} height={210} unoptimized />}
-      {pix.qrCode && <div className="pix-code">
-        <code>{pix.qrCode}</code>
-        <button type="button" className="button button-glass button-small" onClick={() => void copyPix(pix.qrCode!)}>
-          <Copy size={14} />{copied ? "Copiado" : "Copiar código"}
-        </button>
-      </div>}
-      <p className="seek-meta">
-        Abra o app do seu banco, pague com o QR Code ou o código copia-e-cola.
-        {pix.expiresAt && ` Válido até ${new Date(pix.expiresAt).toLocaleString("pt-BR")}.`}
-        {" "}Assim que o pagamento confirmar, o plano ativa sozinho.
-      </p>
-    </section>}
+    {pix && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label="Pagamento PIX"
+      onClick={() => setPix(null)}>
+      <section className="pix-panel pix-modal" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="pix-close" aria-label="Fechar" onClick={() => setPix(null)}>×</button>
+        <h2><QrCode size={18} /> PIX — {plans.find((p) => p.slug === pix.plan)?.name}</h2>
+        <p className="plan-price pix-price">{brl(plans.find((p) => p.slug === pix.plan)?.priceCents ?? 0)}<small>/mês</small></p>
+        {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code do PIX" width={210} height={210} unoptimized />}
+        {pix.qrCode && <div className="pix-code">
+          <code>{pix.qrCode}</code>
+          <button type="button" className="button button-glass button-small" onClick={() => void copyPix(pix.qrCode!)}>
+            <Copy size={14} />{copied ? "Copiado" : "Copiar código"}
+          </button>
+        </div>}
+        <p className="seek-meta">
+          Abra o app do seu banco, pague com o QR Code ou o código copia-e-cola.
+          {pix.expiresAt && ` Válido até ${new Date(pix.expiresAt).toLocaleString("pt-BR")}.`}
+          {" "}Assim que o pagamento confirmar, o plano ativa sozinho.
+        </p>
+      </section>
+    </div>}
   </>;
 }

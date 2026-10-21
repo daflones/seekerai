@@ -113,6 +113,8 @@ export function IntegrationsEditor({
 
   return <div className="plan-editor">
     <form className="editor-form" onSubmit={(e) => e.preventDefault()}>
+      {error && <p role="alert" className="auth-error">{error}</p>}
+      {saved && <p role="status" className="editor-saved"><CheckCircle2 size={16} />{saved}</p>}
       <fieldset disabled={busy !== null}>
         <legend><Search size={15} /> Provedor de busca de estabelecimentos</legend>
         <div className="editor-checks">
@@ -193,12 +195,10 @@ export function IntegrationsEditor({
           })}
         </div>
 
-        <label className="editor-block-label">Motivo da alteração
-          <textarea required minLength={5} maxLength={300} rows={2} value={reason}
+        <label className="editor-block-label">Motivo da alteração <small>(obrigatório ao salvar chaves)</small>
+          <textarea minLength={5} maxLength={300} rows={2} value={reason}
             onChange={(e) => setReason(e.target.value)} placeholder="Registrado na auditoria" />
         </label>
-        {error && <p role="alert" className="auth-error">{error}</p>}
-        {saved && <p role="status" className="editor-saved"><CheckCircle2 size={16} />{saved}</p>}
       </fieldset>
     </form>
   </div>;

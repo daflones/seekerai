@@ -24,12 +24,12 @@ const mutationSchema = z.discriminatedUnion("acao", [
     acao: z.literal("definir-setting"),
     chave: z.enum(["search_provider", "search_replay"]),
     valor: z.enum(["google_places", "apify", "on", "off"]),
-    motivo: reason,
+    motivo: reason.optional().or(z.literal("")),
   }),
   z.object({
     acao: z.literal("remover-run"),
     runId: z.string().uuid(),
-    motivo: reason,
+    motivo: reason.optional().or(z.literal("")),
   }),
 ]);
 
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
   if (body.acao === "remover-run") {
     const { error } = await session.supabase.rpc("delete_search_run", {
       p_run: body.runId,
-      p_reason: body.motivo,
+      p_reason: body.motivo || "Run removida pelo painel.",
     });
     if (error) return NextResponse.json({ error: "Não foi possível remover a run." }, { status: 400 });
     return NextResponse.json({ message: "Run removida." }, { headers: { "Cache-Control": "no-store" } });
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
   const { error } = await session.supabase.rpc("configure_app_setting", {
     p_key: body.chave,
     p_value: body.valor,
-    p_reason: body.motivo,
+    p_reason: body.motivo || `Configuração ${body.chave} ajustada pelo painel.`,
   });
   if (error) return NextResponse.json({ error: "Não foi possível salvar a configuração." }, { status: 400 });
   return NextResponse.json({ message: "Configuração atualizada." }, { headers: { "Cache-Control": "no-store" } });

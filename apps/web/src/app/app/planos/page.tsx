@@ -10,9 +10,13 @@ export default async function PlanosPage() {
   const { supabase, user } = await requireSession("/app/planos");
   const [{ plans }, { data: subscriptions }] = await Promise.all([
     publicPlanCards(),
-    supabase.from("subscriptions").select("id,status")
+    supabase.from("subscriptions").select("id,status,plan_id,plans:plan_id(slug)")
       .eq("user_id", user.id).in("status", ["pending", "active", "past_due"]).limit(1),
   ]);
+  const activePlanSlug = (subscriptions?.[0]?.plans as { slug?: string } | null)?.slug ?? null;
+  const currentPlanSlug = activePlanSlug
+    ?? plans.find((p) => p.priceCents === 0)?.slug
+    ?? null;
 
   return <>
     <span className="eyebrow">ASSINATURA</span>
@@ -22,6 +26,7 @@ export default async function PlanosPage() {
     </p>
     {plans.length === 0
       ? <p className="private-intro">Nenhum plano disponível no momento.</p>
-      : <PlanCheckout plans={plans} hasSubscription={(subscriptions ?? []).length > 0} />}
+      : <PlanCheckout plans={plans} hasSubscription={(subscriptions ?? []).length > 0}
+          currentPlanSlug={currentPlanSlug} />}
   </>;
 }
