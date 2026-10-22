@@ -34,6 +34,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       serviceName={service?.nome ?? lead.service_slug}
       enabledActions={service?.enabled_actions ?? []}
       siteSlug={((lead as { dados?: { siteSlug?: string } }).dados?.siteSlug) ?? null}
+      currency={loc.currency}
       t={t.lead}
       statusLabels={t.leadsPage.status}
     />

@@ -79,6 +79,8 @@ export interface LeadRow {
   status: "novo" | "contatado" | "respondeu" | "proposta" | "ganho" | "perdido";
   whatsapp: "sim" | "nao" | null;
   notas: string | null;
+  valor_fechado: number | null;
+  dados?: Record<string, unknown> | null;
   created_at: string;
 }
 

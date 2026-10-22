@@ -9,6 +9,7 @@ const patchSchema = z.object({
   status: z.enum(STATUS).optional(),
   notas: z.string().max(2000).optional(),
   whatsapp: z.enum(["sim", "nao"]).nullish(),
+  valor_fechado: z.number().min(0).max(99_999_999).nullish(),
 });
 
 const outputSchema = z.object({

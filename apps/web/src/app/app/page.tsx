@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CircleDollarSign, Compass, Images, Radar, ShieldCheck, Sparkles, TrendingUp, Users } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
-import { getLocale } from "@/lib/i18n";
+import { getLocale, formatMoney } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
@@ -16,7 +16,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }] = await Promise.all([
+  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "novo"),
@@ -24,6 +24,8 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
       .in("status", ["active", "past_due"]).limit(1),
     supabase.from("credit_operations").select("action,cost,status,created_at")
       .eq("status", "completed").order("created_at", { ascending: false }).limit(30),
+    supabase.from("leads").select("id,nome,valor_fechado,updated_at")
+      .eq("status", "ganho").order("updated_at", { ascending: false }).limit(20),
   ]);
 
   type Op = { action: string; cost: number; status: string; created_at: string };
@@ -39,6 +41,9 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   ).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const assinatura = subs?.length ? "ativa" : null;
   const dateLocale = { pt: "pt-BR", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", it: "it-IT" }[loc.lang];
+  type WonLead = { id: string; nome: string; valor_fechado: number | null; updated_at: string };
+  const ganhos = (wonLeads ?? []) as WonLead[];
+  const totalFechado = ganhos.reduce((acc, l) => acc + (l.valor_fechado ?? 0), 0);
 
   return <>
     {params.checkout === "sucesso" && (
@@ -73,7 +78,27 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
         <strong>{gastoMes}</strong>
         <span className="stat-sub">{t.s4sub}</span>
       </section>
+      <section className="stat-card">
+        <span className="stat-icon"><CircleDollarSign size={18} /></span>
+        <small>{t.s5l}</small>
+        <strong>{formatMoney(Math.round(totalFechado * 100), loc.currency, loc.lang)}</strong>
+        <span className="stat-sub">{t.s5sub} · {ganhos.length}</span>
+      </section>
     </div>
+
+    <section className="dash-panel">
+      <h2><CircleDollarSign size={16} /> {t.wonTitle}</h2>
+      {ganhos.length === 0
+        ? <p className="dash-empty">{t.wonEmpty}</p>
+        : <ul className="dash-usage">
+            {ganhos.map((l) => (
+              <li key={l.id}>
+                <span><Link className="text-link" href={`/app/leads/${l.id}`}>{l.nome}</Link></span>
+                <strong>{l.valor_fechado != null ? formatMoney(Math.round(l.valor_fechado * 100), loc.currency, loc.lang) : "—"}</strong>
+              </li>
+            ))}
+          </ul>}
+    </section>
 
     <div className="dash-grid">
       <section className="dash-panel">

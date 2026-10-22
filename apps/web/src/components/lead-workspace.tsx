@@ -9,6 +9,7 @@ import {
   FileText, MonitorSmartphone,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { formatMoney, type Currency } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { LeadAssistant } from "./lead-assistant";
 
@@ -37,12 +38,17 @@ function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
   }
 }
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
+  novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
+};
+
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, currency = "brl", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
   siteSlug?: string | null;
+  currency?: Currency;
   t?: Messages["lead"];
   statusLabels?: Record<string, string>;
 }) {
@@ -66,6 +72,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [wonOpen, setWonOpen] = useState(false);
+  const [wonValue, setWonValue] = useState("");
+  const wonPending = useRef<LeadRow["status"] | null>(null);
 
   const canSite = enabledActions.includes("generate_site");
   const siteCheck = (lead as LeadRow & {
@@ -260,6 +269,37 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     });
   }
 
+  function changeStatus(next: LeadRow["status"]) {
+    if (next === "ganho" && lead.status !== "ganho") {
+      wonPending.current = next;
+      setWonValue(lead.valor_fechado ? String(lead.valor_fechado) : "");
+      setWonOpen(true);
+      return;
+    }
+    setLead((l) => ({ ...l, status: next }));
+    void patch({ status: next });
+  }
+
+  function advanceStage() {
+    const next = NEXT_STAGE[lead.status];
+    if (!next || isBusy("stage")) return;
+    changeStatus(next);
+  }
+
+  async function confirmWon(withValue: boolean) {
+    const value = withValue ? Number(wonValue.replace(/\./g, "").replace(",", ".")) : null;
+    const status = wonPending.current ?? "ganho";
+    wonPending.current = null;
+    setWonOpen(false);
+    const patchBody: Record<string, unknown> = { status };
+    if (withValue && Number.isFinite(value) && value! >= 0) patchBody.valor_fechado = value;
+    setLead((l) => ({ ...l, status, valor_fechado: (patchBody.valor_fechado as number | undefined) ?? l.valor_fechado }));
+    setBusyKey("stage", true);
+    await patch(patchBody);
+    setBusyKey("stage", false);
+    router.refresh();
+  }
+
   async function removeLead() {
     if (isBusy("delete") || !confirm(`${t.confirmDelete} "${lead.nome}" ${t.confirmDeleteSuffix}`)) return;
     setBusyKey("delete", true);
@@ -289,10 +329,21 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
             aria-label="Status do lead"
             value={lead.status}
             className={`lead-status lead-status-${lead.status}`}
-            onChange={(e) => { const status = e.target.value as LeadRow["status"]; setLead((l) => ({ ...l, status })); void patch({ status }); }}
+            onChange={(e) => changeStatus(e.target.value as LeadRow["status"])}
           >
             {LEAD_STATUS.map(([v]) => <option key={v} value={v}>{statusLabels[v] ?? v}</option>)}
           </select>
+          {NEXT_STAGE[lead.status] && (
+            <button type="button" className="lead-next-stage" disabled={isBusy("stage")}
+              onClick={advanceStage} title={statusLabels[NEXT_STAGE[lead.status]!]}>
+              {t.nextStage} → {statusLabels[NEXT_STAGE[lead.status]!] ?? NEXT_STAGE[lead.status]}
+            </button>
+          )}
+          {lead.status === "ganho" && lead.valor_fechado != null && (
+            <button type="button" className="lead-won-value" onClick={() => { wonPending.current = "ganho"; setWonValue(String(lead.valor_fechado)); setWonOpen(true); }}>
+              {t.wonBadge} {formatMoney(Math.round(lead.valor_fechado * 100), currency)}
+            </button>
+          )}
         </div>
         {lead.categoria && <span className="seek-category">{lead.categoria} · {serviceName}</span>}
         {lead.endereco && <p className="seek-line"><MapPin size={12} />{[lead.endereco, lead.cidade, lead.uf].filter(Boolean).join(" · ")}</p>}
@@ -422,5 +473,34 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </section>
 
     <LeadAssistant lead={lead} serviceName={serviceName} t={t.copilot} />
+
+    {wonOpen && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={t.wonTitle}
+      onClick={() => { setWonOpen(false); wonPending.current = null; }}>
+      <section className="pix-panel pix-modal lead-won-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{t.wonTitle}</h3>
+        <p className="seek-meta">{t.wonHint}</p>
+        <div className="lead-won-input">
+          <span>{currency.toUpperCase()}</span>
+          <input
+            inputMode="decimal"
+            autoFocus
+            value={wonValue}
+            placeholder={t.wonPh}
+            onChange={(e) => setWonValue(e.target.value.replace(/[^\d.,]/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void confirmWon(true); } }}
+          />
+        </div>
+        <div className="seek-confirm-actions">
+          <button type="button" className="button button-primary button-small"
+            disabled={!wonValue.trim() || isBusy("stage")} onClick={() => void confirmWon(true)}>
+            {isBusy("stage") ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+            {t.wonSave}
+          </button>
+          <button type="button" className="button button-glass button-small" onClick={() => void confirmWon(false)}>
+            {t.wonSkip}
+          </button>
+        </div>
+      </section>
+    </div>}
   </>;
 }
