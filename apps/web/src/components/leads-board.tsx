@@ -46,19 +46,26 @@ function promptFor(kind: ActionKind, lead: LeadRow, serviceName: string): string
   }
 }
 
-export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, t = getMessages("pt").leadsPage }: {
+export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, t = getMessages("pt").leadsPage }: {
   initialLeads: LeadRow[];
   serviceNames: Record<string, string>;
   serviceActions: Record<string, string[]>;
   costs: Record<string, number | null>;
+  doneByLead?: Record<string, string[]>;
   t?: Messages["leadsPage"];
 }) {
   const [leads, setLeads] = useState(initialLeads);
+  const [done, setDone] = useState<Record<string, Set<string>>>(() =>
+    Object.fromEntries(Object.entries(doneByLead).map(([k, v]) => [k, new Set(v)])));
   const [filter, setFilter] = useState<string>("todos");
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<Record<string, string>>({});
+
+  function markDone(leadId: string, kind: string) {
+    setDone((d) => ({ ...d, [leadId]: new Set([...(d[leadId] ?? []), kind]) }));
+  }
 
   function suggestion(lead: LeadRow): string {
     if (!lead.site && lead.whatsapp === "sim") return t.sugNoSiteWa;
@@ -103,6 +110,47 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
     setNotices((n) => ({ ...n, [id]: msg }));
   }
 
+  // Site roda como job (geração longa) — o resto vai direto na edge.
+  async function generateSiteJob(lead: LeadRow, serviceName: string) {
+    const res = await fetch("/api/ai-jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: lead.id, tipo: "generate_site", serviceSlug: lead.service_slug,
+        requestRef: crypto.randomUUID(),
+        prompt: promptFor("generate_site", lead, serviceName),
+        context: {
+          nome: lead.nome, categoria: lead.categoria, endereco: lead.endereco,
+          cidade: lead.cidade, uf: lead.uf, telefone: lead.telefone, site: lead.site,
+          avaliacao: lead.avaliacao, totalAvaliacoes: lead.total_avaliacoes,
+          imagem: lead.imagem, mapsUrl: lead.maps_url, instagram: lead.instagram,
+        },
+      }),
+    }).catch(() => null);
+    const data = res ? (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null : null;
+    if (!res?.ok || !data?.jobId) {
+      setBusy(null);
+      setError(data?.error ?? t.noneHere);
+      return;
+    }
+    notice(lead.id, `${t.actSite}…`);
+    const poller = setInterval(async () => {
+      const r = await fetch(`/api/ai-jobs/${data.jobId}`, { cache: "no-store" }).catch(() => null);
+      const j = r ? (await r.json().catch(() => null)) as { job?: { status: string; erro?: string | null } } | null : null;
+      if (!j?.job) return;
+      if (j.job.status === "done") {
+        clearInterval(poller);
+        setBusy(null);
+        markDone(lead.id, "generate_site");
+        notice(lead.id, `${t.actSite} — ${t.generated}`);
+      } else if (j.job.status === "error") {
+        clearInterval(poller);
+        setBusy(null);
+        setError(j.job.erro ?? "Erro");
+      }
+    }, 4000);
+  }
+
   async function generate(lead: LeadRow, kind: ActionKind) {
     const key = `${lead.id}:${kind}`;
     if (busy) return;
@@ -110,6 +158,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
     setError("");
     notice(lead.id, "");
     const serviceName = serviceNames[lead.service_slug] ?? lead.service_slug;
+    if (kind === "generate_site") { await generateSiteJob(lead, serviceName); return; }
     const res = await callAction<{ conteudo?: string; imagens?: string[]; modelo?: string; creditosCobrados?: number }>(
       "ai-generate",
       {
@@ -140,6 +189,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       }).catch(() => null);
     }
     setBusy(null);
+    markDone(lead.id, kind);
     const label = t[KIND_LABEL[kind]] as string;
     notice(lead.id, `${label} — ${t.generated}`);
   }
@@ -199,6 +249,12 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               {QUICK.filter((q) => actions.includes(q.kind)).map(({ kind, icon: Icon }) => {
                 const key = `${lead.id}:${kind}`;
                 const label = t[KIND_LABEL[kind]] as string;
+                if (done[lead.id]?.has(kind)) {
+                  return <Link key={kind} className="lead-action lead-action-done"
+                    href={`/app/leads/${lead.id}`} title={`${label} — ${t.generated}`}>
+                    <CheckCircle2 size={13} />{label}
+                  </Link>;
+                }
                 return <button key={kind} type="button" className="lead-action"
                   disabled={busy !== null || costs[kind] === null}
                   title={label}

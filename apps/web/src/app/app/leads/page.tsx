@@ -12,16 +12,21 @@ export const metadata: Metadata = { title: "Meus leads", robots: { index: false 
 export default async function LeadsPage() {
   const [{ supabase }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang).leadsPage;
-  const [{ data: leads }, { data: services }, { data: rules }] = await Promise.all([
+  const [{ data: leads }, { data: services }, { data: rules }, { data: outputs }] = await Promise.all([
     supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(500),
     supabase.from("services_catalog").select("slug,nome,enabled_actions"),
     supabase.from("credit_action_rules").select("action,cost,enabled"),
+    supabase.from("lead_outputs").select("lead_id,tipo").limit(2000),
   ]);
   type Service = { slug: string; nome: string; enabled_actions: string[] | null };
   type Rule = { action: string; cost: number; enabled: boolean };
   const serviceNames = Object.fromEntries(((services ?? []) as Service[]).map((s) => [s.slug, s.nome]));
   const serviceActions = Object.fromEntries(((services ?? []) as Service[]).map((s) => [s.slug, s.enabled_actions ?? []]));
   const costs = Object.fromEntries(((rules ?? []) as Rule[]).map((r) => [r.action, r.enabled ? r.cost : null]));
+  const doneByLead: Record<string, string[]> = {};
+  for (const o of (outputs ?? []) as { lead_id: string; tipo: string }[]) {
+    (doneByLead[o.lead_id] ??= []).push(o.tipo);
+  }
 
   return <>
     <span className="eyebrow">{t.eyebrow}</span>
@@ -29,6 +34,6 @@ export default async function LeadsPage() {
     <p className="private-intro">{t.intro}</p>
     {(leads ?? []).length === 0
       ? <p className="private-intro">{t.empty} <Link className="text-link" href="/app/buscar">{t.emptyLink}</Link></p>
-      : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} t={t} />}
+      : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} doneByLead={doneByLead} t={t} />}
   </>;
 }
