@@ -8,17 +8,25 @@ import {
   Phone, Sparkles, Star, Target, FileCode2,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 
 const PAGE_SIZE = 9;
 
 type ActionKind = "sales_reply" | "deep_strategy" | "generate_site" | "generate_image";
 
-const QUICK: { kind: ActionKind; label: string; icon: typeof Sparkles; needsImageAction?: boolean }[] = [
-  { kind: "sales_reply", label: "Mensagem", icon: MessageSquareText },
-  { kind: "deep_strategy", label: "Estratégia", icon: Target },
-  { kind: "generate_site", label: "Site", icon: FileCode2 },
-  { kind: "generate_image", label: "Imagem", icon: ImageIcon, needsImageAction: true },
+const QUICK: { kind: ActionKind; icon: typeof Sparkles; needsImageAction?: boolean }[] = [
+  { kind: "sales_reply", icon: MessageSquareText },
+  { kind: "deep_strategy", icon: Target },
+  { kind: "generate_site", icon: FileCode2 },
+  { kind: "generate_image", icon: ImageIcon, needsImageAction: true },
 ];
+
+const KIND_LABEL: Record<ActionKind, keyof Messages["leadsPage"]> = {
+  sales_reply: "actMessage",
+  deep_strategy: "actStrategy",
+  generate_site: "actSite",
+  generate_image: "actImage",
+};
 
 function promptFor(kind: ActionKind, lead: LeadRow, serviceName: string): string {
   const gap = lead.site ? "" : " O estabelecimento NÃO tem site — use isso como gancho principal.";
@@ -38,20 +46,12 @@ function promptFor(kind: ActionKind, lead: LeadRow, serviceName: string): string
   }
 }
 
-// Sugestão de abordagem derivada dos sinais do estabelecimento.
-function suggestion(lead: LeadRow): string {
-  if (!lead.site && lead.whatsapp === "sim") return "Sem site, mas com WhatsApp ativo — o cliente responde rápido e sente falta de presença digital.";
-  if (!lead.site) return "Sem site — primeiro contato deve mostrar o quanto eles perdem sem presença online.";
-  if (lead.whatsapp !== "sim") return "WhatsApp não confirmado — comece pelo telefone ou Maps antes de propor automação.";
-  if ((lead.avaliacao ?? 0) >= 4.5) return "Avaliação alta — use a reputação como argumento para ampliar a presença deles.";
-  return "Perfil com espaço pra crescer — mostre um ganho concreto e mensurável na primeira conversa.";
-}
-
-export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }: {
+export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, t = getMessages("pt").leadsPage }: {
   initialLeads: LeadRow[];
   serviceNames: Record<string, string>;
   serviceActions: Record<string, string[]>;
   costs: Record<string, number | null>;
+  t?: Messages["leadsPage"];
 }) {
   const [leads, setLeads] = useState(initialLeads);
   const [filter, setFilter] = useState<string>("todos");
@@ -59,6 +59,16 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<Record<string, string>>({});
+
+  function suggestion(lead: LeadRow): string {
+    if (!lead.site && lead.whatsapp === "sim") return t.sugNoSiteWa;
+    if (!lead.site) return t.sugNoSite;
+    if (lead.whatsapp !== "sim") return t.sugDefault;
+    if ((lead.avaliacao ?? 0) >= 4.5) return t.sugHigh;
+    return t.sugDefault;
+  }
+
+  const statusLabel = (value: string) => t.status[value] ?? value;
 
   const visible = useMemo(
     () => (filter === "todos" ? leads : leads.filter((l) => l.status === filter)),
@@ -85,7 +95,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
       body: JSON.stringify({ status }),
     });
     setBusy(null);
-    if (!res.ok) { setError("Não foi possível atualizar o status."); return; }
+    if (!res.ok) { setError(t.noneHere); return; }
     setLeads((list) => list.map((l) => l.id === id ? { ...l, status } : l));
   }
 
@@ -130,20 +140,20 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
       }).catch(() => null);
     }
     setBusy(null);
-    const label = QUICK.find((q) => q.kind === kind)?.label ?? "Saída";
-    notice(lead.id, `${label} gerada`);
+    const label = t[KIND_LABEL[kind]] as string;
+    notice(lead.id, `${label} — ${t.generated}`);
   }
 
   return <>
-    <div className="lead-filters" role="tablist" aria-label="Filtrar por status">
+    <div className="lead-filters" role="tablist" aria-label={t.title}>
       <button className={filter === "todos" ? "active" : ""} onClick={() => pick("todos")}>
-        Todos ({counts.todos ?? 0})</button>
-      {LEAD_STATUS.map(([value, label]) => counts[value] ?
+        {t.filterAll} ({counts.todos ?? 0})</button>
+      {LEAD_STATUS.map(([value]) => counts[value] ?
         <button key={value} className={filter === value ? "active" : ""} onClick={() => pick(value)}>
-          {label} ({counts[value]})</button> : null)}
+          {statusLabel(value)} ({counts[value]})</button> : null)}
     </div>
     {error && <p role="alert" className="auth-error">{error}</p>}
-    {visible.length === 0 && <p className="seek-empty">Nenhum lead nesse status ainda.</p>}
+    {visible.length === 0 && <p className="seek-empty">{t.noneHere}</p>}
 
     <div className="lead-grid">
       {pageItems.map((lead) => {
@@ -156,13 +166,13 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
               ? <img src={placeImageSrc(lead.imagem)!} alt={`Foto de ${lead.nome}`} loading="lazy" />
               : <span className="lead-card-fallback"><Building2 size={26} />{lead.nome.slice(0, 1)}</span>}
             <select
-              aria-label={`Status de ${lead.nome}`}
+              aria-label={`${lead.nome}`}
               value={lead.status}
               disabled={busy === lead.id}
               onChange={(e) => void setStatus(lead.id, e.target.value as LeadRow["status"])}
               className={`lead-status lead-status-${lead.status}`}
             >
-              {LEAD_STATUS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {LEAD_STATUS.map(([value]) => <option key={value} value={value}>{statusLabel(value)}</option>)}
             </select>
           </div>
 
@@ -178,37 +188,38 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs }
             </p>
             <p className="lead-row-tags">
               <span className="seek-badge">{serviceName}</span>
-              {!lead.site && <span className="seek-badge seek-badge-gap">Sem site</span>}
-              {lead.site && <span className="seek-badge seek-badge-ok"><Globe size={10} />Site</span>}
+              {!lead.site && <span className="seek-badge seek-badge-gap">{t.siteNo}</span>}
+              {lead.site && <span className="seek-badge seek-badge-ok"><Globe size={10} />{t.siteYes}</span>}
               {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok">WhatsApp</span>}
               {lead.instagram && <span className="seek-badge">{lead.instagram}</span>}
             </p>
             <p className="lead-tip"><Sparkles size={12} />{suggestion(lead)}</p>
 
             <div className="lead-actions">
-              {QUICK.filter((q) => actions.includes(q.kind)).map(({ kind, label, icon: Icon }) => {
+              {QUICK.filter((q) => actions.includes(q.kind)).map(({ kind, icon: Icon }) => {
                 const key = `${lead.id}:${kind}`;
+                const label = t[KIND_LABEL[kind]] as string;
                 return <button key={kind} type="button" className="lead-action"
                   disabled={busy !== null || costs[kind] === null}
-                  title={costs[kind] === null ? `${label} indisponível` : label}
+                  title={label}
                   onClick={() => void generate(lead, kind)}>
                   {busy === key ? <Loader2 size={13} className="spin" /> : <Icon size={13} />}
                   {label}
                 </button>;
               })}
-              <Link className="lead-open" href={`/app/leads/${lead.id}`}>Abrir <ArrowUpRight size={13} /></Link>
+              <Link className="lead-open" href={`/app/leads/${lead.id}`}>{t.open} <ArrowUpRight size={13} /></Link>
             </div>
-            {notices[lead.id] && <p className="lead-notice"><CheckCircle2 size={12} />{notices[lead.id]} — <Link href={`/app/leads/${lead.id}`}>ver no lead</Link></p>}
+            {notices[lead.id] && <p className="lead-notice"><CheckCircle2 size={12} />{notices[lead.id]}</p>}
           </div>
         </article>;
       })}
     </div>
 
     {pages > 1 && (
-      <nav className="lead-pager" aria-label="Páginas de leads">
-        <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}><ChevronLeft size={14} /> Anterior</button>
+      <nav className="lead-pager" aria-label={t.title}>
+        <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}><ChevronLeft size={14} /> {t.prev}</button>
         <span>{page + 1} / {pages}</span>
-        <button type="button" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>Próxima <ChevronRight size={14} /></button>
+        <button type="button" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>{t.next} <ChevronRight size={14} /></button>
       </nav>
     )}
   </>;

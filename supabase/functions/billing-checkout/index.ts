@@ -23,24 +23,38 @@ interface CheckoutBody {
   planSlug?: string;
   method?: string;
   creditPack?: boolean;
+  currency?: string;
 }
 
-// Pacote avulso: +50 créditos por R$20 (somam no saldo — não é assinatura).
-const CREDIT_PACK = { credits: 50, amountCents: 2000, label: "SeekerAi — +50 créditos" };
+type BillingCurrency = "brl" | "usd" | "eur";
+
+// Preços para fora do Brasil: Essential $5/€5 · Pro $15/€15 · King $25/€25.
+// O número é o mesmo em USD e EUR (conforme regra de negócio).
+const INTL_PRICES: Record<string, number> = {
+  essencial: 500,
+  pro: 1500,
+  king: 2500,
+};
+
+// Pacote avulso: +50 créditos por R$20 no BR, $4/€4 fora (soma no saldo — não é assinatura).
+const CREDIT_PACK = { credits: 50, amountCents: 2000, intlCents: 400, label: "SeekerAi — +50 créditos" };
 
 async function createStripePackSession(
   userId: string,
   email: string | null,
+  currency: BillingCurrency,
 ): Promise<{ id: string; url: string }> {
+  const amountCents = currency === "brl" ? CREDIT_PACK.amountCents : CREDIT_PACK.intlCents;
   const params = new URLSearchParams({
     mode: "payment",
-    "line_items[0][price_data][currency]": "brl",
-    "line_items[0][price_data][unit_amount]": String(CREDIT_PACK.amountCents),
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][unit_amount]": String(amountCents),
     "line_items[0][price_data][product_data][name]": CREDIT_PACK.label,
     "line_items[0][quantity]": "1",
     client_reference_id: userId,
     "metadata[user_id]": userId,
     "metadata[kind]": "credit_pack",
+    "metadata[currency]": currency,
     success_url: `${APP_URL}/app?checkout=creditos`,
     cancel_url: `${APP_URL}/app/planos?checkout=cancelado`,
   });
@@ -91,11 +105,13 @@ async function createStripeSession(
   plan: { id: string; slug: string; nome: string; preco_centavos: number },
   userId: string,
   email: string | null,
+  currency: BillingCurrency,
+  amountCents: number,
 ): Promise<{ id: string; url: string }> {
   const params = new URLSearchParams({
     mode: "subscription",
-    "line_items[0][price_data][currency]": "brl",
-    "line_items[0][price_data][unit_amount]": String(plan.preco_centavos),
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][unit_amount]": String(amountCents),
     "line_items[0][price_data][recurring][interval]": "month",
     "line_items[0][price_data][product_data][name]": `SeekerAi — ${plan.nome}`,
     "line_items[0][quantity]": "1",
@@ -103,6 +119,7 @@ async function createStripeSession(
     "metadata[user_id]": userId,
     "metadata[plan_id]": plan.id,
     "metadata[plan_slug]": plan.slug,
+    "metadata[currency]": currency,
     "subscription_data[metadata][user_id]": userId,
     "subscription_data[metadata][plan_id]": plan.id,
     success_url: `${APP_URL}/app?checkout=sucesso`,
@@ -175,6 +192,12 @@ Deno.serve(async (req) => {
 
     const method = body.method === "pix" ? "pix" : body.method === "card" ? "card" : null;
     if (!method) throw httpError(400, "Informe method (card|pix)");
+    const currency: BillingCurrency =
+      body.currency === "usd" || body.currency === "eur" ? body.currency : "brl";
+    // Fora do Brasil: PIX é método brasileiro — só cartão via Stripe.
+    if (currency !== "brl" && method === "pix") {
+      throw httpError(400, "PIX is only available in Brazil — use card");
+    }
     const db = serviceClient();
 
     // Pacote avulso de créditos — só para quem já tem assinatura ativa.
@@ -190,15 +213,15 @@ Deno.serve(async (req) => {
         provider: method === "card" ? "stripe" : "mercosulpay",
         provider_ref: internalRef,
         method,
-        amount_cents: CREDIT_PACK.amountCents,
+        amount_cents: currency === "brl" ? CREDIT_PACK.amountCents : CREDIT_PACK.intlCents,
         status: "pending",
-        metadata: { kind: "credit_pack", credits: CREDIT_PACK.credits },
+        metadata: { kind: "credit_pack", credits: CREDIT_PACK.credits, currency },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
       if (method === "card") {
         // provider_ref do Stripe precisa ser o id da sessão — o webhook casa por ele.
-        const session = await createStripePackSession(user.id, null);
+        const session = await createStripePackSession(user.id, null, currency);
         await db.from("payments")
           .update({ provider_ref: session.id })
           .eq("provider", "stripe").eq("provider_ref", internalRef);
@@ -241,16 +264,25 @@ Deno.serve(async (req) => {
       throw httpError(409, "Você já possui uma assinatura em andamento");
     }
 
+    // Preço cobrado: BRL usa o preço do banco; USD/EUR usam a tabela internacional.
+    const amountCents = currency === "brl"
+      ? plan.preco_centavos
+      : INTL_PRICES[plan.slug];
+    if (!amountCents) {
+      throw httpError(409, "Este plano não está disponível nesta região");
+    }
+
     if (method === "card") {
-      const session = await createStripeSession(plan, user.id, null);
+      const session = await createStripeSession(plan, user.id, null, currency, amountCents);
       const { error } = await db.from("payments").insert({
         user_id: user.id,
         plan_id: plan.id,
         provider: "stripe",
         provider_ref: session.id,
         method: "card",
-        amount_cents: plan.preco_centavos,
+        amount_cents: amountCents,
         status: "pending",
+        metadata: { currency },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
       return json({ provider: "stripe", method, checkoutUrl: session.url });

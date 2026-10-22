@@ -5,113 +5,112 @@ import { Navigation } from "@/components/navigation";
 import { Pricing } from "@/components/pricing";
 import { ProductDemo } from "@/components/product-demo";
 import { publicPlanCards } from "@/lib/plans/server";
+import { getLocale } from "@/lib/i18n";
+import { getMessages } from "@/lib/i18n/messages";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
-const faqs = [
-  ["O SeekerAi funciona na minha cidade?", "A busca real está planejada para cidades brasileiras atendidas pela API oficial do Google Places. A quantidade de oportunidades depende dos dados disponíveis em cada região. A demonstração atual usa somente negócios fictícios."],
-  ["Preciso ter experiência com vendas?", "Não. A proposta é ajudar você a identificar oportunidades e começar conversas com mais contexto. A ferramenta não substitui seu trabalho, nem garante clientes, respostas ou faturamento."],
-  ["Posso prospectar para diferentes serviços?", "Sim. A proposta é adaptar as oportunidades ao que você oferece: sites, design gráfico, social media, tráfego, branding ou automação. Os recursos disponíveis para cada negócio serão contextualizados ao serviço selecionado."],
-  ["É permitido usar esses dados para prospectar?", "A plataforma utilizará dados públicos de estabelecimentos obtidos por APIs oficiais. Isso não dispensa o usuário de respeitar a LGPD, as políticas dos canais, a finalidade do contato e os pedidos de não receber mensagens. Não coletamos dados pessoais de sócios."],
-  ["Preciso de WhatsApp Business?", "A abordagem pode ser copiada e adaptada por você. O contato será iniciado por você, de forma responsável. Envios automáticos não estão habilitados nesta versão."],
-  ["O copiloto consegue ouvir uma ligação no meu celular?", "Não diretamente. Os modos previstos são áudio compartilhado no computador, microfone em viva-voz ou texto. Gravação e transcrição exigem aviso e consentimento apropriados. O recurso ainda não está conectado nesta demonstração."],
-];
+export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "SoftwareApplication",
-      name: "SeekerAi",
-      url: appUrl,
-      applicationCategory: "BusinessApplication",
-      operatingSystem: "Web",
-      inLanguage: "pt-BR",
-      description:
-        "Plataforma de prospecção que encontra empresas locais que precisam dos seus serviços, verifica contatos e gera abordagens com contexto.",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "BRL", description: "Acesso antecipado gratuito" },
-    },
-    {
-      "@type": "FAQPage",
-      mainEntity: faqs.map(([question, answer]) => ({
-        "@type": "Question",
-        name: question,
-        acceptedAnswer: { "@type": "Answer", text: answer },
-      })),
-    },
-  ],
-};
-
 export default async function Home() {
+  const loc = await getLocale();
+  const t = getMessages(loc.lang);
+  const h = t.home;
   const pricing = await publicPlanCards();
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: "SeekerAi",
+        url: appUrl,
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        inLanguage: { pt: "pt-BR", en: "en", es: "es", fr: "fr", de: "de", it: "it" }[loc.lang],
+        description: `${h.heroDesc1} ${h.heroDesc2}`,
+        offers: { "@type": "Offer", price: "0", priceCurrency: loc.currency.toUpperCase(), description: h.re1 },
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: h.faqs.map(([question, answer]) => ({
+          "@type": "Question",
+          name: question,
+          acceptedAnswer: { "@type": "Answer", text: answer },
+        })),
+      },
+    ],
+  };
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <Navigation />
+      <Navigation t={t.nav} />
       <main id="conteudo">
         <section className="hero">
           <div className="cosmic-grid" aria-hidden="true" /><div className="hero-orbit orbit-one" aria-hidden="true" /><div className="hero-orbit orbit-two" aria-hidden="true" />
           <div className="hero-content container">
-            <div className="announcement"><span className="status-dot" /><span>Menos procura. Mais oportunidade.</span><span className="announcement-new">CONHEÇA O SEEKERAI</span><ArrowUpRight size={12} /></div>
-            <h1>Seu próximo cliente<br />não precisa ser <span className="hero-word">um acaso<svg viewBox="0 0 420 18" fill="none" aria-hidden="true"><path d="M3 13C100 0 296 0 416 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></span><span className="hero-period">.</span></h1>
-            <p className="hero-description">Encontre empresas que precisam do que você vende.<br className="desktop-break" /> Entenda a oportunidade. Saiba como começar a conversa.</p>
-            <div className="hero-ctas"><Link href="/cadastro" className="button button-primary">Encontrar meus próximos clientes <ArrowUpRight size={17} /></Link><a href="#demonstracao" className="button button-glass"><span className="play-circle"><Play size={10} fill="currentColor" /></span>Explorar a plataforma</a></div>
-            <div className="hero-reassurance"><span><Check size={13} />Teste grátis no lançamento</span><span><Check size={13} />Sem cartão de crédito</span><span><Check size={13} />Você no controle</span></div>
+            <div className="announcement"><span className="status-dot" /><span>{h.announce}</span><span className="announcement-new">{h.announceTag}</span><ArrowUpRight size={12} /></div>
+            <h1>{h.heroA}<br />{h.heroB} <span className="hero-word">{h.heroWord}<svg viewBox="0 0 420 18" fill="none" aria-hidden="true"><path d="M3 13C100 0 296 0 416 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></span><span className="hero-period">.</span></h1>
+            <p className="hero-description">{h.heroDesc1}<br className="desktop-break" /> {h.heroDesc2}</p>
+            <div className="hero-ctas"><Link href="/cadastro" className="button button-primary">{h.cta1} <ArrowUpRight size={17} /></Link><a href="#demonstracao" className="button button-glass"><span className="play-circle"><Play size={10} fill="currentColor" /></span>{h.cta2}</a></div>
+            <div className="hero-reassurance"><span><Check size={13} />{h.re1}</span><span><Check size={13} />{h.re2}</span><span><Check size={13} />{h.re3}</span></div>
           </div>
           <div className="hero-product container" id="demonstracao">
-            <div className="product-caption"><span><span className="status-dot" /> PROSPECÇÃO COM DIREÇÃO</span><span>Da busca à primeira conversa <ArrowDown size={12} /></span></div>
+            <div className="product-caption"><span><span className="status-dot" /> {h.captionL}</span><span>{h.captionR} <ArrowDown size={12} /></span></div>
             <ProductDemo />
-            <div className="floating-insight"><span className="insight-icon"><Sparkles size={17} /></span><div><strong>Não é só um contato.</strong><span>É uma oportunidade com contexto.</span></div><span className="insight-check"><Check size={13} /></span></div>
+            <div className="floating-insight"><span className="insight-icon"><Sparkles size={17} /></span><div><strong>{h.insightT}</strong><span>{h.insightS}</span></div><span className="insight-check"><Check size={13} /></span></div>
           </div>
-          <div className="hero-bottom container"><span>FEITO PARA QUEM FAZ ACONTECER</span><div><span><Code2 size={17} />Freelancers</span><span><Compass size={17} />Agências</span><span><WandSparkles size={17} />Social medias</span><span><Zap size={17} />Prestadores de serviço</span></div></div>
+          <div className="hero-bottom container"><span>{h.madeFor}</span><div><span><Code2 size={17} />{h.seg1}</span><span><Compass size={17} />{h.seg2}</span><span><WandSparkles size={17} />{h.seg3}</span><span><Zap size={17} />{h.seg4}</span></div></div>
         </section>
 
         <section id="como-funciona" className="section light-section">
           <div className="container">
-            <div className="section-heading split-heading"><div><span className="eyebrow">SAIA DO “POR ONDE EU COMEÇO?”</span><h2>Menos abas abertas.<br />Mais portas se abrindo.</h2></div><p>Você cuida do que faz de melhor.<br />O SeekerAi ajuda a encontrar quem precisa disso.</p></div>
+            <div className="section-heading split-heading"><div><span className="eyebrow">{h.s2eyebrow}</span><h2>{h.s2titleA}<br />{h.s2titleB}</h2></div><p>{h.s2p}</p></div>
             <div className="steps-grid">
-              <article className="step-card"><div className="step-number">01<span /></div><h3>Encontre o lugar certo.</h3><p>Seu serviço, um nicho e uma cidade.<br />Um novo radar de possibilidades.</p><div className="mini-map"><div className="map-road road-one" /><div className="map-road road-two" /><div className="map-road road-three" /><span className="map-area area-one" /><span className="map-area area-two" /><span className="map-pin pin-one"><MapPin size={17} /></span><span className="map-pin pin-two"><MapPin size={13} /></span><span className="map-pin pin-three"><MapPin size={13} /></span><div className="map-tooltip"><span className="map-icon"><Search size={15} /></span><div><strong>Sua próxima oportunidade</strong><small>Perto de você</small></div></div><span className="mini-map-label"><span className="status-dot" />Radar de oportunidades</span></div></article>
-              <article className="step-card"><div className="step-number">02<span /></div><h3>Enxergue o que está faltando.</h3><p>Transforme dados em contexto.<br />E contexto em uma boa proposta.</p><div className="mini-analysis"><div className="mini-analysis-top"><span className="business-avatar violet">BH</span><div><strong>Barbearia Horizonte</strong><small>Exemplo de análise</small></div><span className="mini-score">96<span>/100</span></span></div><div className="analysis-signals"><span><Globe size={20} /><strong>Site próprio</strong><small className="signal-missing">Não encontrado</small></span><span><MapPin size={20} /><strong>Presença local</strong><small>Identificada</small></span><span><MessageCircle size={20} /><strong>Contato</strong><small>A verificar</small></span></div><div className="analysis-recommendation"><Sparkles size={15} /><span>Uma página com agendamento<br /><strong>pode ser o próximo passo.</strong></span></div></div></article>
-              <article className="step-card"><div className="step-number">03<span /></div><h3>Chegue com algo a dizer.</h3><p>Uma abordagem que faz sentido.<br />Não mais uma mensagem genérica.</p><div className="mini-chat"><div className="chat-header"><span className="chat-avatar">BH</span><div><strong>Barbearia Horizonte</strong><small>Conversa ilustrativa</small></div><MessageCircle size={17} /></div><div className="chat-bubble outgoing">Oi! Trabalho com sites para negócios locais. Posso te mostrar uma ideia de página para agendamentos?<small>10:42 <Check size={11} /></small></div><div className="chat-bubble incoming">Pode sim. Como funcionaria?<small>10:43</small></div><div className="chat-input">Sua próxima conversa começa aqui. <ArrowUpRight size={14} /></div></div></article>
+              <article className="step-card"><div className="step-number">01<span /></div><h3>{h.step1t}</h3><p>{h.step1p}</p><div className="mini-map"><div className="map-road road-one" /><div className="map-road road-two" /><div className="map-road road-three" /><span className="map-area area-one" /><span className="map-area area-two" /><span className="map-pin pin-one"><MapPin size={17} /></span><span className="map-pin pin-two"><MapPin size={13} /></span><span className="map-pin pin-three"><MapPin size={13} /></span><div className="map-tooltip"><span className="map-icon"><Search size={15} /></span><div><strong>{h.step1next}</strong><small>{h.step1near}</small></div></div><span className="mini-map-label"><span className="status-dot" />{h.step1label}</span></div></article>
+              <article className="step-card"><div className="step-number">02<span /></div><h3>{h.step2t}</h3><p>{h.step2p}</p><div className="mini-analysis"><div className="mini-analysis-top"><span className="business-avatar violet">BH</span><div><strong>Barbearia Horizonte</strong><small>{h.step2ex}</small></div><span className="mini-score">96<span>/100</span></span></div><div className="analysis-signals"><span><Globe size={20} /><strong>{h.step2site}</strong><small className="signal-missing">{h.step2missing}</small></span><span><MapPin size={20} /><strong>{h.step2local}</strong><small>{h.step2found}</small></span><span><MessageCircle size={20} /><strong>{h.step2contact}</strong><small>{h.step2verifying}</small></span></div><div className="analysis-recommendation"><Sparkles size={15} /><span>{h.step2rec}</span></div></div></article>
+              <article className="step-card"><div className="step-number">03<span /></div><h3>{h.step3t}</h3><p>{h.step3p}</p><div className="mini-chat"><div className="chat-header"><span className="chat-avatar">BH</span><div><strong>Barbearia Horizonte</strong><small>{h.step3chat}</small></div><MessageCircle size={17} /></div><div className="chat-bubble outgoing">{h.step3b1}<small>10:42 <Check size={11} /></small></div><div className="chat-bubble incoming">{h.step3b2}<small>10:43</small></div><div className="chat-input">{h.step3input} <ArrowUpRight size={14} /></div></div></article>
             </div>
           </div>
         </section>
 
         <section id="recursos" className="section light-section opportunity-section">
           <div className="container feature-split">
-            <div className="feature-copy"><span className="eyebrow">DADOS SÃO SÓ O COMEÇO</span><h2>Não venda para todo mundo.<br /><span className="muted-heading">Fale com quem faz sentido.</span></h2><p>Uma lista de empresas não resolve tudo. Você precisa entender o negócio, encontrar espaço para ajudar e fazer uma proposta relevante.</p><ul className="check-list"><li><Check />Sinais de oportunidade para o serviço que você oferece</li><li><Check />Abordagens com contexto, prontas para adaptar</li><li><Check />Leads organizados para continuar a conversa</li></ul><Link href="/explorar" className="text-link">Experimentar uma busca de exemplo <ArrowUpRight size={17} /></Link></div>
-            <div className="opportunity-visual"><span className="visual-orbit" /><div className="opportunity-detail"><div className="detail-top"><span><Sparkles size={13} />INTELIGÊNCIA DE OPORTUNIDADE</span><span className="detail-sparkle">✧</span></div><h3>Uma boa proposta começa<br />com uma boa observação.</h3><div className="detail-row"><span className="detail-icon"><Globe size={20} /></span><div><small>OPORTUNIDADE ILUSTRATIVA</small><strong>Sem uma página de agendamento.</strong></div><span className="detail-indicator" /></div><div className="detail-offer"><span>O QUE VOCÊ PODE OFERECER</span><p>Um site simples. Uma agenda mais acessível.<br />Uma experiência melhor para o cliente.</p></div><div className="detail-footer"><ShieldCheck size={14} />Você valida a necessidade. A IA ajuda no caminho.</div></div><div className="context-chip"><MousePointer2 size={14} />Mais contexto. Menos “oi, tudo bem?”.</div></div>
+            <div className="feature-copy"><span className="eyebrow">{h.feyebrow}</span><h2>{h.ftitleA}<br /><span className="muted-heading">{h.ftitleB}</span></h2><p>{h.fp}</p><ul className="check-list"><li><Check />{h.fli1}</li><li><Check />{h.fli2}</li><li><Check />{h.fli3}</li></ul><Link href="/explorar" className="text-link">{h.flink} <ArrowUpRight size={17} /></Link></div>
+            <div className="opportunity-visual"><span className="visual-orbit" /><div className="opportunity-detail"><div className="detail-top"><span><Sparkles size={13} />{h.fdetailEyebrow}</span><span className="detail-sparkle">✧</span></div><h3>{h.fdetailT}</h3><div className="detail-row"><span className="detail-icon"><Globe size={20} /></span><div><small>{h.fdetailRow}</small><strong>{h.fdetailGap}</strong></div><span className="detail-indicator" /></div><div className="detail-offer"><span>{h.fdetailOffer}</span><p>{h.fdetailOfferP}</p></div><div className="detail-footer"><ShieldCheck size={14} />{h.fdetailFoot}</div></div><div className="context-chip"><MousePointer2 size={14} />{h.fdetailChip}</div></div>
           </div>
         </section>
 
         <section className="section dark-feature-section">
           <div className="container feature-split">
             <div className="site-preview"><div className="site-browser"><span /><span /><span /><small>seu-proximo-projeto.demo</small></div><div className="sample-site"><div className="sample-site-nav">HORIZONTE<span>BARBEARIA & ESTILO</span><span>AGENDAMENTO ↗</span></div><span className="sample-site-eyebrow">SEU ESTILO. SEU TEMPO.</span><h3>Mais que um corte.<br /><em>Seu momento.</em></h3><p>Um novo jeito de cuidar de você.</p><span className="sample-site-button">Reserve seu horário <ArrowUpRight size={12} /></span><div className="barber-art" aria-hidden="true"><span className="barber-arch" /><span className="barber-mirror" /><span className="barber-chair" /></div><div className="sample-site-bottom"><span>FEITO PARA O SEU NEGÓCIO</span><span>01 — 03</span></div></div><div className="generation-pill"><WandSparkles size={15} /><span>Do “e se?” ao “olha isso”.</span><Check size={14} /></div></div>
-            <div className="feature-copy"><span className="eyebrow">MOSTRE. NÃO SÓ CONTE.</span><h2>Sua ideia ganha forma.<br /><span className="gradient-text">Sua proposta ganha força.</span></h2><p>Imagine apresentar uma prévia de site feita para aquele negócio. Uma forma mais visual de mostrar o valor do seu trabalho antes de falar de preço.</p><ul className="check-list"><li><Check />Demos pensadas para o contexto da empresa</li><li><Check />Visual responsivo, do computador ao celular</li><li><Check />Um link para acompanhar sua proposta</li></ul><span className="roadmap-label"><span className="status-dot" />Geração por IA planejada para a fase 7</span></div>
+            <div className="feature-copy"><span className="eyebrow">{h.deyebrow}</span><h2>{h.dtitleA}<br /><span className="gradient-text">{h.dtitleB}</span></h2><p>{h.dp}</p><ul className="check-list"><li><Check />{h.dli1}</li><li><Check />{h.dli2}</li><li><Check />{h.dli3}</li></ul><span className="roadmap-label"><span className="status-dot" />{h.droadmap}</span></div>
           </div>
         </section>
 
         <section className="section copilot-section">
           <div className="container feature-split">
-            <div className="feature-copy"><span className="eyebrow">SEU REFORÇO NA HORA H</span><h2>Deu branco?<br /><span className="gradient-text">Você não está sozinho.</span></h2><p>Um copiloto para ajudar você a encontrar a próxima pergunta, explicar seu valor e conduzir a conversa — sem virar um robô.</p><div className="copilot-modes"><span><Mic size={14} />Áudio com consentimento</span><span><MessageCircle size={14} />Modo texto</span></div><span className="roadmap-label"><span className="status-dot" />Prévia do recurso · ainda não conectado</span></div>
-            <div className="copilot-window"><div className="copilot-header"><span className="copilot-icon"><AudioLines size={20} /></span><div><strong>Copiloto de vendas</strong><small>Uma segunda cabeça na conversa.</small></div><span className="example-tag">PRÉVIA</span></div><div className="audio-wave" aria-hidden="true">{Array.from({ length: 45 }, (_, i) => <i key={i} style={{ height: `${12 + ((i * 17 + 13) % 45)}px`, animationDelay: `${i * 0.04}s` }} />)}</div><div className="transcript"><span>CLIENTE · EXEMPLO</span><p>“Gostei da ideia, mas agora estou achando caro.”</p></div><div className="copilot-answer"><span><Sparkles size={13} />UMA FORMA DE CONTINUAR</span><p>“Entendo. Para eu montar algo que faça sentido: o que seria mais importante resolver primeiro no seu negócio?”</p><div><span>Escute antes de argumentar.</span><span>↗</span></div></div><div className="copilot-disclaimer"><ShieldCheck size={12} />Não captura ligações de celular diretamente.</div></div>
+            <div className="feature-copy"><span className="eyebrow">{h.ceyebrow}</span><h2>{h.ctitleA}<br /><span className="gradient-text">{h.ctitleB}</span></h2><p>{h.cp}</p><div className="copilot-modes"><span><Mic size={14} />{h.cm1}</span><span><MessageCircle size={14} />{h.cm2}</span></div><span className="roadmap-label"><span className="status-dot" />{h.croadmap}</span></div>
+            <div className="copilot-window"><div className="copilot-header"><span className="copilot-icon"><AudioLines size={20} /></span><div><strong>{h.ccopT}</strong><small>{h.ccopS}</small></div><span className="example-tag">{h.cpreview}</span></div><div className="audio-wave" aria-hidden="true">{Array.from({ length: 45 }, (_, i) => <i key={i} style={{ height: `${12 + ((i * 17 + 13) % 45)}px`, animationDelay: `${i * 0.04}s` }} />)}</div><div className="transcript"><span>{h.cclient}</span><p>{h.cquote}</p></div><div className="copilot-answer"><span><Sparkles size={13} />{h.canswerT}</span><p>{h.canswer}</p><div><span>{h.ctip}</span><span>↗</span></div></div><div className="copilot-disclaimer"><ShieldCheck size={12} />{h.cdisc}</div></div>
           </div>
         </section>
 
         <section id="portfolio" className="section light-section portfolio-section">
-          <div className="container feature-split"><div className="portfolio-phones"><div className="phone phone-back"><div className="phone-camera" /><div className="portfolio-monogram">DA<span>DESIGN QUE APROXIMA</span></div><h3>Seu trabalho<br />fala por você.</h3><div className="phone-project project-orange" /><div className="phone-project project-green" /></div><div className="phone phone-front"><div className="phone-camera" /><span className="phone-availability"><span className="status-dot" />Disponível para novos projetos</span><div className="phone-avatar">DA<span>✦</span></div><small>SEU PRÓXIMO PARCEIRO CRIATIVO</small><h3>Design com<br />propósito.</h3><p>Marcas e sites que conectam<br />pessoas a bons negócios.</p><span className="phone-cta">Vamos criar juntos <ArrowUpRight size={13} /></span><div className="phone-work"><span>SELEÇÃO DE PROJETOS</span><div /><small>Identidade visual · Projeto de exemplo</small></div></div><span className="portfolio-example">Templates ilustrativos de portfólio</span></div><div className="feature-copy"><span className="eyebrow">SUA MELHOR PRIMEIRA IMPRESSÃO</span><h2>Seu talento merece<br /><span className="muted-heading">um endereço à altura.</span></h2><p>Reúna seus trabalhos em um portfólio feito para abrir no celular. Sua abordagem apresenta a ideia. Seu portfólio mostra o que você sabe fazer.</p><ul className="check-list"><li><Check />Modelos que deixam seu trabalho no centro</li><li><Check />Link para compartilhar nas suas conversas</li><li><Check />Contato a um toque de distância</li></ul><Link href="/cadastro" className="button button-dark">Quero construir minha presença <ArrowUpRight size={16} /></Link></div></div>
+          <div className="container feature-split"><div className="portfolio-phones"><div className="phone phone-back"><div className="phone-camera" /><div className="portfolio-monogram">DA<span>DESIGN QUE APROXIMA</span></div><h3>Seu trabalho<br />fala por você.</h3><div className="phone-project project-orange" /><div className="phone-project project-green" /></div><div className="phone phone-front"><div className="phone-camera" /><span className="phone-availability"><span className="status-dot" />{h.pavail}</span><div className="phone-avatar">DA<span>✦</span></div><small>SEU PRÓXIMO PARCEIRO CRIATIVO</small><h3>Design com<br />propósito.</h3><p>Marcas e sites que conectam<br />pessoas a bons negócios.</p><span className="phone-cta">Vamos criar juntos <ArrowUpRight size={13} /></span><div className="phone-work"><span>SELEÇÃO DE PROJETOS</span><div /><small>Identidade visual · Projeto de exemplo</small></div></div><span className="portfolio-example">{h.pexample}</span></div><div className="feature-copy"><span className="eyebrow">{h.peyebrow}</span><h2>{h.ptitleA}<br /><span className="muted-heading">{h.ptitleB}</span></h2><p>{h.pp}</p><ul className="check-list"><li><Check />{h.pli1}</li><li><Check />{h.pli2}</li><li><Check />{h.pli3}</li></ul><Link href="/cadastro" className="button button-dark">{h.pcta} <ArrowUpRight size={16} /></Link></div></div>
         </section>
 
-        <section className="section toolkit-section light-section"><div className="container"><div className="section-heading centered"><span className="eyebrow">DO PRIMEIRO SINAL AO PRÓXIMO PASSO</span><h2>Um lugar. Um fluxo.<br /><span className="muted-heading">Muito mais direção.</span></h2></div><div className="toolkit-grid">{[{ icon: Search, title: "Radar de clientes", text: "Encontre negócios por serviço, nicho e região." }, { icon: Radar, title: "Análise de oportunidades", text: "Entenda os sinais antes de fazer sua oferta." }, { icon: MessageCircle, title: "Abordagens com contexto", text: "Troque mensagens genéricas por boas conversas." }, { icon: AudioLines, title: "Copiloto de vendas", text: "Encontre caminhos para continuar uma negociação." }, { icon: Bookmark, title: "Seu CRM, sem complicar", text: "Organize leads e acompanhe os próximos passos." }, { icon: Globe, title: "Seu portfólio no ar", text: "Mostre o valor do trabalho que você já entrega." }].map(({ icon: Icon, title, text }) => <article key={title}><span><Icon size={21} /></span><h3>{title}</h3><p>{text}</p></article>)}</div><p className="roadmap-footnote">Visão do produto. Nesta primeira versão, explore a busca demonstrativa; integrações e demais recursos estão em construção.</p></div></section>
+        <section className="section toolkit-section light-section"><div className="container"><div className="section-heading centered"><span className="eyebrow">{h.teyebrow}</span><h2>{h.ttitleA}<br /><span className="muted-heading">{h.ttitleB}</span></h2></div><div className="toolkit-grid">{[{ icon: Search, title: h.tk1t, text: h.tk1p }, { icon: Radar, title: h.tk2t, text: h.tk2p }, { icon: MessageCircle, title: h.tk3t, text: h.tk3p }, { icon: AudioLines, title: h.tk4t, text: h.tk4p }, { icon: Bookmark, title: h.tk5t, text: h.tk5p }, { icon: Globe, title: h.tk6t, text: h.tk6p }].map(({ icon: Icon, title, text }) => <article key={title}><span><Icon size={21} /></span><h3>{title}</h3><p>{text}</p></article>)}</div><p className="roadmap-footnote">{h.tfoot}</p></div></section>
 
-        <div className="container"><Pricing plans={pricing.plans} source={pricing.source} /></div>
+        <div className="container"><Pricing plans={pricing.plans} source={pricing.source} locale={loc} t={t.pricing} /></div>
 
-        <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">PODE PERGUNTAR</span><h2>Boas decisões<br />começam sem dúvidas.</h2><p>Transparência também faz parte<br />de uma boa parceria.</p></div><div className="faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
+        <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">{h.faqeyebrow}</span><h2>{h.faqtitleA}<br />{h.faqtitleB}</h2><p>{h.faqp}</p></div><div className="faq-list">{h.faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
 
-        <section className="final-cta"><div className="cta-orbit" aria-hidden="true" /><div className="container"><span className="eyebrow">NÃO ESPERE A PRÓXIMA INDICAÇÃO</span><h2>Tem gente precisando<br />do que <span className="gradient-text">você faz.</span></h2><p>O próximo passo pode começar por uma boa conversa.</p><Link href="/cadastro" className="button button-primary">Colocar meu negócio em movimento <ArrowUpRight size={17} /></Link><span className="final-note">Conheça o SeekerAi. Sem cartão. Sem promessas mágicas.</span></div></section>
+        <section className="final-cta"><div className="cta-orbit" aria-hidden="true" /><div className="container"><span className="eyebrow">{h.ctaeyebrow}</span><h2>{h.ctatitleA}<br /><span className="gradient-text">{h.ctatitleB}</span></h2><p>{h.ctap}</p><Link href="/cadastro" className="button button-primary">{h.ctab} <ArrowUpRight size={17} /></Link><span className="final-note">{h.ctanote}</span></div></section>
       </main>
-      <footer className="footer"><div className="container"><div className="footer-top"><div><Brand /><p>Encontre a oportunidade.<br />Faça a conversa acontecer.</p></div><div className="footer-links"><a href="#como-funciona">Como funciona</a><a href="#planos">Planos</a><Link href="/explorar">Demonstração <ArrowUpRight size={12} /></Link></div><div className="footer-links"><Link href="/termos">Termos de uso</Link><Link href="/privacidade">Privacidade</Link><Link href="/cadastro">Acesso antecipado</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} SeekerAi. Feito para criar possibilidades.</span><span><span className="status-dot" />Construindo o próximo passo.</span></div></div></footer>
-      <div className="mobile-sticky-cta"><Link href="/explorar" className="button button-primary">Explorar demonstração <ArrowRight size={16} /></Link></div>
+      <footer className="footer"><div className="container"><div className="footer-top"><div><Brand /><p>{h.footSlogan1}<br />{h.footSlogan2}</p></div><div className="footer-links"><a href="#como-funciona">{h.footHow}</a><a href="#planos">{h.footPlans}</a><Link href="/explorar">{h.footDemo} <ArrowUpRight size={12} /></Link></div><div className="footer-links"><Link href="/termos">{h.footTerms}</Link><Link href="/privacidade">{h.footPrivacy}</Link><Link href="/cadastro">{h.footEarly}</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} SeekerAi. {h.footCopy}</span><LocaleSwitcher current={loc} /><span><span className="status-dot" />{h.footBuilding}</span></div></div></footer>
+      <div className="mobile-sticky-cta"><Link href="/explorar" className="button button-primary">{h.stickyCta} <ArrowRight size={16} /></Link></div>
     </>
   );
 }

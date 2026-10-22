@@ -9,6 +9,7 @@ import {
   FileText, MonitorSmartphone,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { LeadAssistant } from "./lead-assistant";
 
 interface OutputRow {
@@ -19,13 +20,7 @@ interface OutputRow {
   created_at: string;
 }
 
-const OUTPUT_LABEL: Record<string, string> = {
-  sales_reply: "Mensagem de abordagem",
-  deep_strategy: "Estratégia",
-  generate_site: "Site gerado",
-  generate_image: "Imagem",
-  image_prompt: "Prompt de imagem",
-};
+
 
 function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
   const gap = lead.site ? "" : " O estabelecimento NÃO tem site — use isso como gancho principal.";
@@ -42,12 +37,15 @@ function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
   }
 }
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
+  t?: Messages["lead"];
+  statusLabels?: Record<string, string>;
 }) {
+  const OUTPUT_LABEL = t.outLabels;
   const router = useRouter();
   const [lead, setLead] = useState(initialLead);
   const [outputs, setOutputs] = useState(initialOutputs);
@@ -72,10 +70,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const siteCheck = (lead as LeadRow & {
     dados?: { siteCheck?: { estado?: string; sinais?: string[] } | null } | null;
   }).dados?.siteCheck ?? null;
-  const siteCheckLabel = siteCheck?.estado === "desatualizado" ? "Site desatualizado"
-    : siteCheck?.estado === "fora" ? "Site fora do ar"
-    : siteCheck?.estado === "bom" ? "Site bom"
-    : siteCheck?.estado === "ok" ? "Site comum" : null;
+  const siteCheckLabel = siteCheck?.estado === "desatualizado" ? t.labels.siteOld
+    : siteCheck?.estado === "fora" ? t.labels.siteOut
+    : siteCheck?.estado === "bom" ? t.labels.siteBom
+    : siteCheck?.estado === "ok" ? t.labels.siteComum : null;
   const canImage = enabledActions.includes("generate_image");
   const waDigits = (lead.telefone ?? "").replace(/\D/g, "");
   const waLink = waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}` : null;
@@ -98,13 +96,13 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           if (sitePoller.current) clearInterval(sitePoller.current);
           sitePoller.current = null;
           setBusyKey("generate_site", false);
-          setNotice("Site gerado e salvo abaixo.");
+          setNotice(t.siteDone);
           router.refresh();
         } else if (data.job.status === "error") {
           if (sitePoller.current) clearInterval(sitePoller.current);
           sitePoller.current = null;
           setBusyKey("generate_site", false);
-          setError(data.job.erro ?? "A geração do site falhou. Tente novamente.");
+          setError(data.job.erro ?? t.errNoContent);
         }
       })();
     }, 4000);
@@ -156,10 +154,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     const data = res ? (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null : null;
     if (!res?.ok || !data?.jobId) {
       setBusyKey("generate_site", false);
-      setError(data?.error ?? "Não foi possível iniciar a geração do site.");
+      setError(data?.error ?? t.errNoContent);
       return;
     }
-    setNotice("Gerando o site em segundo plano — pode sair da página, ele aparece aqui quando ficar pronto.");
+    setNotice(t.siteRunning);
     pollSiteJob(data.jobId);
   }
 
@@ -193,7 +191,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     );
     if (!res.ok || !res.data.conteudo) {
       setBusyKey(tipo, false);
-      setError(res.ok ? "A IA não devolveu conteúdo." : res.error);
+      setError(res.ok ? t.errNoContent : res.error);
       return;
     }
     const save = await fetch(`/api/leads/${lead.id}`, {
@@ -207,7 +205,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setOpen((o) => ({ ...o, [saved.output!.id]: true }));
     }
     setBusyKey(tipo, false);
-    setNotice(`${OUTPUT_LABEL[tipo]} gerada.`);
+    setNotice(`${OUTPUT_LABEL[tipo]} ${t.genDone}`);
   }
 
   async function generateImage(kind: "generate_image" | "image_prompt" = "generate_image") {
@@ -232,10 +230,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         },
       },
     );
-    const conteudo = kind === "image_prompt" ? res.data.conteudo : res.ok ? res.data.imagens?.[0] : null;
+    const conteudo = !res.ok ? null : kind === "image_prompt" ? res.data.conteudo : res.data.imagens?.[0];
     if (!res.ok || !conteudo) {
       setBusyKey(kind, false);
-      setError(res.ok ? "A IA não devolveu conteúdo." : res.error);
+      setError(res.ok ? (kind === "generate_image" ? t.errNoImage : t.errNoContent) : res.error);
       return;
     }
     const save = await fetch(`/api/leads/${lead.id}`, {
@@ -250,7 +248,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     }
     setImagePrompt("");
     setBusyKey(kind, false);
-    setNotice(kind === "image_prompt" ? "Prompt gerado — copie e use na IA que quiser." : "Imagem gerada.");
+    setNotice(kind === "image_prompt" ? t.promptDone : t.genDone);
   }
 
   async function patch(body: Record<string, unknown>) {
@@ -262,11 +260,11 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
 
   async function removeLead() {
-    if (isBusy("delete") || !confirm(`Remover o lead "${lead.nome}" e tudo que foi gerado para ele?`)) return;
+    if (isBusy("delete") || !confirm(`${t.confirmDelete} "${lead.nome}" ${t.confirmDeleteSuffix}`)) return;
     setBusyKey("delete", true);
     const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
     if (res.ok) router.replace("/app/leads");
-    else { setBusyKey("delete", false); setError("Não foi possível remover."); }
+    else { setBusyKey("delete", false); setError(t.errDelete); }
   }
 
   function openSite(html: string) {
@@ -285,7 +283,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
 
   async function copy(text: string) {
     await navigator.clipboard.writeText(text).catch(() => {});
-    setNotice("Copiado.");
+    setNotice(t.copied);
   }
 
   return <>
@@ -300,19 +298,19 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
             className={`lead-status lead-status-${lead.status}`}
             onChange={(e) => { const status = e.target.value as LeadRow["status"]; setLead((l) => ({ ...l, status })); void patch({ status }); }}
           >
-            {LEAD_STATUS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+            {LEAD_STATUS.map(([v]) => <option key={v} value={v}>{statusLabels[v] ?? v}</option>)}
           </select>
         </div>
         {lead.categoria && <span className="seek-category">{lead.categoria} · {serviceName}</span>}
         {lead.endereco && <p className="seek-line"><MapPin size={12} />{[lead.endereco, lead.cidade, lead.uf].filter(Boolean).join(" · ")}</p>}
         <div className="lead-contacts">
           {lead.telefone && <a className="seek-badge seek-badge-ok" href={waLink ?? "#"} target="_blank" rel="noopener noreferrer"><Phone size={11} />{lead.telefone}</a>}
-          {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />WhatsApp ativo</span>}
-          {lead.whatsapp === "nao" && <span className="seek-badge">Sem WhatsApp</span>}
-          {lead.avaliacao !== null && <span className="seek-badge"><Star size={11} />{lead.avaliacao.toFixed(1)}{lead.total_avaliacoes ? ` · ${lead.total_avaliacoes} avaliações` : ""}</span>}
+          {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.labels.waYes}</span>}
+          {lead.whatsapp === "nao" && <span className="seek-badge">{t.labels.waNo}</span>}
+          {lead.avaliacao !== null && <span className="seek-badge"><Star size={11} />{lead.avaliacao.toFixed(1)}{lead.total_avaliacoes ? ` · ${lead.total_avaliacoes} ${t.labels.rating}` : ""}</span>}
           {lead.site
-            ? <a className="seek-badge seek-badge-ok" href={lead.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />Site atual<ExternalLink size={10} /></a>
-            : <span className="seek-badge seek-badge-gap">Sem site — oportunidade</span>}
+            ? <a className="seek-badge seek-badge-ok" href={lead.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />{t.labels.siteYes}<ExternalLink size={10} /></a>
+            : <span className="seek-badge seek-badge-gap">{t.labels.siteNo}</span>}
           {siteCheckLabel && <span
             className={`seek-badge ${siteCheck!.estado === "bom" ? "seek-badge-ok" : siteCheck!.estado === "ok" ? "" : "seek-badge-gap"}`}
             title={(siteCheck!.sinais ?? []).join(" · ")}>
@@ -328,21 +326,21 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       {!hasReply && <button type="button" className="button button-primary button-small" disabled={isBusy("sales_reply")}
         onClick={() => void generate("sales_reply")}>
         {isBusy("sales_reply") ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
-        Mensagem de abordagem
+        {t.actReply}
       </button>}
       {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={isBusy("deep_strategy")}
         onClick={() => void generate("deep_strategy")}>
         {isBusy("deep_strategy") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-        Estratégia
+        {t.actStrategy}
       </button>}
       {canSite && <button type="button" className="button button-glass button-small" disabled={isBusy("generate_site")}
         onClick={() => void generateSite()}>
         {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
-        Gerar site
+        {t.actSite}
       </button>}
       <button type="button" className="button button-glass button-small lead-delete" disabled={isBusy("delete")}
         onClick={() => void removeLead()}>
-        <Trash2 size={14} />Remover
+        <Trash2 size={14} />{t.delete}
       </button>
     </section>
 
@@ -350,57 +348,57 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     {notice && <p role="status" className="editor-saved"><Sparkles size={14} />{notice}</p>}
 
     {canImage && <section className="lead-image-gen">
-      <h2><ImagePlus size={17} /> Criar imagem</h2>
-      <p className="seek-meta">Descreva a imagem que você precisa — a direção de arte profissional é aplicada automaticamente.</p>
+      <h2><ImagePlus size={17} /> {t.imgTitle}</h2>
+      <p className="seek-meta">{t.imgHint}</p>
       <div className="lead-image-row">
         <input
           value={imagePrompt}
           maxLength={2000}
-          placeholder="Ex.: post de feed anunciando combo de corte + barba, tons escuros, estilo premium"
+          placeholder={t.imgPh}
           onChange={(e) => setImagePrompt(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generateImage(); } }}
         />
         <button type="button" className="button button-glass button-small" disabled={isBusy("image_prompt") || !imagePrompt.trim()}
           onClick={() => void generateImage("image_prompt")}>
           {isBusy("image_prompt") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-          Gerar prompt
+          {t.imgPrompt}
         </button>
         <button type="button" className="button button-primary button-small" disabled={isBusy("generate_image") || !imagePrompt.trim()}
           onClick={() => void generateImage()}>
           {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
-          Gerar imagem
+          {t.imgGen}
         </button>
       </div>
     </section>}
 
     <section className="lead-outputs">
-      <h2>Gerado para este lead</h2>
-      {outputs.length === 0 && <p className="seek-empty">Nada gerado ainda — comece pela mensagem de abordagem.</p>}
+      <h2>{t.outTitle}</h2>
+      {outputs.length === 0 && <p className="seek-empty">{t.outEmpty}</p>}
       {outputs.map((o) => <article key={o.id} className="lead-output">
         <button type="button" className="lead-output-head" onClick={() => setOpen((s) => ({ ...s, [o.id]: !s[o.id] }))}>
           <span>{OUTPUT_LABEL[o.tipo]}</span>
-          <small>{new Date(o.created_at).toLocaleString("pt-BR")}{o.modelo ? ` · ${o.modelo}` : ""}</small>
+          <small>{new Date(o.created_at).toLocaleString()}{o.modelo ? ` · ${o.modelo}` : ""}</small>
         </button>
         {open[o.id] && <div className="lead-output-body">
           {o.tipo === "generate_site" && <div className="lead-output-actions">
-            <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />Abrir site</button>
-            <button type="button" className="button button-glass button-small" onClick={() => downloadSite(o.conteudo)}><Download size={14} />Baixar HTML</button>
+            <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />{t.openSite}</button>
+            <button type="button" className="button button-glass button-small" onClick={() => downloadSite(o.conteudo)}><Download size={14} />{t.downloadHtml}</button>
           </div>}
           {o.tipo === "generate_image" && <div className="lead-output-image">
-            <Image src={o.conteudo} alt="Imagem gerada por IA" width={640} height={640} unoptimized
+            <Image src={o.conteudo} alt={OUTPUT_LABEL.generate_image} width={640} height={640} unoptimized
               style={{ width: "100%", height: "auto", borderRadius: 10 }} />
             <a className="button button-glass button-small" href={o.conteudo} download={`imagem-${o.id.slice(0, 8)}.png`} target="_blank" rel="noopener noreferrer">
-              <Download size={14} />Baixar imagem
+              <Download size={14} />{t.downloadImg}
             </a>
           </div>}
           {(o.tipo === "sales_reply" || o.tipo === "deep_strategy" || o.tipo === "image_prompt") && <>
             <pre className="lead-output-text">{o.conteudo}</pre>
             <div className="lead-output-actions">
-              <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />Copiar</button>
+              <button type="button" className="button button-glass button-small" onClick={() => void copy(o.conteudo)}><Copy size={14} />{t.copy}</button>
               {o.tipo === "sales_reply" && waMsgLink(o.conteudo) && (
                 <a className="button button-primary button-small lead-wa-send"
                   href={waMsgLink(o.conteudo)!} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle size={14} />Enviar no WhatsApp
+                  <MessageCircle size={14} />{t.sendWa}
                 </a>
               )}
             </div>
@@ -410,20 +408,20 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </section>
 
     <section className="lead-notes">
-      <h2>Notas</h2>
+      <h2>{t.notes}</h2>
       <textarea
         value={notas}
         maxLength={2000}
-        placeholder="Anotações sobre a conversa, combinados, retornos…"
+        placeholder={t.notesPh}
         onChange={(e) => setNotas(e.target.value)}
       />
       <button type="button" className="button button-glass button-small"
         disabled={notas === (lead.notas ?? "")}
-        onClick={() => { void patch({ notas }); setLead((l) => ({ ...l, notas })); setNotice("Notas salvas."); }}>
-        Salvar notas
+        onClick={() => { void patch({ notas }); setLead((l) => ({ ...l, notas })); setNotice(t.notesSaved); }}>
+        {t.notesSave}
       </button>
     </section>
 
-    <LeadAssistant lead={lead} serviceName={serviceName} />
+    <LeadAssistant lead={lead} serviceName={serviceName} t={t.copilot} />
   </>;
 }

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { cityGroups, formatPotential, nicheGroups } from "@/lib/catalog";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { FancySelect } from "./fancy-select";
 
 const PAGE_SIZE = 9;
@@ -36,12 +37,12 @@ interface StoredState {
   meta: { provedor?: string; replay?: boolean; creditos?: number } | null;
 }
 
-function siteCheckBadge(check: NonNullable<PlaceResult["siteCheck"]>) {
+function siteCheckBadge(check: NonNullable<PlaceResult["siteCheck"]>, t: Messages["seek"]) {
   const label = {
-    bom: "Site bom",
-    ok: "Site comum",
-    desatualizado: "Site desatualizado",
-    fora: "Site fora do ar",
+    bom: t.siteBom,
+    ok: t.siteOk,
+    desatualizado: t.siteOld,
+    fora: t.siteOut,
   }[check.estado];
   const cls = check.estado === "bom" ? "seek-badge-ok"
     : check.estado === "ok" ? ""
@@ -53,10 +54,12 @@ export function SearchConsole({
   services,
   canSearch = true,
   freeSearchesLeft = null,
+  t = getMessages("pt").seek,
 }: {
   services: { slug: string; nome: string; categoria: string }[];
   canSearch?: boolean;
   freeSearchesLeft?: number | null;
+  t?: Messages["seek"];
 }) {
   const router = useRouter();
   const [service, setService] = useState(services[0]?.slug ?? "");
@@ -112,7 +115,7 @@ export function SearchConsole({
           } else if (job.status === "error") {
             stopPolling();
             setBusy(false);
-            setError(job.erro ?? "A busca não pôde ser concluída.");
+            setError(job.erro ?? t.errSearch);
             store({ jobId: null, results: null, meta: null });
           }
         } catch { /* tenta de novo no próximo tick */ }
@@ -152,14 +155,14 @@ export function SearchConsole({
       const data = (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null;
       if (!res.ok || !data?.jobId) {
         setBusy(false);
-        setError(data?.error ?? "Não foi possível iniciar a busca.");
+        setError(data?.error ?? t.errSearch);
         return;
       }
       store({ jobId: data.jobId, results: null, meta: null });
       pollJob(data.jobId);
     } catch {
       setBusy(false);
-      setError("Sem conexão. Tente novamente.");
+      setError(t.errNet);
     }
   }
 
@@ -217,7 +220,7 @@ export function SearchConsole({
     const data = (await res.json().catch(() => null)) as { lead?: { id: string }; error?: string } | null;
     setSaving(null);
     if (!res.ok || !data?.lead) {
-      setError(data?.error ?? "Não foi possível salvar o lead.");
+      setError(data?.error ?? t.errSave);
       return;
     }
     setSaved((s) => ({ ...s, [index]: data.lead!.id }));
@@ -236,7 +239,7 @@ export function SearchConsole({
       { leads?: (string | null)[]; salvos?: number; error?: string } | null;
     setSaving(null);
     if (!res.ok || !data?.leads) {
-      setError(data?.error ?? "Não foi possível salvar os leads.");
+      setError(data?.error ?? t.errSave);
       return false;
     }
     setSaved((s) => {
@@ -262,8 +265,8 @@ export function SearchConsole({
   return <div className="seek-console">
     <form className="seek-form" onSubmit={(e) => { e.preventDefault(); void search(); }}>
       <label className="seek-field">
-        <span>O que você vende</span>
-        <FancySelect ariaLabel="Serviço que você vende" value={service} onChange={setService}
+        <span>{t.fService}</span>
+        <FancySelect ariaLabel={t.fServiceAria} value={service} onChange={setService}
           groups={[...new Set(services.map((s) => s.categoria))].map((categoria) => ({
             label: categoria,
             options: services.filter((s) => s.categoria === categoria)
@@ -271,16 +274,16 @@ export function SearchConsole({
           }))} />
       </label>
       <label className="seek-field">
-        <span>Nicho</span>
-        <FancySelect ariaLabel="Tipo de estabelecimento" value={niche} onChange={setNiche}
+        <span>{t.fNiche}</span>
+        <FancySelect ariaLabel={t.fNicheAria} value={niche} onChange={setNiche}
           groups={nicheGroups.map((group) => ({
             label: group.label,
             options: group.niches.map((item) => ({ value: item, label: item })),
           }))} />
       </label>
       <label className="seek-field seek-field-grow">
-        <span>Cidade</span>
-        <FancySelect ariaLabel="Cidade" value={city} onChange={setCity} icon={<MapPin size={14} />}
+        <span>{t.fCity}</span>
+        <FancySelect ariaLabel={t.fCity} value={city} onChange={setCity} icon={<MapPin size={14} />}
           groups={cityGroups.map((group) => ({
             label: group.region,
             options: group.cities.map((item) => ({
@@ -291,70 +294,68 @@ export function SearchConsole({
           }))} />
       </label>
       <label className="seek-field seek-field-refine">
-        <span>Refinar <em>(opcional)</em></span>
+        <span>{t.fRefine} <em>{t.fRefineOpt}</em></span>
         <input
           value={refine}
           onChange={(e) => setRefine(e.target.value)}
-          placeholder="Ex.: bairro Moema"
+          placeholder={t.fRefinePh}
           maxLength={120}
         />
       </label>
       {canSearch
         ? <button type="submit" className="button button-primary" disabled={busy}>
             {busy ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
-            {busy ? "Buscando…" : "Buscar"}
+            {busy ? t.searching : t.search}
           </button>
-        : <Link href="/app/planos" className="button button-primary"><Lock size={15} />Assinar para buscar</Link>}
+        : <Link href="/app/planos" className="button button-primary"><Lock size={15} />{t.subscribe}</Link>}
     </form>
 
     {canSearch && freeSearchesLeft !== null && <p className="seek-meta seek-free-left" role="note">
-      {freeSearchesLeft === 1
-        ? "Última busca gratuita restante — depois disso, assine para continuar."
-        : `${freeSearchesLeft} buscas gratuitas restantes no plano grátis.`}
+      {freeSearchesLeft === 1 ? t.freeLast : `${freeSearchesLeft} ${t.freeLeft}`}
     </p>}
 
     {!canSearch && <div className="seek-locked" role="note">
       <Lock size={18} />
       <div>
-        <strong>Suas buscas gratuitas acabaram.</strong>
-        <p>Assinando, o radar continua trazendo estabelecimentos reais com WhatsApp verificado, sinais de oportunidade e a mensagem pronta.</p>
-        <Link href="/app/planos" className="text-link">Ver planos <ExternalLink size={12} /></Link>
+        <strong>{t.lockedT}</strong>
+        <p>{t.lockedP}</p>
+        <Link href="/app/planos" className="text-link">{t.lockedLink} <ExternalLink size={12} /></Link>
       </div>
     </div>}
 
     {busy && <p className="seek-meta seek-running" role="status">
-      <Loader2 size={13} className="spin" /> Radar trabalhando — pode sair da página que ele continua.
+      <Loader2 size={13} className="spin" /> {t.running}
     </p>}
     {error && <p role="alert" className="auth-error">{error}</p>}
 
     {meta && results !== null && !busy && <p className="seek-meta">
-      {results.length} estabelecimento{results.length === 1 ? "" : "s"} encontrado{results.length === 1 ? "" : "s"}
-      {meta.replay && <strong className="seek-replay-tag"> · demonstração (replay)</strong>}
+      {results.length} {results.length === 1 ? t.foundOne : t.found}
+      {meta.replay && <strong className="seek-replay-tag">{t.replay}</strong>}
     </p>}
 
     {results !== null && results.length === 0 && !error && !busy &&
-      <p className="seek-empty">Nenhum resultado. Tente outra combinação de nicho e cidade.</p>}
+      <p className="seek-empty">{t.empty}</p>}
 
     {results !== null && results.length > 0 && <div className="seek-bulkbar">
       <label className="seek-check">
         <input type="checkbox"
           checked={selectableCount > 0 && selected.size === selectableCount}
           onChange={toggleSelectAll} />
-        <span>{selected.size === 0 ? "Selecionar todos" : `${selected.size} selecionado${selected.size === 1 ? "" : "s"}`}</span>
+        <span>{selected.size === 0 ? t.selectAll : `${selected.size} ${t.selected}`}</span>
       </label>
       {selected.size > 0 && <button type="button" className="button button-primary button-small"
         disabled={saving !== null} onClick={() => void saveIndexes([...selected])}>
         {saving === "all" ? <Loader2 size={13} className="spin" /> : <BookmarkPlus size={13} />}
-        Salvar {selected.size} lead{selected.size === 1 ? "" : "s"}
+        {t.saveLeads} {selected.size} {t.leadsW}
       </button>}
     </div>}
 
     <div className="seek-grid">
       {pageItems.map((p) => {
         const i = results!.indexOf(p);
-        const check = p.siteCheck ? siteCheckBadge(p.siteCheck) : null;
+        const check = p.siteCheck ? siteCheckBadge(p.siteCheck, t) : null;
         return <article key={p.id ?? i} className={`seek-card${selected.has(i) ? " selected" : ""}`}>
-          <button type="button" className="seek-card-check" aria-label="Selecionar estabelecimento"
+          <button type="button" className="seek-card-check" aria-label={t.selectAll}
             aria-pressed={selected.has(i)} onClick={() => toggleSelect(i)}>
             {selected.has(i) ? <CheckCircle2 size={17} /> : <span className="seek-check-dot" />}
           </button>
@@ -373,21 +374,21 @@ export function SearchConsole({
               {p.site && check
                 ? <a className={`seek-badge ${check.cls}`} href={p.site} target="_blank" rel="noopener noreferrer" title={check.sinais}><Globe size={11} />{check.label}</a>
                 : p.site
-                ? <a className="seek-badge seek-badge-ok" href={p.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />Tem site</a>
-                : <span className="seek-badge seek-badge-gap">Sem site — oportunidade</span>}
+                ? <a className="seek-badge seek-badge-ok" href={p.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />{t.hasSite}</a>
+                : <span className="seek-badge seek-badge-gap">{t.noSite}</span>}
               {check && check.sinais && p.siteCheck!.estado !== "bom" &&
                 <span className="seek-badge seek-site-note" title={check.sinais}>{check.sinais.split(" · ")[0]}</span>}
-              {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />WhatsApp verificado</span>}
-              {p.whatsapp === false && p.telefone && <span className="seek-badge">Sem WhatsApp</span>}
+              {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.waOk}</span>}
+              {p.whatsapp === false && p.telefone && <span className="seek-badge">{t.waNo}</span>}
               {p.instagram && <a className="seek-badge" href={`https://instagram.com/${p.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{p.instagram}</a>}
-              {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">Fechado</span>}
+              {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">{t.closed}</span>}
             </div>
             <div className="seek-card-actions">
               {saved[i]
-                ? <Link className="button button-glass button-small" href={`/app/leads/${saved[i]}`}><CheckCircle2 size={14} />Ver lead</Link>
+                ? <Link className="button button-glass button-small" href={`/app/leads/${saved[i]}`}><CheckCircle2 size={14} />{t.viewLead}</Link>
                 : <button type="button" className="button button-glass button-small" disabled={saving !== null}
                     onClick={() => void saveLead(p, i)}>
-                    {saving === i ? <Loader2 size={14} className="spin" /> : <BookmarkPlus size={14} />}Salvar lead</button>}
+                    {saving === i ? <Loader2 size={14} className="spin" /> : <BookmarkPlus size={14} />}{t.saveLead}</button>}
               {p.mapsUrl && <a className="text-link" href={p.mapsUrl} target="_blank" rel="noopener noreferrer">Maps<ExternalLink size={12} /></a>}
             </div>
           </div>
@@ -398,24 +399,22 @@ export function SearchConsole({
     {pageCount > 1 && <nav className="lead-pager" aria-label="Páginas de resultados">
       <button type="button" className="button button-glass button-small" disabled={page <= 1}
         onClick={() => setPage((p) => Math.max(1, p - 1))}>
-        <ChevronLeft size={14} /> Anterior
+        <ChevronLeft size={14} /> {t.prev}
       </button>
       <span className="lead-pager-info">{page} / {pageCount}</span>
       <button type="button" className="button button-glass button-small" disabled={page >= pageCount}
         onClick={() => setPage((p) => Math.min(pageCount, p + 1))}>
-        Próxima <ChevronRight size={14} />
+        {t.next} <ChevronRight size={14} />
       </button>
     </nav>}
 
-    {confirming && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label="Nova busca"
+    {confirming && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={t.confirmT}
       onClick={() => setConfirming(false)}>
       <section className="pix-panel seek-confirm" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="pix-close" aria-label="Fechar" onClick={() => setConfirming(false)}>×</button>
-        <h2><Search size={18} /> Nova busca</h2>
+        <button type="button" className="pix-close" aria-label="×" onClick={() => setConfirming(false)}>×</button>
+        <h2><Search size={18} /> {t.confirmT}</h2>
         <p className="seek-meta">
-          Você tem <strong>{unsavedIndexes().length}</strong> estabelecimento{unsavedIndexes().length === 1 ? "" : "s"} na tela
-          ainda não salvo{unsavedIndexes().length === 1 ? "" : "s"}. Uma nova busca limpa esses resultados —
-          salve os que interessam antes.
+          <strong>{unsavedIndexes().length}</strong> {t.confirmP}
         </p>
         <div className="seek-confirm-actions">
           {selected.size > 0 && <button type="button" className="button button-primary"
@@ -424,7 +423,7 @@ export function SearchConsole({
               if (await saveIndexes([...selected])) void doSearch();
             })()}>
             {saving === "all" ? <Loader2 size={14} className="spin" /> : <BookmarkPlus size={14} />}
-            Salvar {selected.size} selecionado{selected.size === 1 ? "" : "s"} e buscar
+            {t.saveLeads} {selected.size} {t.confirmSaveSel}
           </button>}
           <button type="button" className="button button-primary"
             disabled={saving !== null}
@@ -432,12 +431,12 @@ export function SearchConsole({
               if (await saveIndexes(unsavedIndexes())) void doSearch();
             })()}>
             {saving === "all" ? <Loader2 size={14} className="spin" /> : <BookmarkPlus size={14} />}
-            Salvar todos e buscar
+            {t.confirmSaveAll}
           </button>
           <button type="button" className="button button-glass"
             disabled={saving !== null}
             onClick={() => void doSearch()}>
-            Buscar sem salvar
+            {t.confirmSkip}
           </button>
         </div>
       </section>

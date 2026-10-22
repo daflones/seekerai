@@ -4,29 +4,29 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Briefcase, CircleEllipsis, Facebook, Instagram, Lightbulb, ListChecks, MessageCircle, MessagesSquare, Search, Share2, TrendingUp, Youtube } from "lucide-react";
 import { Brand } from "./brand";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 
-const ORIGENS = [
-  { value: "instagram", label: "Instagram", icon: Instagram },
-  { value: "tiktok", label: "TikTok", icon: Share2 },
-  { value: "youtube", label: "YouTube", icon: Youtube },
-  { value: "google", label: "Pesquisa no Google", icon: Search },
-  { value: "indicacao", label: "Indicação de amigos", icon: MessagesSquare },
-  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { value: "facebook", label: "Facebook", icon: Facebook },
-  { value: "outro", label: "Outro", icon: CircleEllipsis },
-];
-
-const DIFICULDADES = [
-  { value: "encontrar_clientes", label: "Encontrar clientes", icon: Search },
-  { value: "o_que_oferecer", label: "Saber o que oferecer para cada empresa", icon: Lightbulb },
-  { value: "primeira_mensagem", label: "Saber o que falar na primeira mensagem", icon: MessageCircle },
-  { value: "converter", label: "Converter leads em vendas", icon: TrendingUp },
-  { value: "portfolio", label: "Ter um portfólio que passe confiança", icon: Briefcase },
-  { value: "organizar", label: "Organizar meus contatos e oportunidades", icon: ListChecks },
-  { value: "outra", label: "Outra coisa", icon: CircleEllipsis },
-];
-
-export function WelcomeQuiz({ name }: { name: string }) {
+export function WelcomeQuiz({ name, t }: { name: string; t?: Messages["welcome"] }) {
+  const tt = t ?? getMessages("pt").welcome;
+  const ORIGENS = [
+    { value: "instagram", label: "Instagram", icon: Instagram },
+    { value: "tiktok", label: "TikTok", icon: Share2 },
+    { value: "youtube", label: "YouTube", icon: Youtube },
+    { value: "google", label: tt.o1, icon: Search },
+    { value: "indicacao", label: tt.o2, icon: MessagesSquare },
+    { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+    { value: "facebook", label: "Facebook", icon: Facebook },
+    { value: "outro", label: tt.o3, icon: CircleEllipsis },
+  ];
+  const DIFICULDADES = [
+    { value: "encontrar_clientes", label: tt.d1, icon: Search },
+    { value: "o_que_oferecer", label: tt.d2, icon: Lightbulb },
+    { value: "primeira_mensagem", label: tt.d3, icon: MessageCircle },
+    { value: "converter", label: tt.d4, icon: TrendingUp },
+    { value: "portfolio", label: tt.d5, icon: Briefcase },
+    { value: "organizar", label: tt.d6, icon: ListChecks },
+    { value: "outra", label: tt.d7, icon: CircleEllipsis },
+  ];
   const router = useRouter();
   const [origem, setOrigem] = useState("");
   const [dificuldade, setDificuldade] = useState("");
@@ -44,13 +44,13 @@ export function WelcomeQuiz({ name }: { name: string }) {
         body: JSON.stringify(answers),
       });
       if (!res.ok) {
-        setError("Não foi possível salvar agora. Tente novamente.");
+        setError(tt.errSave);
         setBusy(false);
         return;
       }
       router.replace("/app");
     } catch {
-      setError("Sem conexão. Tente novamente.");
+      setError(tt.errNet);
       setBusy(false);
     }
   }
@@ -58,11 +58,11 @@ export function WelcomeQuiz({ name }: { name: string }) {
   return <div className="welcome-screen">
     <div className="welcome-card">
       <span className="welcome-logo"><Brand /></span>
-      <h1>Bem-vindo ao SeekerAi{name ? `, ${name.split(" ")[0]}` : ""}</h1>
-      <p>Duas perguntas rápidas pra deixar o SeekerAi com a sua cara — responda se quiser.</p>
+      <h1>{tt.hi}{name ? `, ${name.split(" ")[0]}` : ""}</h1>
+      <p>{tt.sub}</p>
 
       <div className="welcome-question">
-        <strong>Como você conheceu o SeekerAi? <em>(opcional)</em></strong>
+        <strong>{tt.q1} <em>{tt.optional}</em></strong>
         <div className="welcome-grid welcome-grid-4">
           {ORIGENS.map(({ value, label, icon: Icon }) => (
             <button key={value} type="button" className={origem === value ? "selected" : ""} onClick={() => setOrigem(value)}>
@@ -73,7 +73,7 @@ export function WelcomeQuiz({ name }: { name: string }) {
       </div>
 
       <div className="welcome-question">
-        <strong>Qual sua maior dificuldade hoje para vender seus serviços? <em>(opcional)</em></strong>
+        <strong>{tt.q2} <em>{tt.optional}</em></strong>
         <div className="welcome-grid welcome-grid-2">
           {DIFICULDADES.map(({ value, label, icon: Icon }) => (
             <button key={value} type="button" className={dificuldade === value ? "selected" : ""} onClick={() => setDificuldade(value)}>
@@ -86,9 +86,9 @@ export function WelcomeQuiz({ name }: { name: string }) {
       {error && <p role="alert" className="auth-error">{error}</p>}
 
       <button className="button button-primary welcome-cta" disabled={busy} onClick={() => void finish({ origem, dificuldade })}>
-        {busy ? "Abrindo seu radar…" : <>Começar a usar o SeekerAi <ArrowRight size={16} /></>}
+        {busy ? tt.going : <>{tt.go} <ArrowRight size={16} /></>}
       </button>
-      <button className="text-link welcome-skip" disabled={busy} onClick={() => void finish({})}>Pular</button>
+      <button className="text-link welcome-skip" disabled={busy} onClick={() => void finish({})}>{tt.skip}</button>
     </div>
   </div>;
 }

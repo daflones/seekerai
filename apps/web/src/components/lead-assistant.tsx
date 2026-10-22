@@ -3,21 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send, Sparkles, X } from "lucide-react";
 import { callAction, type LeadRow } from "@/lib/app-client";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 
 interface Msg {
   autor: "user" | "ia";
   texto: string;
 }
 
-const SUGESTOES = [
-  "Como abordo esse lead?",
-  "Ele disse que já tem site — o que respondo?",
-  "Escreve uma mensagem pra mandar agora",
-  "Qual o próximo passo pra fechar?",
-];
-
 // Balão flutuante: assistente de conversação em tempo real dentro do lead.
-export function LeadAssistant({ lead, serviceName }: { lead: LeadRow; serviceName: string }) {
+export function LeadAssistant({ lead, serviceName, t }: {
+  lead: LeadRow;
+  serviceName: string;
+  t?: Messages["lead"]["copilot"];
+}) {
+  const tt = t ?? getMessages("pt").lead.copilot;
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -59,7 +58,7 @@ export function LeadAssistant({ lead, serviceName }: { lead: LeadRow; serviceNam
     );
     setBusy(false);
     if (!res.ok || !res.data.conteudo) {
-      setMsgs((m) => [...m, { autor: "ia", texto: res.ok ? "Não consegui responder agora." : `Erro: ${res.error}` }]);
+      setMsgs((m) => [...m, { autor: "ia", texto: res.ok ? tt.err : `Erro: ${res.error}` }]);
       return;
     }
     setMsgs((m) => [...m, { autor: "ia", texto: res.data.conteudo! }]);
@@ -67,34 +66,34 @@ export function LeadAssistant({ lead, serviceName }: { lead: LeadRow; serviceNam
 
   return <>
     <button type="button" className={`assist-fab${open ? " open" : ""}`}
-      aria-label={open ? "Fechar assistente" : "Abrir assistente de conversão"}
+      aria-label={open ? tt.close : tt.open}
       onClick={() => setOpen((o) => !o)}>
       {open ? <X size={20} /> : <Sparkles size={20} />}
-      {!open && <span>Copiloto</span>}
+      {!open && <span>{tt.fab}</span>}
     </button>
 
-    {open && <aside className="assist-panel" aria-label="Assistente de conversão">
+    {open && <aside className="assist-panel" aria-label={tt.title}>
       <header className="assist-head">
         <Bot size={17} />
         <div>
-          <strong>Copiloto de conversão</strong>
+          <strong>{tt.title}</strong>
           <small>{lead.nome} · {lead.status}</small>
         </div>
       </header>
 
       <div className="assist-body">
         {msgs.length === 0 && <div className="assist-intro">
-          <p>Eu conheço este lead — avaliações, contatos, sinais e o que já foi gerado. Pergunte qualquer coisa sobre como converter.</p>
+          <p>{tt.intro}</p>
           <div className="assist-sugestoes">
-            {SUGESTOES.map((s) => (
-              <button key={s} type="button" onClick={() => void send(s)}>{s}</button>
+            {tt.sug.map((sug) => (
+              <button key={sug} type="button" onClick={() => void send(sug)}>{sug}</button>
             ))}
           </div>
         </div>}
         {msgs.map((m, i) => (
           <div key={i} className={`assist-msg assist-${m.autor}`}>{m.texto}</div>
         ))}
-        {busy && <div className="assist-msg assist-ia assist-typing"><Loader2 size={14} className="spin" /> pensando…</div>}
+        {busy && <div className="assist-msg assist-ia assist-typing"><Loader2 size={14} className="spin" /> {tt.thinking}</div>}
         <div ref={endRef} />
       </div>
 
@@ -103,11 +102,11 @@ export function LeadAssistant({ lead, serviceName }: { lead: LeadRow; serviceNam
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Pergunte sobre este lead…"
+          placeholder={tt.ph}
           maxLength={600}
           disabled={busy}
         />
-        <button type="submit" className="assist-send" disabled={busy || !input.trim()} aria-label="Enviar">
+        <button type="submit" className="assist-send" disabled={busy || !input.trim()} aria-label={tt.send}>
           {busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
         </button>
       </form>

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth/session";
 import { SearchConsole } from "@/components/search-console";
+import { getLocale } from "@/lib/i18n";
+import { getMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Buscar oportunidades", robots: { index: false } };
@@ -8,7 +10,10 @@ export const metadata: Metadata = { title: "Buscar oportunidades", robots: { ind
 const FREE_SEARCHES = 2;
 
 export default async function BuscarPage() {
-  const { supabase, user, profile } = await requireSession("/app/buscar");
+  const [{ supabase, user, profile }, loc] = await Promise.all([
+    requireSession("/app/buscar"), getLocale(),
+  ]);
+  const t = getMessages(loc.lang).seek;
   const [{ data: services }, { data: subs }, { count: used }] = await Promise.all([
     supabase.from("services_catalog").select("slug,nome,categoria").eq("ativo", true).order("nome"),
     supabase.from("subscriptions").select("status").eq("user_id", user.id)
@@ -24,12 +29,9 @@ export default async function BuscarPage() {
   const canSearch = profile.role === "admin" || subscribed || (freeLeft ?? 0) > 0;
 
   return <>
-    <span className="eyebrow">RADAR DE OPORTUNIDADES</span>
-    <h1>Encontre quem precisa de você<span className="gradient-text">.</span></h1>
-    <p className="private-intro">
-      Escolha o serviço, o nicho e a cidade — o radar traz os estabelecimentos reais com os
-      sinais de oportunidade (sem site, avaliação, telefone, WhatsApp verificado).
-    </p>
-    <SearchConsole services={services ?? []} canSearch={canSearch} freeSearchesLeft={freeLeft} />
+    <span className="eyebrow">{t.eyebrow}</span>
+    <h1>{t.title}<span className="gradient-text">.</span></h1>
+    <p className="private-intro">{t.intro}</p>
+    <SearchConsole services={services ?? []} canSearch={canSearch} freeSearchesLeft={freeLeft} t={t} />
   </>;
 }
