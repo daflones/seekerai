@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { parseLocaleTag, LOCALE_COOKIE, type Locale } from "./shared";
+import { parseLocaleTag, LOCALE_COOKIE, THEME_COOKIE, type Locale, type Theme } from "./shared";
 
 // Detecção de idioma/moeda pelo país da pessoa (server-only).
 // Ordem: cookie salvo > Accept-Language do navegador > padrão pt-BR.
@@ -18,4 +18,9 @@ export async function getLocale(): Promise<Locale> {
   const accept = (await headers()).get("accept-language") ?? "";
   const first = accept.split(",").map((p) => p.split(";")[0].trim()).filter(Boolean)[0];
   return parseLocaleTag(first ?? "pt-BR");
+}
+
+/** Tema salvo em cookie — padrão escuro. */
+export async function getTheme(): Promise<Theme> {
+  return (await cookies()).get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
 }

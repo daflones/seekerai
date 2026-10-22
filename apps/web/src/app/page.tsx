@@ -5,7 +5,7 @@ import { Navigation } from "@/components/navigation";
 import { Pricing } from "@/components/pricing";
 import { ProductDemo } from "@/components/product-demo";
 import { publicPlanCards } from "@/lib/plans/server";
-import { getLocale } from "@/lib/i18n";
+import { getLocale, getTheme } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 
 export default async function Home() {
-  const loc = await getLocale();
+  const [loc, theme] = await Promise.all([getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
   const h = t.home;
   const pricing = await publicPlanCards();
@@ -46,7 +46,7 @@ export default async function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <Navigation t={t.nav} />
+      <Navigation t={t.nav} locale={loc} theme={theme} />
       <main id="conteudo">
         <section className="hero">
           <div className="cosmic-grid" aria-hidden="true" /><div className="hero-orbit orbit-one" aria-hidden="true" /><div className="hero-orbit orbit-two" aria-hidden="true" />

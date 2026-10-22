@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { LOCALE_COOKIE, THEME_COOKIE } from "@/lib/i18n/shared";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/sora";
 import "./globals.css";
@@ -60,9 +62,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const jar = await cookies();
+  const theme = jar.get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
+  const htmlLang = (jar.get(LOCALE_COOKIE)?.value ?? "pt-BR").split("-")[0] || "pt";
   return (
-    <html lang="pt-BR">
+    <html lang={htmlLang} data-theme={theme}>
       <body>
         <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
         {children}

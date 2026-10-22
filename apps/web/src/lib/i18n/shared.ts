@@ -11,6 +11,8 @@ export interface Locale {
 }
 
 export const LOCALE_COOKIE = "sk_locale";
+export const THEME_COOKIE = "sk_theme";
+export type Theme = "dark" | "light";
 
 const EUR_REGIONS = new Set([
   "PT", "IE", "GB", "ES", "FR", "DE", "IT", "NL", "BE", "AT", "FI", "GR",

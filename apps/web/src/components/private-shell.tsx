@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CircleDollarSign, Compass, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, ShieldCheck, Users } from "lucide-react";
 import { Brand } from "./brand";
+import { LocaleSwitcher } from "./locale-switcher";
+import { ThemeToggle } from "./theme-toggle";
+import type { Locale, Theme } from "@/lib/i18n/shared";
 import type { Messages } from "@/lib/i18n/messages";
 
 async function doLogout() {
@@ -36,6 +39,8 @@ export function PrivateShell({
   credits,
   adminArea = false,
   t = DEFAULT_T,
+  locale,
+  theme = "dark",
   children,
 }: {
   admin?: boolean;
@@ -44,6 +49,8 @@ export function PrivateShell({
   credits?: number | null;
   adminArea?: boolean;
   t?: Messages["shell"];
+  locale?: Locale;
+  theme?: Theme;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -86,6 +93,10 @@ export function PrivateShell({
         </div>
         {admin && !adminArea && <Link href="/admin" className="shell-admin-link"><ShieldCheck size={14} />{t.adminPanel}</Link>}
         {adminArea && <Link href="/app" className="shell-admin-link"><Compass size={14} />{t.backToApp}</Link>}
+        <div className="shell-controls">
+          {locale && <LocaleSwitcher current={locale} />}
+          <ThemeToggle theme={theme} />
+        </div>
         <button type="button" onClick={() => void doLogout()} className="shell-logout"><LogOut size={14} />{t.logout}</button>
       </div>
     </aside>
