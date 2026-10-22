@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send, Sparkles, X } from "lucide-react";
 import { callAction, type LeadRow } from "@/lib/app-client";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import type { Lang } from "@/lib/i18n/shared";
 
 interface Msg {
   autor: "user" | "ia";
@@ -11,9 +12,11 @@ interface Msg {
 }
 
 // Balão flutuante: assistente de conversação em tempo real dentro do lead.
-export function LeadAssistant({ lead, serviceName, t }: {
+export function LeadAssistant({ lead, serviceName, lang = "pt", statusLabel, t }: {
   lead: LeadRow;
   serviceName: string;
+  lang?: Lang;
+  statusLabel?: string;
   t?: Messages["lead"]["copilot"];
 }) {
   const tt = t ?? getMessages("pt").lead.copilot;
@@ -42,6 +45,7 @@ export function LeadAssistant({ lead, serviceName, t }: {
         serviceSlug: lead.service_slug,
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
+        lang,
         prompt: pergunta,
         context: {
           lead: {
@@ -77,7 +81,7 @@ export function LeadAssistant({ lead, serviceName, t }: {
         <Bot size={17} />
         <div>
           <strong>{tt.title}</strong>
-          <small>{lead.nome} · {lead.status}</small>
+          <small>{lead.nome} · {statusLabel ?? lead.status}</small>
         </div>
       </header>
 

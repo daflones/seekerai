@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: "Suporte", robots: { index: false } }
 
 export default async function SuportePage() {
   const [{ supabase, user }, loc] = await Promise.all([requireSession("/app/suporte"), getLocale()]);
-  const t = getMessages(loc.lang).misc;
+  const m = getMessages(loc.lang);
+  const t = m.misc;
   const { data: tickets } = await supabase
     .from("support_tickets").select("id,assunto,categoria,prioridade,status,created_at")
     .eq("user_id", user.id).order("created_at", { ascending: false }).limit(50);
@@ -25,7 +26,7 @@ export default async function SuportePage() {
       <section className="dash-panel">
         <h2>{t.supportFormT}</h2>
         <p className="dash-hint">{t.supportFormP}</p>
-        <SupportForm />
+        <SupportForm t={m.support} />
       </section>
       <aside className="dash-panel support-side">
         <h2><Mail size={16} /> {t.supportMailT}</h2>
@@ -38,7 +39,7 @@ export default async function SuportePage() {
     <section className="dash-panel">
       <h2>{t.supportListT}</h2>
       <p className="dash-hint">{t.supportListP}</p>
-      <SupportCenter tickets={tickets ?? []} />
+      <SupportCenter tickets={tickets ?? []} t={m.support} lang={loc.lang} />
     </section>
   </>;
 }

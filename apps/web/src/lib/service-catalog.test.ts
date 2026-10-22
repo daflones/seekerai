@@ -10,14 +10,12 @@ describe("catálogo de serviços", () => {
   it.each(["trafego", "edicao_video", "gravacao_video", "fotografia", "motion_design", "copywriting"])("oferece %s", (id) => {
     expect(findService(id)).toBeDefined();
   });
-  it("só apresenta ferramentas de geração compatíveis com o serviço", () => {
-    expect(supportsAction("sites", "generate_site")).toBe(true);
-    expect(supportsAction("landing_pages", "generate_site")).toBe(true);
-    expect(supportsAction("design", "generate_image")).toBe(true);
-    expect(supportsAction("design", "generate_site")).toBe(false);
-    expect(supportsAction("edicao_video", "generate_site")).toBe(false);
-    expect(supportsAction("fotografia", "generate_image")).toBe(true);
-    expect(supportsAction("automacao", "generate_image")).toBe(false);
+  it("oferece site e imagem em todos os serviços conhecidos", () => {
+    for (const service of services) {
+      expect(supportsAction(service.id, "generate_site")).toBe(true);
+      expect(supportsAction(service.id, "generate_image")).toBe(true);
+    }
     expect(supportsAction("desconhecido", "generate_site")).toBe(false);
+    expect(supportsAction("desconhecido", "generate_image")).toBe(false);
   });
 });

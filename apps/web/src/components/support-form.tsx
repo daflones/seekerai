@@ -3,22 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, Send } from "lucide-react";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 
-const CATEGORIAS = [
-  ["tecnico", "Problema técnico"],
-  ["cobranca", "Cobrança e pagamento"],
-  ["creditos", "Créditos e plano"],
-  ["sugestao", "Sugestão"],
-  ["outro", "Outro assunto"],
-];
+type SupT = Messages["support"];
 
-const PRIORIDADES = [
-  ["baixa", "Baixa"],
-  ["normal", "Normal"],
-  ["alta", "Alta"],
-];
-
-export function SupportForm() {
+export function SupportForm({ t }: { t?: SupT }) {
+  const tt = t ?? getMessages("pt").support;
   const [assunto, setAssunto] = useState("");
   const [categoria, setCategoria] = useState("tecnico");
   const [prioridade, setPrioridade] = useState("normal");
@@ -41,56 +31,56 @@ export function SupportForm() {
       });
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
-        setError(data?.error ?? "Não foi possível abrir o chamado.");
+        setError(data?.error ?? tt.err);
         setBusy(false);
         return;
       }
       setDone(true);
       router.refresh();
     } catch {
-      setError("Sem conexão. Tente novamente.");
+      setError(tt.errNet);
       setBusy(false);
     }
   }
 
   if (done) return <div className="ticket-done">
     <CheckCircle2 size={26} />
-    <strong>Chamado aberto.</strong>
-    <p>Nossa equipe recebeu sua mensagem. Clique no chamado na lista abaixo para acompanhar e responder pela conversa.</p>
+    <strong>{tt.doneT}</strong>
+    <p>{tt.doneP}</p>
   </div>;
 
   return <form className="ticket-form" onSubmit={submit}>
     <label className="ticket-field ticket-field-full">
-      <span>Assunto</span>
+      <span>{tt.subject}</span>
       <input value={assunto} onChange={(e) => setAssunto(e.target.value)} maxLength={140}
-        placeholder="Resuma sua dúvida ou problema" required minLength={5} />
+        placeholder={tt.subjectPh} required minLength={5} />
     </label>
     <div className="ticket-row">
       <label className="ticket-field">
-        <span>Categoria</span>
+        <span>{tt.category}</span>
         <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-          {CATEGORIAS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {Object.entries(tt.cats).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </label>
       <div className="ticket-field">
-        <span>Prioridade</span>
-        <div className="ticket-priorities" role="radiogroup" aria-label="Prioridade">
-          {PRIORIDADES.map(([v, l]) => (
+        <span>{tt.priority}</span>
+        <div className="ticket-priorities" role="radiogroup" aria-label={tt.priority}>
+          {Object.entries(tt.priorities).map(([v, l]) => (
             <button key={v} type="button" className={prioridade === v ? "selected" : ""} onClick={() => setPrioridade(v)}>{l}</button>
           ))}
         </div>
       </div>
     </div>
     <label className="ticket-field ticket-field-full">
-      <span>Mensagem</span>
+      <span>{tt.message}</span>
       <textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} rows={5} maxLength={4000}
-        placeholder="Explique o que aconteceu com o máximo de detalhes possível…" required minLength={10} />
+        placeholder={tt.messagePh} required minLength={10} />
       <small className="ticket-count">{mensagem.length}/4000</small>
     </label>
     {error && <p role="alert" className="auth-error">{error}</p>}
     <button type="submit" className="button button-primary" disabled={busy}>
       {busy ? <Loader2 size={16} className="spin" /> : <Send size={15} />}
-      {busy ? "Enviando…" : "Enviar chamado"}
+      {busy ? tt.sending : tt.send}
     </button>
   </form>;
 }

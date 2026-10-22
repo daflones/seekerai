@@ -15,6 +15,7 @@ const bodySchema = z.object({
   serviceSlug: z.string().regex(/^[a-z0-9_]{1,60}$/),
   requestRef: z.string().min(8).max(150),
   prompt: z.string().min(10).max(20_000),
+  lang: z.enum(["pt", "en", "es", "fr", "de", "it"]).optional(),
   context: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -42,6 +43,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
         serviceSlug: payload.serviceSlug,
         businessRef: leadId,
         requestRef: payload.requestRef,
+        lang: payload.lang ?? "pt",
         prompt: payload.prompt,
         context: payload.context ?? {},
       }),

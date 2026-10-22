@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Lock, Send } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
+import { dateTag, type Lang } from "@/lib/i18n/shared";
 
 export interface ChatMessage {
   id: string;
@@ -30,11 +32,17 @@ export function TicketChat({
   ticketId,
   status,
   onStatus,
+  t,
+  lang = "pt",
 }: {
   ticketId: string;
   status: string;
   onStatus?: (status: string) => void;
+  t?: Messages["support"];
+  lang?: Lang;
 }) {
+  const tt = t ?? getMessages("pt").support;
+  const tag = dateTag(lang);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentStatus, setCurrentStatus] = useState(status);
   const [text, setText] = useState("");
@@ -103,7 +111,7 @@ export function TicketChat({
     const data = res ? await res.json().catch(() => null) : null;
     setBusy(false);
     if (!res?.ok || !data?.mensagem) {
-      setError(data?.error ?? "Não foi possível enviar.");
+      setError(data?.error ?? tt.errSend);
       return;
     }
     setText("");
@@ -114,13 +122,13 @@ export function TicketChat({
 
   return <div className="chat">
     <div className="chat-messages" ref={boxRef}>
-      {loading && <p className="chat-loading"><Loader2 size={16} className="spin" /> Carregando conversa…</p>}
-      {!loading && messages.length === 0 && <p className="chat-loading">Nenhuma mensagem ainda.</p>}
+      {loading && <p className="chat-loading"><Loader2 size={16} className="spin" /> {tt.loading}</p>}
+      {!loading && messages.length === 0 && <p className="chat-loading">{tt.noMsgs}</p>}
       {messages.map((m) => (
         <div key={m.id} className={`chat-msg ${m.sender_role === "admin" ? "chat-msg-admin" : "chat-msg-user"}`}>
-          <span className="chat-msg-from">{m.sender_role === "admin" ? "Suporte SeekerAi" : "Você"}</span>
+          <span className="chat-msg-from">{m.sender_role === "admin" ? "SeekerAi" : tt.you}</span>
           <p>{m.mensagem}</p>
-          <small>{new Date(m.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
+          <small>{new Date(m.created_at).toLocaleString(tag, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
         </div>
       ))}
     </div>
@@ -129,16 +137,16 @@ export function TicketChat({
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 4000))}
-          placeholder="Escreva sua mensagem…"
+          placeholder={tt.write}
           rows={2}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
         />
         <button type="button" onClick={() => void send()} disabled={busy || !text.trim()}>
-          {busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} Enviar
+          {busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} {tt.sendBtn}
         </button>
       </div>
     ) : (
-      <p className="chat-closed"><Lock size={14} /> Chamado {TICKET_STATUS_LABEL[currentStatus]?.toLowerCase() ?? currentStatus} — não é possível enviar novas mensagens.</p>
+      <p className="chat-closed"><Lock size={14} /> {(tt.status as Record<string, string>)[currentStatus] ?? currentStatus} — {tt.closed}</p>
     )}
     {error && <p className="form-error">{error}</p>}
   </div>;

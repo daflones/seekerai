@@ -136,13 +136,12 @@ describe("migrations de créditos em PostgreSQL embarcado", () => {
 
   it("respeita compatibilidade de ferramentas e mantém catálogo SQL/TypeScript alinhado", async () => {
     const id = await user();
-    await expect(reserve(id, "site-para-video", "generate_site", "place:a", "edicao_video")).rejects.toThrow("Action incompatible");
-    await expect(reserve(id, "foto-sintetica", "generate_image", "place:a", "automacao")).rejects.toThrow("Action incompatible");
+    await expect(reserve(id, "site-para-video", "generate_site", "place:a", "servico_inexistente")).rejects.toThrow("Action incompatible");
     const rows = (await db.query<{ slug: string; enabled_actions: string[] }>("select slug, enabled_actions from public.services_catalog")).rows;
     expect(rows.map((row) => row.slug).sort()).toEqual(services.map((service) => service.id).sort());
     for (const service of services) {
       expect(rows.find((row) => row.slug === service.id)?.enabled_actions.sort()).toEqual(
-        ["search", "deep_strategy", "sales_reply", "whatsapp_check", ...service.actions].sort(),
+        ["search", "deep_strategy", "sales_reply", "whatsapp_check", "lead_assist", "image_prompt", ...service.actions].sort(),
       );
     }
   });
@@ -181,10 +180,12 @@ describe("migrations de créditos em PostgreSQL embarcado", () => {
     await db.query("insert into public.plans (id, slug, nome, preco_centavos, creditos_mensais, ativo) values ($1, $2, 'Plano de teste', 2490, 150, true)", [planId, `teste-${planId}`]);
     await db.query("select * from public.grant_plan_allowance($1, $2, 'stripe:invoice:teste')", [id, planId]);
     await authenticated(admin, (tx) => tx.query("select public.configure_plan_credits($1, 200, 'Novo limite do plano')", [planId]));
+    // Mesmo ciclo: idempotente — não re-concede nem reajusta.
     await db.query("select * from public.grant_plan_allowance($1, $2, 'stripe:invoice:teste')", [id, planId]);
-    expect(await balance(id)).toBe(200);
+    expect(await balance(id)).toBe(150);
+    // Novo ciclo: reseta o saldo para a cota atual do plano (não acumula).
     await db.query("select * from public.grant_plan_allowance($1, $2, 'stripe:invoice:proximo')", [id, planId]);
-    expect(await balance(id)).toBe(400);
+    expect(await balance(id)).toBe(200);
   });
 
   it("limita tentativas de autenticação atomicamente e não expõe os buckets", async () => {

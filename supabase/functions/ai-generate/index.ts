@@ -147,19 +147,35 @@ interface GenerateBody {
   serviceSlug?: string;
   requestRef?: string;
   prompt?: string;
+  lang?: string;
   context?: Record<string, unknown>;
 }
 
-function systemPromptFor(action: string): string {
+// Nome do idioma pra instrução de sistema — o modelo responde na língua do usuário.
+const LANG_NAMES: Record<string, string> = {
+  pt: "português brasileiro (pt-BR)",
+  en: "English",
+  es: "español",
+  fr: "français",
+  de: "Deutsch",
+  it: "italiano",
+};
+
+function langName(lang: string | undefined): string {
+  return LANG_NAMES[lang ?? "pt"] ?? LANG_NAMES.pt;
+}
+
+function systemPromptFor(action: string, lang: string): string {
+  const L = langName(lang);
   switch (action) {
     case "deep_strategy":
-      return "Você é um estrategista de vendas B2B brasileiro. Analise o estabelecimento e produza: diagnóstico, oportunidades, ângulos de abordagem e próximos passos práticos. Responda em pt-BR, direto e acionável.";
+      return `Você é um estrategista de vendas B2B experiente. Analise o estabelecimento e produza: diagnóstico, oportunidades, ângulos de abordagem e próximos passos práticos. Responda OBRIGATORIAMENTE em ${L}, direto e acionável.`;
     case "sales_reply":
-      return "Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em pt-BR para o estabelecimento descrito. Sem emojis excessivos, sem promessas irreais.";
+      return `Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em ${L} para o estabelecimento descrito. Sem emojis excessivos, sem promessas irreais.`;
     case "generate_site":
       return [
         "Você é um diretor de arte e desenvolvedor front-end premiado (nível Awwwards).",
-        "Gere um site institucional completo em um único arquivo HTML autocontido, em pt-BR.",
+        `Gere um site institucional completo em um único arquivo HTML autocontido, TODO o conteúdo em ${L}.`,
         "REGRAS VISUAIS OBRIGATÓRIAS:",
         "- Use EXCLUSIVAMENTE as URLs de imagem fornecidas no contexto para toda fotografia (hero, galeria, seções). Nunca placeholders, nunca unplash/picsum.",
         "- PROIBIDO emojis em qualquer lugar — use ícones SVG inline discretos (lucide-style, stroke 1.5px) quando necessário.",
@@ -173,14 +189,14 @@ function systemPromptFor(action: string): string {
       ].join("\n");
     case "lead_assist":
       return [
-        "Você é o copiloto de conversão do SeekerAi: um closer B2B brasileiro experiente",
+        "Você é o copiloto de conversão do SeekerAi: um closer B2B experiente",
         "acompanhando este lead específico em tempo real.",
         "Use TODOS os dados do contexto (estabelecimento, avaliações, site, WhatsApp, status",
         "do funil e o que já foi gerado) para responder de forma concreta.",
         "Ajude a converter: sugira ângulos de abordagem, mensagens prontas para copiar,",
         "respostas para objeções, próximos passos e o que fazer em cada etapa do funil",
         "(novo → contatado → respondeu → proposta → ganho).",
-        "Respostas curtas e diretas em pt-BR, com mensagens prontas entre aspas quando fizer sentido.",
+        `Respostas curtas e diretas OBRIGATORIAMENTE em ${L}, com mensagens prontas entre aspas quando fizer sentido.`,
       ].join("\n");
     case "generate_image":
       return [
@@ -191,7 +207,7 @@ function systemPromptFor(action: string): string {
         "Sem texto na imagem a menos que o usuário peça explicitamente. Sem marcas d'água, sem emojis.",
       ].join("\n");
     default:
-      return "Responda em pt-BR.";
+      return `Responda em ${L}.`;
   }
 }
 
@@ -274,6 +290,7 @@ Deno.serve(async (req) => {
     const businessRef = asString(body.businessRef, 300);
     const requestRef = asString(body.requestRef, 150);
     const prompt = asString(body.prompt, 20_000);
+    const lang = asString(body.lang, 10) || "pt";
     if (!action || !ACTIONS.has(action) || !service || !businessRef || !requestRef || !prompt) {
       throw httpError(400, "Informe action, serviceSlug, businessRef, requestRef e prompt");
     }
@@ -347,7 +364,7 @@ Deno.serve(async (req) => {
       const t0 = Date.now();
       let data: Record<string, unknown> | null = null;
       let modelo = model;
-      const systemPrompt = systemPromptFor(action);
+      const systemPrompt = systemPromptFor(action, lang);
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {

@@ -20,6 +20,8 @@ describe("política contextual de ações", () => {
     expect(siteProposalMode("sites", { state: "improvable", url: "https://example.com", evidence: [] })).toBeNull();
     expect(siteProposalMode("sites", { state: "not_analyzed", url: "https://example.com", evidence: [] })).toBeNull();
     expect(siteProposalMode("sites", { state: "current", url: "https://example.com", evidence: [] })).toBeNull();
-    expect(siteProposalMode("fotografia", { state: "missing", url: null, evidence: [] })).toBeNull();
+    // Site e imagem são universais: todo serviço propõe site novo quando falta.
+    expect(siteProposalMode("fotografia", { state: "missing", url: null, evidence: [] })).toBe("new");
+    expect(siteProposalMode("servico_inexistente", { state: "missing", url: null, evidence: [] })).toBeNull();
   });
 });

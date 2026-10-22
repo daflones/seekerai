@@ -9,7 +9,8 @@ import {
   FileText, MonitorSmartphone,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
-import { formatMoney, type Currency } from "@/lib/i18n/shared";
+import { promptFor } from "@/lib/ai-prompts";
+import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { LeadAssistant } from "./lead-assistant";
 
@@ -21,34 +22,18 @@ interface OutputRow {
   created_at: string;
 }
 
-
-
-function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
-  const gap = lead.site ? "" : " O estabelecimento NÃO tem site — use isso como gancho principal.";
-  switch (tipo) {
-    case "sales_reply":
-      return `Escreva uma mensagem curta de primeira abordagem via WhatsApp oferecendo ${serviceName} para este estabelecimento.` +
-        `${gap} Tom humano, sem exageros, máximo 3 parágrafos curtos, terminando com uma pergunta simples.`;
-    case "deep_strategy":
-      return `Monte a estratégia de venda de ${serviceName} para este estabelecimento: diagnóstico, gaps observáveis,` +
-        ` ângulo de abordagem, objeções prováveis e o próximo passo concreto.${gap}`;
-    default:
-      return `Crie o site institucional completo deste estabelecimento, pronto para publicar.` +
-        ` Nome, categoria, endereço, telefone e avaliação estão no contexto — use-os de verdade.`;
-  }
-}
-
 const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
   novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
 };
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, currency = "brl", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, currency = "brl", lang = "pt", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
   siteSlug?: string | null;
   currency?: Currency;
+  lang?: Lang;
   t?: Messages["lead"];
   statusLabels?: Record<string, string>;
 }) {
@@ -145,7 +130,8 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         tipo: "generate_site",
         serviceSlug: lead.service_slug,
         requestRef: crypto.randomUUID(),
-        prompt: promptFor("generate_site", lead, serviceName),
+        lang,
+        prompt: promptFor("generate_site", lead, serviceName, lang),
         context: {
           nome: lead.nome,
           categoria: lead.categoria,
@@ -183,7 +169,8 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         serviceSlug: lead.service_slug,
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
-        prompt: promptFor(tipo, lead, serviceName),
+        lang,
+        prompt: promptFor(tipo, lead, serviceName, lang),
         context: {
           nome: lead.nome,
           categoria: lead.categoria,
@@ -231,6 +218,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         serviceSlug: lead.service_slug,
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
+        lang,
         prompt,
         context: {
           nome: lead.nome,
@@ -472,7 +460,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       </button>
     </section>
 
-    <LeadAssistant lead={lead} serviceName={serviceName} t={t.copilot} />
+    <LeadAssistant lead={lead} serviceName={serviceName} lang={lang} statusLabel={statusLabels[lead.status] ?? lead.status} t={t.copilot} />
 
     {wonOpen && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={t.wonTitle}
       onClick={() => { setWonOpen(false); wonPending.current = null; }}>

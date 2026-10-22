@@ -7,6 +7,7 @@ import { LeadWorkspace } from "@/components/lead-workspace";
 import type { LeadRow } from "@/lib/app-client";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
+import { serviceName } from "@/lib/catalog-i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Lead", robots: { index: false } };
@@ -31,10 +32,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     <LeadWorkspace
       lead={lead as LeadRow}
       outputs={outputs ?? []}
-      serviceName={service?.nome ?? lead.service_slug}
+      serviceName={service ? serviceName(service.slug, service.nome, loc.lang) : lead.service_slug}
       enabledActions={service?.enabled_actions ?? []}
       siteSlug={((lead as { dados?: { siteSlug?: string } }).dados?.siteSlug) ?? null}
       currency={loc.currency}
+      lang={loc.lang}
       t={t.lead}
       statusLabels={t.leadsPage.status}
     />

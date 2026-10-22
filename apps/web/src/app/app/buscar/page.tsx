@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { SearchConsole } from "@/components/search-console";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
+import { serviceCategory, serviceName } from "@/lib/catalog-i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Buscar oportunidades", robots: { index: false } };
@@ -32,6 +33,9 @@ export default async function BuscarPage() {
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.title}<span className="gradient-text">.</span></h1>
     <p className="private-intro">{t.intro}</p>
-    <SearchConsole services={services ?? []} canSearch={canSearch} freeSearchesLeft={freeLeft} t={t} />
+    <SearchConsole
+      services={((services ?? []) as { slug: string; nome: string; categoria: string }[])
+        .map((s) => ({ slug: s.slug, nome: serviceName(s.slug, s.nome, loc.lang), categoria: serviceCategory(s.categoria, loc.lang) }))}
+      canSearch={canSearch} freeSearchesLeft={freeLeft} loc={loc} t={t} />
   </>;
 }

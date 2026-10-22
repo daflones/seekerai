@@ -5,6 +5,7 @@ import { LeadsBoard } from "@/components/leads-board";
 import type { LeadRow } from "@/lib/app-client";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
+import { serviceName } from "@/lib/catalog-i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Meus leads", robots: { index: false } };
@@ -20,7 +21,7 @@ export default async function LeadsPage() {
   ]);
   type Service = { slug: string; nome: string; enabled_actions: string[] | null };
   type Rule = { action: string; cost: number; enabled: boolean };
-  const serviceNames = Object.fromEntries(((services ?? []) as Service[]).map((s) => [s.slug, s.nome]));
+  const serviceNames = Object.fromEntries(((services ?? []) as Service[]).map((s) => [s.slug, serviceName(s.slug, s.nome, loc.lang)]));
   const serviceActions = Object.fromEntries(((services ?? []) as Service[]).map((s) => [s.slug, s.enabled_actions ?? []]));
   const costs = Object.fromEntries(((rules ?? []) as Rule[]).map((r) => [r.action, r.enabled ? r.cost : null]));
   const doneByLead: Record<string, string[]> = {};
@@ -34,6 +35,6 @@ export default async function LeadsPage() {
     <p className="private-intro">{t.intro}</p>
     {(leads ?? []).length === 0
       ? <p className="private-intro">{t.empty} <Link className="text-link" href="/app/buscar">{t.emptyLink}</Link></p>
-      : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} doneByLead={doneByLead} t={t} />}
+      : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} doneByLead={doneByLead} lang={loc.lang} t={t} />}
   </>;
 }

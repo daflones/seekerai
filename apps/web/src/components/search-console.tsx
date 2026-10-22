@@ -8,8 +8,10 @@ import {
   Globe, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone, Search, Star,
 } from "lucide-react";
 import { placeImageSrc, type PlaceResult } from "@/lib/app-client";
-import { cityGroups, formatPotential, nicheGroups } from "@/lib/catalog";
+import { formatPotential } from "@/lib/catalog";
+import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/lib/catalog-i18n";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import type { Locale } from "@/lib/i18n/shared";
 import { FancySelect } from "./fancy-select";
 
 const PAGE_SIZE = 9;
@@ -55,16 +57,25 @@ export function SearchConsole({
   canSearch = true,
   freeSearchesLeft = null,
   t = getMessages("pt").seek,
+  loc,
 }: {
   services: { slug: string; nome: string; categoria: string }[];
   canSearch?: boolean;
   freeSearchesLeft?: number | null;
   t?: Messages["seek"];
+  loc?: Locale;
 }) {
+  const locale: Locale = loc ?? { lang: "pt", region: "BR", currency: "brl", isBrazil: true };
+  const lang = locale.lang;
+  const nGroups = nicheGroupsFor(lang);
+  const cGroups = cityGroupsFor(locale);
+  // Nicho/cidade exibidos localizados; o canônico PT alimenta pesos e a query pro provedor.
+  const canonicalNiche = (label: string) =>
+    nGroups.flatMap((g) => g.options).find((o) => o.label === label)?.canonical ?? label;
   const router = useRouter();
   const [service, setService] = useState(services[0]?.slug ?? "");
-  const [niche, setNiche] = useState("Barbearias");
-  const [city, setCity] = useState("São Paulo, SP");
+  const [niche, setNiche] = useState(nGroups[0].options[0].label);
+  const [city, setCity] = useState(cGroups[0].cities[0].label);
   const [refine, setRefine] = useState("");
   const [results, setResults] = useState<PlaceResult[] | null>(null);
   const [meta, setMeta] = useState<{ provedor?: string; replay?: boolean; creditos?: number } | null>(null);
@@ -132,7 +143,7 @@ export function SearchConsole({
   }
 
   async function doSearch() {
-    const q = `${niche} em ${city}${refine.trim() ? `, ${refine.trim()}` : ""}`;
+    const q = `${niche} ${lang === "pt" ? "em" : "in"} ${city}${refine.trim() ? `, ${refine.trim()}` : ""}`;
     setConfirming(false);
     setResults(null);
     setMeta(null);
@@ -149,7 +160,7 @@ export function SearchConsole({
           query: q,
           serviceSlug: service,
           requestRef: crypto.randomUUID(),
-          regionCode: "BR",
+          regionCode: locale.region,
         }),
       });
       const data = (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null;
@@ -268,28 +279,28 @@ export function SearchConsole({
         <span>{t.fService}</span>
         <FancySelect ariaLabel={t.fServiceAria} value={service} onChange={setService}
           groups={[...new Set(services.map((s) => s.categoria))].map((categoria) => ({
-            label: categoria,
+            label: serviceCategory(categoria, lang),
             options: services.filter((s) => s.categoria === categoria)
-              .map((s) => ({ value: s.slug, label: s.nome })),
+              .map((s) => ({ value: s.slug, label: serviceName(s.slug, s.nome, lang) })),
           }))} />
       </label>
       <label className="seek-field">
         <span>{t.fNiche}</span>
         <FancySelect ariaLabel={t.fNicheAria} value={niche} onChange={setNiche}
-          groups={nicheGroups.map((group) => ({
+          groups={nGroups.map((group) => ({
             label: group.label,
-            options: group.niches.map((item) => ({ value: item, label: item })),
+            options: group.options.map((o) => ({ value: o.label, label: o.label })),
           }))} />
       </label>
       <label className="seek-field seek-field-grow">
         <span>{t.fCity}</span>
         <FancySelect ariaLabel={t.fCity} value={city} onChange={setCity} icon={<MapPin size={14} />}
-          groups={cityGroups.map((group) => ({
+          groups={cGroups.map((group) => ({
             label: group.region,
             options: group.cities.map((item) => ({
               value: item.label,
               label: item.label,
-              badge: formatPotential(item, niche, service),
+              badge: formatPotential(item, canonicalNiche(niche), service),
             })),
           }))} />
       </label>
@@ -396,7 +407,7 @@ export function SearchConsole({
       })}
     </div>
 
-    {pageCount > 1 && <nav className="lead-pager" aria-label="Páginas de resultados">
+    {pageCount > 1 && <nav className="lead-pager" aria-label={t.pagerAria}>
       <button type="button" className="button button-glass button-small" disabled={page <= 1}
         onClick={() => setPage((p) => Math.max(1, p - 1))}>
         <ChevronLeft size={14} /> {t.prev}

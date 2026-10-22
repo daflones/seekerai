@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 export default async function ExplorePage() {
   const loc = await getLocale();
-  const t = getMessages(loc.lang).misc;
-  return <div className="inner-page"><InnerHeader label={t.backHome} /><main id="conteudo" className="container explore-content"><span className="eyebrow">{t.exploreEyebrow}</span><h1>{t.exploreTitle}</h1><p>{t.exploreP}</p><ProductDemo full /><div className="explore-note"><Info size={18} /><p>{t.exploreNote}</p></div></main></div>;
+  const m = getMessages(loc.lang);
+  const t = m.misc;
+  return <div className="inner-page"><InnerHeader label={t.backHome} /><main id="conteudo" className="container explore-content"><span className="eyebrow">{t.exploreEyebrow}</span><h1>{t.exploreTitle}</h1><p>{t.exploreP}</p><ProductDemo full loc={loc} t={m.demo} /><div className="explore-note"><Info size={18} /><p>{t.exploreNote}</p></div></main></div>;
 }

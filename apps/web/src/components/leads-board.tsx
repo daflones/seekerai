@@ -8,7 +8,9 @@ import {
   Phone, Sparkles, Star, Target, FileCode2,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { promptFor } from "@/lib/ai-prompts";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import type { Lang } from "@/lib/i18n/shared";
 
 const PAGE_SIZE = 9;
 
@@ -28,30 +30,13 @@ const KIND_LABEL: Record<ActionKind, keyof Messages["leadsPage"]> = {
   generate_image: "actImage",
 };
 
-function promptFor(kind: ActionKind, lead: LeadRow, serviceName: string): string {
-  const gap = lead.site ? "" : " O estabelecimento NÃO tem site — use isso como gancho principal.";
-  switch (kind) {
-    case "sales_reply":
-      return `Escreva uma mensagem curta de primeira abordagem via WhatsApp oferecendo ${serviceName} para este estabelecimento.` +
-        `${gap} Tom humano, sem exageros, máximo 3 parágrafos curtos, terminando com uma pergunta simples.`;
-    case "deep_strategy":
-      return `Monte a estratégia de venda de ${serviceName} para este estabelecimento: diagnóstico, gaps observáveis,` +
-        ` ângulo de abordagem, objeções prováveis e o próximo passo concreto.${gap}`;
-    case "generate_site":
-      return `Crie o site institucional completo deste estabelecimento, pronto para publicar.` +
-        ` Nome, categoria, endereço, telefone e avaliação estão no contexto — use-os de verdade.`;
-    default:
-      return `Fotografia profissional e realista de ${lead.nome} — ${lead.categoria ?? "negócio local"} em ${lead.cidade ?? "cidade brasileira"}.` +
-        ` Estilo editorial premium, luz natural, sem texto nem marcas d'água.`;
-  }
-}
-
-export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, t = getMessages("pt").leadsPage }: {
+export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, lang = "pt", t = getMessages("pt").leadsPage }: {
   initialLeads: LeadRow[];
   serviceNames: Record<string, string>;
   serviceActions: Record<string, string[]>;
   costs: Record<string, number | null>;
   doneByLead?: Record<string, string[]>;
+  lang?: Lang;
   t?: Messages["leadsPage"];
 }) {
   const [leads, setLeads] = useState(initialLeads);
@@ -117,8 +102,8 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         leadId: lead.id, tipo: "generate_site", serviceSlug: lead.service_slug,
-        requestRef: crypto.randomUUID(),
-        prompt: promptFor("generate_site", lead, serviceName),
+        requestRef: crypto.randomUUID(), lang,
+        prompt: promptFor("generate_site", lead, serviceName, lang),
         context: {
           nome: lead.nome, categoria: lead.categoria, endereco: lead.endereco,
           cidade: lead.cidade, uf: lead.uf, telefone: lead.telefone, site: lead.site,
@@ -166,7 +151,8 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
         serviceSlug: lead.service_slug,
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
-        prompt: promptFor(kind, lead, serviceName),
+        lang,
+        prompt: promptFor(kind, lead, serviceName, lang),
         context: {
           nome: lead.nome, categoria: lead.categoria, endereco: lead.endereco,
           cidade: lead.cidade, uf: lead.uf, telefone: lead.telefone, site: lead.site,

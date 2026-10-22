@@ -68,3 +68,8 @@ export const LANG_NAMES: Record<Lang, string> = {
   de: "Deutsch",
   it: "Italiano",
 };
+
+/** BCP-47 tag para formatação de datas por idioma. */
+export function dateTag(lang: Lang): string {
+  return { pt: "pt-BR", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", it: "it-IT" }[lang];
+}
