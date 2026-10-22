@@ -21,6 +21,11 @@ const bodySchema = z.object({
 // Site + fallback lento: orçamento grande de propósito. A edge tem ~400s.
 const EDGE_TIMEOUT_MS = 390_000;
 
+function slugify(text: string): string {
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "site";
+}
+
 async function runJob(jobId: string, leadId: string, userId: string, token: string, payload: z.infer<typeof bodySchema>) {
   const admin = createSupabaseAdminClient();
   const config = supabasePublicConfig();
@@ -57,6 +62,21 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
       lead_id: leadId, user_id: userId, tipo: payload.tipo,
       conteudo: data.conteudo, modelo: typeof data.modelo === "string" ? data.modelo : null,
     });
+    // Garante slug público pro site gerado (/site/<slug>).
+    const { data: leadRow } = await admin.from("leads")
+      .select("nome,cidade,bairro,dados").eq("id", leadId).maybeSingle();
+    const dados = (leadRow?.dados ?? {}) as Record<string, unknown>;
+    if (leadRow && !dados.siteSlug) {
+      const base = slugify([leadRow.nome, leadRow.bairro ?? leadRow.cidade].filter(Boolean).join(" "));
+      let slug = base;
+      for (let i = 2; i < 20; i++) {
+        const { data: clash } = await admin.from("leads")
+          .select("id").eq("dados->>siteSlug", slug).maybeSingle();
+        if (!clash) break;
+        slug = `${base}-${i}`;
+      }
+      await admin.from("leads").update({ dados: { ...dados, siteSlug: slug } }).eq("id", leadId);
+    }
     await admin.from("ai_jobs")
       .update({ status: "done", result: { modelo: data.modelo ?? null }, updated_at: new Date().toISOString() })
       .eq("id", jobId);

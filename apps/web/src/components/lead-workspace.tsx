@@ -37,11 +37,12 @@ function promptFor(tipo: string, lead: LeadRow, serviceName: string): string {
   }
 }
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
+  siteSlug?: string | null;
   t?: Messages["lead"];
   statusLabels?: Record<string, string>;
 }) {
@@ -268,17 +269,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
 
   function openSite(html: string) {
+    if (siteSlug) { window.open(`/site/${siteSlug}`, "_blank", "noopener"); return; }
     const blob = new Blob([html], { type: "text/html" });
     window.open(URL.createObjectURL(blob), "_blank", "noopener");
-  }
-
-  function downloadSite(html: string) {
-    const blob = new Blob([html], { type: "text/html" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${lead.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50)}.html`;
-    a.click();
-    URL.revokeObjectURL(a.href);
   }
 
   async function copy(text: string) {
@@ -380,10 +373,16 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           <small>{new Date(o.created_at).toLocaleString()}{o.modelo ? ` · ${o.modelo}` : ""}</small>
         </button>
         {open[o.id] && <div className="lead-output-body">
-          {o.tipo === "generate_site" && <div className="lead-output-actions">
-            <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />{t.openSite}</button>
-            <button type="button" className="button button-glass button-small" onClick={() => downloadSite(o.conteudo)}><Download size={14} />{t.downloadHtml}</button>
-          </div>}
+          {o.tipo === "generate_site" && <>
+            <iframe className="lead-site-preview" srcDoc={o.conteudo} sandbox="allow-scripts"
+              title={`${OUTPUT_LABEL.generate_site} — ${lead.nome}`} loading="lazy" />
+            <div className="lead-output-actions">
+              {siteSlug
+                ? <a className="button button-glass button-small" href={`/site/${siteSlug}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />{`/site/${siteSlug}`}</a>
+                : null}
+              <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />{t.openSite}</button>
+            </div>
+          </>}
           {o.tipo === "generate_image" && <div className="lead-output-image">
             <Image src={o.conteudo} alt={OUTPUT_LABEL.generate_image} width={640} height={640} unoptimized
               style={{ width: "100%", height: "auto", borderRadius: 10 }} />
