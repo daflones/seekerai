@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Copy, Download, ExternalLink, Eye, ImagePlus, Instagram, Loader2, MapPin,
-  MessageSquareText, Phone, Sparkles, Star, Trash2, Globe, MessageCircle,
-  FileText, MonitorSmartphone,
+  Check, Copy, Download, ExternalLink, Eye, ImagePlus, Instagram, Loader2,
+  Lock, MapPin, MessageSquareText, Phone, Sparkles, Star, Trash2, Globe,
+  MessageCircle, FileText, MonitorSmartphone,
 } from "lucide-react";
 import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { promptFor } from "@/lib/ai-prompts";
@@ -26,12 +26,13 @@ const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
   novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
 };
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, currency = "brl", lang = "pt", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, senderName = null, currency = "brl", lang = "pt", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
   siteSlug?: string | null;
+  senderName?: string | null;
   currency?: Currency;
   lang?: Lang;
   t?: Messages["lead"];
@@ -74,8 +75,13 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const waLink = waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}` : null;
   const waMsgLink = (text: string) =>
     waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}?text=${encodeURIComponent(text)}` : null;
-  const hasReply = outputs.some((o) => o.tipo === "sales_reply");
   const hasStrategy = outputs.some((o) => o.tipo === "deep_strategy");
+  const latestReply = outputs.find((o) => o.tipo === "sales_reply");
+  const latestImage = outputs.find((o) => o.tipo === "generate_image");
+  const hasSite = Boolean(siteSlug);
+  const siteHref = siteSlug ? `/site/${siteSlug}` : null;
+  const siteAbsoluteUrl = () =>
+    siteSlug ? `${window.location.origin}/site/${siteSlug}` : "";
   const sitePoller = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Site completo leva minutos quando o provedor principal falha e o
@@ -157,7 +163,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     pollSiteJob(data.jobId);
   }
 
-  async function generate(tipo: "sales_reply" | "deep_strategy") {
+  async function generate(tipo: "sales_reply" | "deep_strategy", extra?: { prompt?: string; context?: Record<string, unknown> }) {
     if (isBusy(tipo)) return;
     setBusyKey(tipo, true);
     setError("");
@@ -170,7 +176,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         businessRef: lead.id,
         requestRef: crypto.randomUUID(),
         lang,
-        prompt: promptFor(tipo, lead, serviceName, lang),
+        prompt: promptFor(tipo, lead, serviceName, lang) + (extra?.prompt ?? ""),
         context: {
           nome: lead.nome,
           categoria: lead.categoria,
@@ -183,6 +189,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           totalAvaliacoes: lead.total_avaliacoes,
           imagem: lead.imagem,
           mapsUrl: lead.maps_url,
+          ...extra?.context,
         },
       },
     );
@@ -205,8 +212,19 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     setNotice(`${OUTPUT_LABEL[tipo]} ${t.genDone}`);
   }
 
-  async function generateImage(kind: "generate_image" | "image_prompt" = "generate_image") {
-    const prompt = imagePrompt.trim();
+  // Etapa 2 da jornada — a mensagem sai com o link do site e assinada
+  // com o nome de quem está vendendo (perfil da conta).
+  function generateOutreach() {
+    const site = siteAbsoluteUrl();
+    void generate("sales_reply", {
+      prompt: (site ? `\n\nO site de demonstração já está pronto: ${site} — inclua o link completo na mensagem de forma natural (ex.: "montei uma prévia do site pra você ver").` : "")
+        + (senderName ? `\nAssine a mensagem como "${senderName}".` : ""),
+      context: { remetente: senderName ?? undefined, siteUrl: site || undefined },
+    });
+  }
+
+  async function generateImage(kind: "generate_image" | "image_prompt" = "generate_image", preset?: string) {
+    const prompt = (preset ?? imagePrompt).trim();
     if (isBusy(kind) || !prompt) return;
     setBusyKey(kind, true);
     setError("");
@@ -355,20 +373,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </header>
 
     <section className="lead-actions">
-      {!hasReply && <button type="button" className="button button-primary button-small" disabled={isBusy("sales_reply")}
-        onClick={() => void generate("sales_reply")}>
-        {isBusy("sales_reply") ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
-        {t.actReply}
-      </button>}
       {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={isBusy("deep_strategy")}
         onClick={() => void generate("deep_strategy")}>
         {isBusy("deep_strategy") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
         {t.actStrategy}
-      </button>}
-      {canSite && <button type="button" className="button button-glass button-small" disabled={isBusy("generate_site")}
-        onClick={() => void generateSite()}>
-        {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
-        {t.actSite}
       </button>}
       <button type="button" className="button button-glass button-small lead-delete" disabled={isBusy("delete")}
         onClick={() => void removeLead()}>
@@ -379,29 +387,113 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     {error && <p role="alert" className="auth-error">{error}</p>}
     {notice && <p role="status" className="editor-saved"><Sparkles size={14} />{notice}</p>}
 
-    {canImage && <section className="lead-image-gen">
-      <h2><ImagePlus size={17} /> {t.imgTitle}</h2>
-      <p className="seek-meta">{t.imgHint}</p>
-      <div className="lead-image-row">
-        <input
-          value={imagePrompt}
-          maxLength={2000}
-          placeholder={t.imgPh}
-          onChange={(e) => setImagePrompt(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generateImage(); } }}
-        />
-        <button type="button" className="button button-glass button-small" disabled={isBusy("image_prompt") || !imagePrompt.trim()}
-          onClick={() => void generateImage("image_prompt")}>
-          {isBusy("image_prompt") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-          {t.imgPrompt}
-        </button>
-        <button type="button" className="button button-primary button-small" disabled={isBusy("generate_image") || !imagePrompt.trim()}
-          onClick={() => void generateImage()}>
-          {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
-          {t.imgGen}
-        </button>
-      </div>
-    </section>}
+    <section className="lead-journey">
+      <h2><Sparkles size={17} /> {t.journey}</h2>
+      <ol className="lead-steps">
+        {canSite && <li className={`lead-step ${hasSite ? "is-done" : "is-active"}`}>
+          <div className="lead-step-head">
+            <span className="lead-step-num">{hasSite ? <Check size={13} /> : 1}</span>
+            <div><strong>{t.step1}</strong><small>{t.step1Hint}</small></div>
+          </div>
+          {hasSite && siteHref ? <div className="lead-site-done">
+            <a className="lead-site-frame" href={siteHref} target="_blank" rel="noopener noreferrer">
+              <iframe src={siteHref} title={`${t.openSite} — ${lead.nome}`} loading="lazy" tabIndex={-1} />
+              <span className="lead-site-open"><ExternalLink size={15} />{t.openSite}</span>
+            </a>
+            <div className="lead-output-actions">
+              <button type="button" className="button button-glass button-small"
+                onClick={() => void copy(siteAbsoluteUrl())}>
+                <Copy size={14} />{t.copyLink}
+              </button>
+              <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={14} />{`/site/${siteSlug}`}
+              </a>
+            </div>
+          </div> : <div className="lead-step-body">
+            <button type="button" className="button button-primary button-small" disabled={isBusy("generate_site")}
+              onClick={() => void generateSite()}>
+              {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
+              {t.actSite}
+            </button>
+            {isBusy("generate_site") && <small className="lead-step-wait">{t.siteRunning}</small>}
+          </div>}
+        </li>}
+
+        <li className={`lead-step ${!hasSite && canSite ? "is-locked" : latestReply ? "is-done" : "is-active"}`}>
+          <div className="lead-step-head">
+            <span className="lead-step-num">
+              {!hasSite && canSite ? <Lock size={12} /> : latestReply ? <Check size={13} /> : canSite ? 2 : 1}
+            </span>
+            <div><strong>{t.step2}</strong><small>{t.step2Hint}</small></div>
+          </div>
+          {!hasSite && canSite ? <small className="lead-step-locked">{t.stepLocked}</small>
+            : latestReply ? <>
+              <pre className="lead-output-text lead-step-text">{latestReply.conteudo}</pre>
+              <div className="lead-output-actions">
+                <button type="button" className="button button-glass button-small" onClick={() => void copy(latestReply.conteudo)}>
+                  <Copy size={14} />{t.copy}
+                </button>
+                {waMsgLink(latestReply.conteudo) && (
+                  <a className="button button-primary button-small lead-wa-send"
+                    href={waMsgLink(latestReply.conteudo)!} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle size={14} />{t.sendWa}
+                  </a>
+                )}
+              </div>
+            </> : <div className="lead-step-body">
+              <button type="button" className="button button-primary button-small" disabled={isBusy("sales_reply")}
+                onClick={() => generateOutreach()}>
+                {isBusy("sales_reply") ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
+                {t.msgGen}
+              </button>
+            </div>}
+        </li>
+
+        {canImage && <li className={`lead-step ${!latestReply ? "is-locked" : latestImage ? "is-done" : "is-active"}`}>
+          <div className="lead-step-head">
+            <span className="lead-step-num">
+              {!latestReply ? <Lock size={12} /> : latestImage ? <Check size={13} /> : canSite ? 3 : 2}
+            </span>
+            <div><strong>{t.step3}</strong><small>{t.step3Hint}</small></div>
+          </div>
+          {!latestReply ? <small className="lead-step-locked">{t.stepLocked}</small> : <div className="lead-step-body">
+            <button type="button" className="button button-primary button-small"
+              disabled={isBusy("generate_image")}
+              onClick={() => void generateImage("generate_image", `post de WhatsApp divulgando o novo site de ${lead.nome}`)}>
+              {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+              {t.imgSupport}
+            </button>
+            <div className="lead-image-row">
+              <input
+                value={imagePrompt}
+                maxLength={2000}
+                placeholder={t.imgPh}
+                onChange={(e) => setImagePrompt(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void generateImage(); } }}
+              />
+              <button type="button" className="button button-glass button-small" disabled={isBusy("image_prompt") || !imagePrompt.trim()}
+                onClick={() => void generateImage("image_prompt")}>
+                {isBusy("image_prompt") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
+                {t.imgPrompt}
+              </button>
+              <button type="button" className="button button-glass button-small" disabled={isBusy("generate_image") || !imagePrompt.trim()}
+                onClick={() => void generateImage()}>
+                {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
+                {t.imgGen}
+              </button>
+            </div>
+            {latestImage && <div className="lead-output-image lead-step-image">
+              <Image src={latestImage.conteudo} alt={t.step3} width={640} height={640} unoptimized
+                style={{ width: "100%", height: "auto", borderRadius: 10 }} />
+              <a className="button button-glass button-small" href={latestImage.conteudo}
+                download={`imagem-${latestImage.id.slice(0, 8)}.png`} target="_blank" rel="noopener noreferrer">
+                <Download size={14} />{t.downloadImg}
+              </a>
+            </div>}
+          </div>}
+        </li>}
+      </ol>
+    </section>
 
     <section className="lead-outputs">
       <h2>{t.outTitle}</h2>

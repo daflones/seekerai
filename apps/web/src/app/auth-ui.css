@@ -542,7 +542,33 @@ a.lead-action { text-decoration: none; }
 .assist-input input:focus { outline: none; border-color: var(--violet); }
 .assist-send { width: 40px; border-radius: 10px; border: none; background: var(--violet); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .assist-send:disabled { opacity: .5; cursor: default; }
-.lead-wa-send { background: linear-gradient(100deg, var(--ok), var(--ok)) !important; border: none !important; color: var(--ok) !important; }
+.lead-wa-send { background: linear-gradient(100deg, var(--ok), var(--ok)) !important; border: none !important; color: #fff !important; }
+
+/* Jornada de abordagem — etapas guiadas site → mensagem → imagem */
+.lead-journey { margin-top: 28px; border: 1px solid #ab7bcd22; border-radius: 13px; padding: 20px; background: #ffffff04; }
+.lead-journey > h2 { display: flex; align-items: center; gap: 9px; font-size: 16px; color: var(--fg2); margin: 0 0 14px; }
+.lead-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.lead-step { border: 1px solid #ab7bcd22; border-radius: 11px; padding: 14px; background: #ffffff03; }
+.lead-step.is-locked { opacity: .45; }
+.lead-step.is-done { border-color: #6fe3b333; }
+.lead-step-head { display: flex; gap: 12px; align-items: flex-start; }
+.lead-step-head:not(:only-child) { margin-bottom: 12px; }
+.lead-step-num { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: var(--violet); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.lead-step.is-done .lead-step-num { background: var(--ok); }
+.lead-step.is-locked .lead-step-num { background: #ffffff18; color: var(--muted); }
+.lead-step-head strong { display: block; font-size: 14px; color: var(--white); }
+.lead-step-head small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.lead-step-body { display: flex; flex-direction: column; gap: 10px; }
+.lead-step-locked, .lead-step-wait { color: var(--muted); font-size: 12px; }
+.lead-step-text { margin-bottom: 10px; }
+.lead-step-image { margin-top: 4px; }
+.lead-step-body > .button { align-self: flex-start; }
+
+/* Preview real do site no passo 1 — iframe escalonado, clique abre a página */
+.lead-site-frame { position: relative; display: block; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; border: 1px solid #ab7bcd33; margin-bottom: 10px; background: var(--panel); }
+.lead-site-frame iframe { position: absolute; top: 0; left: 0; width: 250%; height: 250%; transform: scale(.4); transform-origin: 0 0; border: 0; pointer-events: none; }
+.lead-site-open { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; font-size: 13px; font-weight: 600; opacity: 0; background: transparent; transition: opacity .2s, background .2s; }
+.lead-site-frame:hover .lead-site-open, .lead-site-frame:focus-visible .lead-site-open { opacity: 1; background: #10081ccc; }
 @media (max-width: 640px) { .assist-panel { right: 12px; left: 12px; width: auto; bottom: 84px; } .assist-fab { right: 16px; bottom: 18px; } }
 
 /* Financeiro admin */

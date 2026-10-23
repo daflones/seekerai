@@ -16,11 +16,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const [{ supabase, user }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang);
-  const [{ data: lead }, { data: outputs }, { data: services }] = await Promise.all([
+  const [{ data: lead }, { data: outputs }, { data: services }, { data: profile }] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
     supabase.from("lead_outputs").select("id,tipo,conteudo,modelo,created_at")
       .eq("lead_id", id).order("created_at", { ascending: false }),
     supabase.from("services_catalog").select("slug,nome,enabled_actions"),
+    supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
   ]);
   if (!lead) notFound();
 
@@ -35,6 +36,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       serviceName={service ? serviceName(service.slug, service.nome, loc.lang) : lead.service_slug}
       enabledActions={service?.enabled_actions ?? []}
       siteSlug={((lead as { dados?: { siteSlug?: string } }).dados?.siteSlug) ?? null}
+      senderName={((profile as { nome?: string } | null)?.nome) ?? null}
       currency={loc.currency}
       lang={loc.lang}
       t={t.lead}
