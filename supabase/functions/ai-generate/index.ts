@@ -71,10 +71,12 @@ async function nvidiaChat(
       model: NVIDIA_TEXT_MODEL,
       stream: false,
       max_tokens: maxTokens ?? 4096,
-      // GLM "thinking" desligado — resposta direta, latência menor.
+      // Raciocínio desligado/mínimo — resposta direta, latência menor.
       ...(NVIDIA_TEXT_MODEL.includes("glm") ? {
         reasoning_effort: "low",
         chat_template_kwargs: { clear_thinking: true, enable_thinking: false },
+      } : NVIDIA_TEXT_MODEL.includes("gpt-oss") ? {
+        reasoning_effort: "low",
       } : {}),
       messages: [
         { role: "system", content: system },
@@ -374,6 +376,186 @@ async function fetchImageBytes(
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
 }
 
+/** Baixa um vídeo remoto → bytes (cap 70MB — reels chegam perto de 50MB), ou null. */
+async function fetchVideoBytes(
+  url: string,
+): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(45_000) }).catch(() => null);
+  if (!res?.ok) return null;
+  const len = Number(res.headers.get("content-length") ?? 0);
+  if (len > 70_000_000) return null;
+  const contentType = res.headers.get("content-type")?.split(";")[0] ?? "video/mp4";
+  if (!contentType.startsWith("video/")) return null;
+  return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
+}
+
+const APIFY_PLACES_ACTOR = (optionalEnv("APIFY_PLACES_ACTOR") ?? "compass/crawler-google-places").replace("/", "~");
+const APIFY_IG_ACTOR = (optionalEnv("APIFY_IG_ACTOR") ?? "apify/instagram-scraper").replace("/", "~");
+
+interface PlaceReview { autor: string; nota: number; texto: string; quando?: string }
+interface PlaceDetails {
+  reviews: PlaceReview[];
+  imageUrls: string[];
+  horarios?: Record<string, [string, string][] | null>;
+  horariosLabel?: [string, string][];
+}
+
+const DAY_KEY: Record<string, string> = {
+  monday: "1", tuesday: "2", wednesday: "3", thursday: "4", friday: "5", saturday: "6", sunday: "0",
+  "segunda-feira": "1", "terça-feira": "2", "quarta-feira": "3",
+  "quinta-feira": "4", "sexta-feira": "5", "sábado": "6", "domingo": "0",
+};
+const DAY_PT: Record<string, string> = {
+  "1": "Segunda", "2": "Terça", "3": "Quarta", "4": "Quinta", "5": "Sexta", "6": "Sábado", "0": "Domingo",
+};
+
+/** "9:00 AM to 7:00 PM" / "05:00 to 21:00" (e múltiplas janelas) → [["09:00","19:00"], ...]. */
+function parseOpeningHours(hours: string): [string, string][] | null {
+  if (/closed|fechado/i.test(hours)) return null;
+  if (/24\s*(hours|horas)/i.test(hours)) return [["00:00", "23:59"]];
+  const to24 = (h: string, m: string, ap: string | undefined) => {
+    let hh = Number(h);
+    if (ap?.toUpperCase() === "PM" && hh < 12) hh += 12;
+    if (ap?.toUpperCase() === "AM" && hh === 12) hh = 0;
+    return `${String(hh).padStart(2, "0")}:${m}`;
+  };
+  const out: [string, string][] = [];
+  const re = /(\d{1,2}):(\d{2})\s*([AP]M)?\s*(?:to|às|a)\s*(\d{1,2}):(\d{2})\s*([AP]M)?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(hours))) out.push([to24(m[1], m[2], m[3]), to24(m[4], m[5], m[6])]);
+  return out.length ? out : null;
+}
+
+/**
+ * Avaliações + horários reais do Maps via Apify — o scraper da busca
+ * roda com maxReviews: 0, então aqui fazemos uma chamada mirada só
+ * quando o site está sendo gerado (até 6 reviews).
+ */
+async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDetails> {
+  const empty: PlaceDetails = { reviews: [], imageUrls: [] };
+  const token = await getSecret("APIFY_API_TOKEN");
+  if (!token) return empty;
+  const nome = asString(lead.nome, 150) ?? "";
+  const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
+  // reviewsSort é o que efetivamente liga o scrape de reviews no actor;
+  // busca por nome+cidade (o maps_url é URL de search, não de place).
+  const body = {
+    searchStringsArray: [`${nome} ${cidade}`.trim()],
+    maxCrawledPlacesPerSearch: 1,
+    maxReviews: 6,
+    reviewsSort: "newest",
+    language: "pt-BR",
+  };
+  const res = await fetch(
+    `https://api.apify.com/v2/actors/${APIFY_PLACES_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=55`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(70_000) },
+  ).catch(() => null);
+  if (!res?.ok) {
+    console.error("[site] apify reviews falhou:", res?.status ?? "network");
+    return empty;
+  }
+  const items = (await res.json().catch(() => [])) as unknown[];
+  const place = isRecord(items[0]) ? items[0] : {};
+  // Fotos reais do Maps além da capa — galeria enriquecida com mídia do local.
+  const imageUrls = (Array.isArray(place.imageUrls) ? place.imageUrls : [])
+    .map((u) => asString(u, 800)).filter((u): u is string => Boolean(u)).slice(0, 6);
+  const reviews = (Array.isArray(place.reviews) ? place.reviews : [])
+    .slice(0, 6).flatMap((r): PlaceReview[] => {
+      if (!isRecord(r)) return [];
+      const texto = asString(r.text ?? r.reviewText, 500);
+      const autor = asString(r.name ?? r.reviewerName, 80) ?? "Cliente";
+      if (!texto || texto.length < 12) return [];
+      return [{
+        autor,
+        nota: typeof r.stars === "number" ? r.stars : 5,
+        texto,
+        quando: asString(r.publishAt ?? r.publishedAtDate ?? r.reviewPublishedDate, 40),
+      }];
+    });
+
+  // Horários reais do Maps → horarios/horariosLabel determinísticos.
+  const horarios: Record<string, [string, string][] | null> = {};
+  const byDay = new Map<string, [string, string]>();
+  for (const d of Array.isArray(place.openingHours) ? place.openingHours : []) {
+    if (!isRecord(d)) continue;
+    const key = DAY_KEY[(asString(d.day, 20) ?? "").toLowerCase()];
+    if (!key) continue;
+    const windows = parseOpeningHours(asString(d.hours, 160) ?? "");
+    horarios[key] = windows;
+    byDay.set(key, [DAY_PT[key], windows ? windows.map((w) => `${w[0]} – ${w[1]}`).join(", ") : "Fechado"]);
+  }
+  const horariosLabel = ["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []);
+  return { reviews, imageUrls, ...(horariosLabel.length ? { horarios, horariosLabel } : {}) };
+}
+
+interface IgMedia {
+  images: string[];
+  videos: { src: string; titulo: string }[];
+  captions: string[];
+  profilePic?: string;
+  bio?: string;
+  erro?: string;
+}
+
+/**
+ * Scraper de Instagram via Apify — pega posts do @ do lead:
+ * imagens (displayUrl/sidecar), vídeos (videoUrl/reels) e legendas.
+ * As legendas viram contexto pra IA (serviços/diferenciais reais) e
+ * a mídia real re-hospedada popula galeria e reels do site.
+ */
+async function fetchInstagramMedia(lead: Record<string, unknown>): Promise<IgMedia | null> {
+  const token = await getSecret("APIFY_API_TOKEN");
+  const raw = asString(lead.instagram, 300);
+  if (!token || !raw) return null;
+  const handle = raw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1] ?? raw.replace(/^@/, "").replace(/\/+$/, "");
+  if (!/^[A-Za-z0-9._]{1,60}$/.test(handle)) return null;
+  const res = await fetch(
+    `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=80`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        directUrls: [`https://www.instagram.com/${handle}/`],
+        resultsType: "posts",
+        resultsLimit: 12,
+      }),
+      signal: AbortSignal.timeout(95_000),
+    },
+  ).catch(() => null);
+  if (!res?.ok) {
+    console.error("[site] apify instagram falhou:", res?.status ?? "network");
+    return { images: [], videos: [], captions: [], erro: `http:${res?.status ?? "network"}` };
+  }
+  const items = (await res.json().catch(() => [])) as unknown[];
+  const media: IgMedia = { images: [], videos: [], captions: [] };
+  if (!Array.isArray(items) || !items.length) media.erro = "vazio";
+  for (const item of items) {
+    if (!isRecord(item)) continue;
+    const caption = asString(item.caption, 600);
+    if (caption) media.captions.push(caption);
+    const type = asString(item.type, 40);
+    if (type === "Video" || asString(item.isVideo) === "true") {
+      const videoUrl = asString(item.videoUrl, 1200);
+      if (videoUrl) {
+        media.videos.push({ src: videoUrl, titulo: caption?.split("\n")[0]?.slice(0, 80) || "Reel" });
+      }
+    }
+    const pushImg = (v: unknown) => {
+      const u = asString(v, 1200);
+      if (u && u.startsWith("http")) media.images.push(u);
+    };
+    // Sidecar traz filhos em campos diferentes conforme a versão do actor.
+    const children = [item.images, item.childPosts, item.sidecarImages].filter(Array.isArray)[0] as unknown[] | undefined;
+    if (children?.length) for (const c of children) pushImg(isRecord(c) ? c.displayUrl ?? c.url : c);
+    else pushImg(item.displayUrl ?? item.imageUrl);
+  }
+  media.images = media.images.slice(0, 8);
+  media.videos = media.videos.slice(0, 2);
+  media.captions = media.captions.slice(0, 10);
+  if (!media.images.length && !media.videos.length && !media.erro) media.erro = "sem-midia";
+  return media;
+}
+
 /** Upload pro bucket público site-assets, com retry — Storage falha intermitente. */
 async function uploadSiteAsset(
   db: ReturnType<typeof serviceClient>,
@@ -532,11 +714,6 @@ function sanitizeConfigPatch(raw: unknown): Record<string, unknown> {
       .filter((x) => x.q && x.a);
     if (f.length) patch.faq = f;
   }
-  if (Array.isArray(raw.horariosLabel)) {
-    const h = raw.horariosLabel.filter(Array.isArray).slice(0, 7)
-      .map((x) => [str(x[0], 60), str(x[1], 60)]).filter((x) => x[0] && x[1]);
-    if (h.length) patch.horariosLabel = h;
-  }
   if (isRecord(raw.seo)) {
     const desc = str(raw.seo.description, 160);
     if (desc) patch.seo = { description: desc };
@@ -550,7 +727,7 @@ const CONFIG_PATCH_SYSTEM = [
   "Responda APENAS com JSON válido (sem markdown, sem comentários) neste formato exato:",
   '{ "tagline": "frase curta de marca", "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null}],',
   '  "historia": {"titulo":"…","paragrafos":["…","…"]}, "diferenciais":["…"],',
-  '  "faq":[{"q":"…","a":"…"}], "horariosLabel":[["Segunda a sexta","09:00 – 19:00"]], "seo":{"description":"…"} }',
+  '  "faq":[{"q":"…","a":"…"}], "seo":{"description":"…"} }',
   "REGRAS:",
   "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados). Não invente preços, profissionais, prêmios ou números.",
   "- Se os serviços reais não estiverem claros, proponha os 4-8 serviços mais típicos da categoria, com duracaoMin plausível (30-120) e preco SEMPRE null.",
@@ -564,13 +741,14 @@ const CONFIG_PATCH_SYSTEM = [
 async function configPatchFromAi(
   apiKey: string | null,
   lead: Record<string, unknown>,
+  extraFacts?: string,
 ): Promise<{ patch: Record<string, unknown>; modelo: string }> {
   const facts = {
     nome: lead.nome, categoria: lead.categoria, cidade: lead.cidade, uf: lead.uf,
     endereco: lead.endereco, avaliacao: lead.avaliacao, totalAvaliacoes: lead.total_avaliacoes,
     instagram: lead.instagram, temWhatsApp: lead.whatsapp === "sim",
   };
-  const userContent = `Estabelecimento:\n${JSON.stringify(facts)}`;
+  const userContent = `Estabelecimento:\n${JSON.stringify(facts)}${extraFacts ?? ""}`;
 
   // OpenRouter primeiro; NVIDIA gratuita se falhar ou não houver chave.
   let content: unknown = null;
@@ -603,14 +781,18 @@ async function configPatchFromAi(
     }
   }
   if (typeof content !== "string" || !content.trim()) {
-    const nv = await nvidiaChat(CONFIG_PATCH_SYSTEM, userContent, 3000, 90_000);
-    const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
-    const nvContent = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
-      ? nvChoices[0].message.content : null;
-    if (typeof nvContent === "string" && nvContent.trim()) {
-      content = nvContent;
-      modelo = NVIDIA_TEXT_MODEL;
-      console.log("[site-config] respondido via NVIDIA (fallback)");
+    // Uma falha transitória não deve derrubar o patch — uma retentativa.
+    for (let t = 0; t < 2; t++) {
+      const nv = await nvidiaChat(CONFIG_PATCH_SYSTEM, userContent, 3000, 60_000);
+      const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
+      const nvContent = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
+        ? nvChoices[0].message.content : null;
+      if (typeof nvContent === "string" && nvContent.trim()) {
+        content = nvContent;
+        modelo = NVIDIA_TEXT_MODEL;
+        console.log("[site-config] respondido via NVIDIA (fallback)");
+        break;
+      }
     }
   }
   if (typeof content !== "string") return { patch: {}, modelo: "base" };
@@ -650,7 +832,7 @@ async function publishPremiumSite(
   apiKey: string | null,
   leadId: string,
   context: Record<string, unknown>,
-): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number; imagemErros: string[] }> {
+): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number; imagemErros: string[]; debug: Record<string, unknown> }> {
   const { data: lead } = await db.from("leads").select("*").eq("id", leadId).maybeSingle();
   if (!lead) throw httpError(404, "Lead não encontrado");
 
@@ -673,12 +855,31 @@ async function publishPremiumSite(
 
   await ensureSiteBucket(db);
 
-  // Patch de config roda EM PARALELO com as imagens — são independentes,
-  // e a function tem ~150s de wall-clock no gateway.
-  const patchPromise = configPatchFromAi(apiKey, lead);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  // Scrapes secundários em paralelo — Apify demora e o gateway corta em
+  // ~150s, então cada consumidor faz race com um cap próprio.
+  const igPromise = lead.instagram ? fetchInstagramMedia(lead) : Promise.resolve(null);
+  const placePromise = fetchPlaceDetails(lead);
+
+  // Patch de config roda EM PARALELO com as imagens — são independentes.
+  // Espera o Instagram até 35s só pra capturar as legendas como contexto.
+  const patchPromise = (async () => {
+    const ig = await Promise.race([igPromise, sleep(35_000).then(() => null)]);
+    const captions = ig?.captions?.slice(0, 8).join("\n---\n") ?? "";
+    return configPatchFromAi(apiKey, lead, captions
+      ? `\nLegendas reais do Instagram do estabelecimento (use pra inferir serviços, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}`
+      : "");
+  })();
 
   // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
   const sources = await resolveLeadImageSources(lead, context);
+  // Instagram é bonus — não pode segurar o pipeline se o actor demorar.
+  const ig = await Promise.race([igPromise, sleep(60_000).then(() => null)]);
+  if (ig) {
+    for (const u of ig.images) {
+      if (sources.length < MAX_SITE_IMAGES && !sources.includes(u)) sources.push(u);
+    }
+  }
   const publicUrls: { url: string; real: boolean }[] = [];
   {
     const downloads = await Promise.all(sources.map(fetchImageBytes));
@@ -730,14 +931,52 @@ async function publishPremiumSite(
   }
 
   // 3) SiteConfig: base determinística + patch de IA (OpenRouter → NVIDIA).
+  // Em paralelo: re-hospeda vídeos do Instagram e espera as avaliações
+  // do Maps (antes só nota/total — agora com autor e texto).
+  const igVideoPromise = (async () => {
+    // Reels chegam a ~50MB — sequencial pra não estourar a memória do edge.
+    const out: { src: string; titulo: string }[] = [];
+    let idx = 0;
+    for (const v of ig?.videos ?? []) {
+      const dl = await fetchVideoBytes(v.src);
+      if (!dl) continue;
+      const ext = dl.contentType.includes("webm") ? "webm" : "mp4";
+      const url = await uploadSiteAsset(db, slug, `video-${++idx}.${ext}`, dl.bytes, dl.contentType);
+      if (url) out.push({ src: url, titulo: v.titulo });
+    }
+    return out;
+  })();
+  const [videos, place] = await Promise.all([
+    igVideoPromise,
+    Promise.race([placePromise, sleep(45_000).then(() => ({ reviews: [], imageUrls: [] } as PlaceDetails))]),
+  ]);
+
+  // Fotos do Maps re-hospedadas — URLs do Google expiram, então
+  // copiamos pro Storage como o resto das imagens reais.
+  const placeImgs = (await Promise.all(place.imageUrls.slice(0, 4).map(async (u, i) => {
+    const dl = await fetchImageBytes(u);
+    if (!dl) return null;
+    const ext = dl.contentType.includes("png") ? "png" : dl.contentType.includes("webp") ? "webp" : "jpg";
+    return uploadSiteAsset(db, slug, `maps-${i + 1}.${ext}`, dl.bytes, dl.contentType);
+  }))).filter((u): u is string => Boolean(u));
+
   const config = baseSiteConfig(lead, tipo);
   const { patch, modelo } = await patchPromise;
   Object.assign(config, patch);
   if (patch.seo) config.seo = { ...(isRecord(config.seo) ? config.seo : {}), ...patch.seo };
+  const realPhotos = publicUrls.filter((x) => x.real).map((x) => x.url);
+  const genPhotos = publicUrls.filter((x) => !x.real).map((x) => x.url);
   config.fotos = {
-    hero: publicUrls[0]?.url,
-    galeria: publicUrls.slice(1).map((x) => x.url),
+    hero: realPhotos[0] ?? genPhotos[0],
+    galeria: [...realPhotos.slice(1), ...placeImgs, ...genPhotos],
   };
+  // Fatos reais vencem o patch — horários e avaliações vêm do Maps.
+  if (place.horarios) config.horarios = place.horarios;
+  if (place.horariosLabel) config.horariosLabel = place.horariosLabel;
+  if (videos.length) config.videos = videos;
+  if (place.reviews.length && isRecord(config.avaliacoes)) {
+    (config.avaliacoes as Record<string, unknown>).itens = place.reviews;
+  }
 
   // 4) Publica.
   const { error: siteErr } = await db.from("sites").upsert(
@@ -756,6 +995,12 @@ async function publishPremiumSite(
     geradas: publicUrls.filter((x) => !x.real).length,
     reais: publicUrls.filter((x) => x.real).length,
     imagemErros: imgErrors.slice(0, 8),
+    debug: {
+      ig: ig ? { imgs: ig.images.length, vids: ig.videos.length, erro: ig.erro ?? null } : "sem-instagram/timeout",
+      videosRehosted: videos.length,
+      place: { reviews: place.reviews.length, imgs: placeImgs.length, horarios: place.horariosLabel?.length ?? 0 },
+      sources: sources.length,
+    },
   };
 }
 
@@ -821,6 +1066,7 @@ Deno.serve(async (req) => {
           imagensReais: site.reais,
           imagensGeradas: site.geradas,
           imagemErros: site.imagemErros,
+          debug: site.debug,
           modelo: site.modelo,
           creditosCobrados: reservation.cost,
         });

@@ -36,13 +36,15 @@ console.log("créditos: 50");
 
 // 3. lead com imagem real (padaria do banco, lh3)
 const { data: src } = await db.from("leads")
-  .select("nome,endereco,bairro,cidade,uf,telefone,avaliacao,total_avaliacoes,imagem,categoria")
-  .eq("categoria", "Padaria").not("imagem", "is", null).limit(1).single();
+  .select("nome,endereco,bairro,cidade,uf,telefone,avaliacao,total_avaliacoes,imagem,categoria,maps_url,instagram")
+  .eq("categoria", "Padaria").not("maps_url", "is", null).not("instagram", "is", null)
+  .order("avaliacao", { ascending: false, nullsFirst: false }).limit(1).single();
 const { data: lead, error: lErr } = await db.from("leads").insert({
   user_id: userId, service_slug: "sites", place_id: `test-${Date.now()}`,
   nome: src.nome, categoria: src.categoria, endereco: src.endereco,
   bairro: src.bairro, cidade: src.cidade, uf: src.uf, telefone: src.telefone,
   avaliacao: src.avaliacao, total_avaliacoes: src.total_avaliacoes,
+  maps_url: src.maps_url, instagram: src.instagram,
   imagem: src.imagem, whatsapp: "nao", dados: {},
 }).select("id").single();
 if (lErr) { console.error("lead:", lErr.message); process.exit(1); }
@@ -84,7 +86,7 @@ console.log(`edge: ${res.status} em ${Math.round((Date.now() - t0) / 1000)}s`);
 console.log(JSON.stringify({
   siteSlug: data.siteSlug, siteUrl: data.siteUrl, modelo: data.modelo,
   imagensReais: data.imagensReais, imagensGeradas: data.imagensGeradas,
-  imagemErros: data.imagemErros,
+  imagemErros: data.imagemErros, debug: data.debug,
   creditosCobrados: data.creditosCobrados, erro: data.erro ?? data.error,
 }, null, 2));
 
@@ -96,6 +98,10 @@ if (data.siteSlug) {
   console.log("servicos:", site?.config?.servicos?.map((s) => s.nome).join(", "));
   console.log("tagline:", site?.config?.tagline);
   console.log("faq:", site?.config?.faq?.length);
+  console.log("mapsUrl:", site?.config?.contato?.mapsUrl ? "ok" : "FALTA");
+  console.log("reviews:", site?.config?.avaliacoes?.itens?.length ?? 0);
+  console.log("videos:", site?.config?.videos?.length ?? 0);
+  console.log("horarios:", site?.config?.horariosLabel?.map((h) => `${h[0]} ${h[1]}`).join(" | "));
 }
 console.log("TEST_LEAD=" + lead.id);
 console.log("TEST_USER=" + userId);

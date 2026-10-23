@@ -5,6 +5,8 @@ import { Navigation } from "@/components/navigation";
 import { Pricing } from "@/components/pricing";
 import { ProductDemo } from "@/components/product-demo";
 import { publicPlanCards } from "@/lib/plans/server";
+import { formatPlanPrice } from "@/lib/plans/model";
+import { formatMoney, INTL_PRICES } from "@/lib/i18n/shared";
 import { getLocale, getTheme } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -107,7 +109,31 @@ export default async function Home() {
 
         <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">{h.faqeyebrow}</span><h2>{h.faqtitleA}<br />{h.faqtitleB}</h2><p>{h.faqp}</p></div><div className="faq-list">{h.faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
 
-        <section className="final-cta"><div className="cta-orbit" aria-hidden="true" /><div className="container"><span className="eyebrow">{h.ctaeyebrow}</span><h2>{h.ctatitleA}<br /><span className="gradient-text">{h.ctatitleB}</span></h2><p>{h.ctap}</p><Link href="/cadastro" className="button button-primary">{h.ctab} <ArrowUpRight size={17} /></Link><span className="final-note">{h.ctanote}</span></div></section>
+        <section className="final-cta"><div className="cta-orbit" aria-hidden="true" /><div className="container">
+          <span className="eyebrow">{h.ctaeyebrow}</span>
+          <h2>{h.ctatitleA}<br /><span className="gradient-text">{h.ctatitleB}</span></h2>
+          <p>{h.ctap}</p>
+          <ul className="cta-benefits"><li><Check size={13} />{h.re1}</li><li><Check size={13} />{h.re2}</li><li><Check size={13} />{h.re3}</li></ul>
+          {pricing.plans.length > 0
+            ? <div className="cta-plans">{pricing.plans.map((plan) => (
+                <Link key={plan.slug} href={`/cadastro?plano=${plan.slug}`}
+                  className={`cta-plan${plan.featured ? " is-featured" : ""}`}>
+                  <strong>{plan.name}</strong>
+                  <span className="cta-plan-price">
+                    {plan.slug === "gratis"
+                      ? formatMoney(0, loc.currency, loc.lang)
+                      : loc.isBrazil
+                        ? <>R$ {formatPlanPrice(plan.priceCents)}</>
+                        : formatMoney(INTL_PRICES[plan.slug] ?? plan.priceCents, loc.currency, loc.lang)}
+                    <small>{plan.slug === "gratis" ? t.pricing.freeSuffix : t.pricing.perMonth}</small>
+                  </span>
+                  <em>{plan.content.cta} <ArrowUpRight size={13} /></em>
+                </Link>
+              ))}</div>
+            : <Link href="/cadastro" className="button button-primary">{h.ctab} <ArrowUpRight size={17} /></Link>}
+          <span className="final-note">{h.ctanote}</span>
+          <span className="cta-wordmark" aria-hidden="true">seekerai.</span>
+        </div></section>
       </main>
       <footer className="footer"><div className="container"><div className="footer-top"><div><Brand /><p>{h.footSlogan1}<br />{h.footSlogan2}</p></div><div className="footer-links"><a href="#como-funciona">{h.footHow}</a><a href="#planos">{h.footPlans}</a><Link href="/explorar">{h.footDemo} <ArrowUpRight size={12} /></Link></div><div className="footer-links"><Link href="/termos">{h.footTerms}</Link><Link href="/privacidade">{h.footPrivacy}</Link><Link href="/cadastro">{h.footEarly}</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} SeekerAi. {h.footCopy}</span><LocaleSwitcher current={loc} /><span><span className="status-dot" />{h.footBuilding}</span></div></div></footer>
       <div className="mobile-sticky-cta"><Link href="/explorar" className="button button-primary">{h.stickyCta} <ArrowRight size={16} /></Link></div>
