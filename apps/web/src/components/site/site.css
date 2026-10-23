@@ -125,8 +125,10 @@
 }
 .bshop-hero-photo-cap .stars { color: var(--bs-accent-2); letter-spacing: 1px; }
 @media (max-width: 900px) {
+  .bshop-hero { padding-top: 96px; }
   .bshop-hero-content { grid-template-columns: 1fr; }
-  .bshop-hero-photo { aspect-ratio: 4/5; max-height: 52vh; order: 2; }
+  /* A equipe abre a experiência no celular — texto e CTAs vêm depois */
+  .bshop-hero-photo { aspect-ratio: 4/5; max-height: 54vh; order: -1; }
   .bshop-hero h1 { font-size: clamp(52px, 15vw, 84px); }
 }
 .bshop-eyebrow {
