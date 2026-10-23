@@ -46,6 +46,9 @@ export interface SiteConfig {
     print?: string;
   };
   faq?: { q: string; a: string }[];
+  /** Cards de dúvidas em imagem (ex.: carrossel de FAQ do Instagram).
+      Se presente, substitui o acordeão por uma esteira de cards. */
+  faqImagens?: string[];
   booking: { slotMin: number; diasFuturos: number; antecedenciaMin: number };
   seo?: { title?: string; description?: string };
 }

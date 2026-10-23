@@ -433,6 +433,21 @@
   text-transform: uppercase; color: var(--bb-muted); padding: 0 6px 4px;
 }
 
+/* ---------- Dúvidas: esteira de cards em imagem ---------- */
+.bbeauty-duvidas {
+  display: flex; gap: 16px; overflow-x: auto; padding: 6px 4px 18px;
+  scroll-snap-type: x mandatory; scrollbar-width: thin;
+}
+.bbeauty-duvida-card {
+  flex: 0 0 min(300px, 74vw); scroll-snap-align: start;
+  padding: 0; border: 1px solid var(--bb-line-2); border-radius: 18px;
+  overflow: hidden; background: var(--bb-panel); cursor: zoom-in;
+  box-shadow: 0 24px 56px -30px #33291c40;
+  transition: transform .3s ease, box-shadow .3s ease;
+}
+.bbeauty-duvida-card:hover { transform: translateY(-5px); box-shadow: 0 34px 70px -30px #33291c55; }
+.bbeauty-duvida-card img { width: 100%; display: block; }
+
 /* ---------- FAQ ---------- */
 .bbeauty-faq { max-width: 780px; }
 .bbeauty-faq-item { border-bottom: 1px solid var(--bb-line-2); }

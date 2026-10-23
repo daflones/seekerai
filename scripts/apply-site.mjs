@@ -83,11 +83,16 @@ async function upload(filePath) {
   const body = readFileSync(filePath);
   const mime = /\.(mp4|mov|webm)$/i.test(name) ? "video/mp4"
     : /\.png$/i.test(name) ? "image/png" : "image/jpeg";
-  const { error: upErr } = await db.storage.from("site-assets").upload(path, body, {
-    contentType: mime, upsert: true,
-  });
-  if (upErr) throw new Error(`upload ${name}: ${upErr.message}`);
-  return `${publicBase}/${path}`;
+  let lastErr;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const { error: upErr } = await db.storage.from("site-assets").upload(path, body, {
+      contentType: mime, upsert: true,
+    });
+    if (!upErr) return `${publicBase}/${path}`;
+    lastErr = upErr;
+    await new Promise((r) => setTimeout(r, 800 * attempt));
+  }
+  throw new Error(`upload ${name}: ${lastErr.message}`);
 }
 
 const fotos = [];
@@ -178,6 +183,12 @@ if (override.avaliacoes?.print) {
   config.avaliacoes.print = /^https?:/.test(override.avaliacoes.print)
     ? override.avaliacoes.print
     : `${publicBase}/${slug}/${override.avaliacoes.print}`;
+}
+// faqImagens: cards de FAQ em imagem (URL absoluta ou nome de arquivo
+// já publicado em site-assets/<slug>/ — reaproveita uploads anteriores).
+if (override.faqImagens) {
+  config.faqImagens = override.faqImagens.map((n) =>
+    /^https?:/.test(n) ? n : `${publicBase}/${slug}/${n}`);
 }
 // hero: config vence (aceita URL absoluta ou nome de arquivo enviado em --assets);
 // fallback: primeiro arquivo que pareça capa, senão a primeira foto.

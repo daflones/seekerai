@@ -43,6 +43,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
   const marca = cfg.marca || cfg.nome;
   const galeria = cfg.fotos.galeria;
+  const faqImagens = cfg.faqImagens ?? [];
+  // lightbox cobre galeria + cards de dúvidas
+  const lightboxImgs = [...galeria, ...faqImagens];
   const videosAll = cfg.videos ?? [];
   const destaqueVideo = videosAll.find((v) => v.destaque) ?? videosAll[0] ?? null;
   const outrosVideos = videosAll.filter((v) => v !== destaqueVideo);
@@ -105,7 +108,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
   useOverlayLock(lightbox !== null || bookOpen, {
     onEscape: () => { setLightbox(null); setBookOpen(false); },
-    lightbox: { index: lightbox, total: galeria.length, go: setLightbox },
+    lightbox: { index: lightbox, total: lightboxImgs.length, go: setLightbox },
   });
 
   const marqueeItems = [
@@ -501,14 +504,29 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         </div>
       </section>
 
-      {/* ---------- FAQ ---------- */}
-      {(cfg.faq?.length ?? 0) > 0 && (
+      {/* ---------- DÚVIDAS (cards em imagem ou acordeão) ---------- */}
+      {(faqImagens.length > 0 || (cfg.faq?.length ?? 0) > 0) && (
         <section className="bbeauty-section" id="duvidas" style={{ paddingTop: 0 }}>
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
               <FadeUp y={16}><span className="bbeauty-eyebrow">Dúvidas</span></FadeUp>
               <h2 className="bbeauty-h2"><RevealText text="Perguntas" /> <em><RevealText text="frequentes" delay={0.25} /></em></h2>
             </div>
+            {faqImagens.length > 0 ? (
+              <div className="bbeauty-duvidas">
+                {faqImagens.map((src, i) => (
+                  <motion.button key={i} type="button" className="bbeauty-duvida-card"
+                    onClick={() => setLightbox(galeria.length + i)}
+                    initial={reduced ? false : { opacity: 0, x: 40 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-40px" }}
+                    transition={{ duration: 0.55, delay: i * 0.07, ease: EASE }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`Dúvidas frequentes ${i + 1} de ${faqImagens.length}`} loading="lazy" />
+                  </motion.button>
+                ))}
+              </div>
+            ) : (
             <FadeUp>
               <div className="bbeauty-faq">
                 {(cfg.faq ?? []).map((f, i) => (
@@ -532,6 +550,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 ))}
               </div>
             </FadeUp>
+            )}
           </div>
         </section>
       )}
@@ -724,39 +743,39 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       {/* ---------- Lightbox (portal + swipe + setas) ---------- */}
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
-          {lightbox !== null && galeria[lightbox] && (
+          {lightbox !== null && lightboxImgs[lightbox] && (
             <motion.div className="bbeauty-lightbox"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setLightbox(null)}>
-              <motion.img key={lightbox} src={galeria[lightbox]} alt={`${cfg.nome} — trabalho ${lightbox + 1}`}
+              <motion.img key={lightbox} src={lightboxImgs[lightbox]} alt={`${cfg.nome} — imagem ${lightbox + 1}`}
                 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 260, damping: 28 }}
-                drag={galeria.length > 1 ? "x" : false}
+                drag={lightboxImgs.length > 1 ? "x" : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.16}
                 onDragEnd={(_, info) => {
                   const swipe = Math.abs(info.offset.x) > 60 || Math.abs(info.velocity.x) > 450;
                   if (!swipe) return;
                   setLightbox(info.offset.x < 0
-                    ? (lightbox + 1) % galeria.length
-                    : (lightbox - 1 + galeria.length) % galeria.length);
+                    ? (lightbox + 1) % lightboxImgs.length
+                    : (lightbox - 1 + lightboxImgs.length) % lightboxImgs.length);
                 }}
                 whileDrag={{ cursor: "grabbing" }}
-                style={{ touchAction: "pan-y", cursor: galeria.length > 1 ? "grab" : "default" }}
+                style={{ touchAction: "pan-y", cursor: lightboxImgs.length > 1 ? "grab" : "default" }}
                 onClick={(e) => e.stopPropagation()} />
               <span className="bbeauty-lightbox-cap">
-                {cfg.nome} · {lightbox + 1}/{galeria.length}
-                {galeria.length > 1 && <em className="bbeauty-lightbox-swipe">← arraste →</em>}
+                {cfg.nome} · {lightbox + 1}/{lightboxImgs.length}
+                {lightboxImgs.length > 1 && <em className="bbeauty-lightbox-swipe">← arraste →</em>}
               </span>
-              {galeria.length > 1 && (
+              {lightboxImgs.length > 1 && (
                 <>
                   <button className="bbeauty-lightbox-nav prev" aria-label="Anterior"
-                    onClick={(e) => { e.stopPropagation(); setLightbox((lightbox - 1 + galeria.length) % galeria.length); }}>
+                    onClick={(e) => { e.stopPropagation(); setLightbox((lightbox - 1 + lightboxImgs.length) % lightboxImgs.length); }}>
                     <ArrowLeft size={18} />
                   </button>
                   <button className="bbeauty-lightbox-nav next" aria-label="Próxima"
-                    onClick={(e) => { e.stopPropagation(); setLightbox((lightbox + 1) % galeria.length); }}>
+                    onClick={(e) => { e.stopPropagation(); setLightbox((lightbox + 1) % lightboxImgs.length); }}>
                     <ArrowRight size={18} />
                   </button>
                 </>

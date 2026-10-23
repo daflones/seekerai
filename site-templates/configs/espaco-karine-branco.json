@@ -4,7 +4,11 @@
   "logo": "logo.jpg",
   "tagline": "Espaço de beleza",
   "cidade": "Bom Retiro · Teresópolis",
-  "fotos": { "hero": "resultado-2.jpg", "excluir": ["elogio.jpg"] },
+  "fotos": {
+    "hero": "resultado-2.jpg",
+    "excluir": ["elogio.jpg", "Carrosel0.jpg", "Carrosel1.jpg", "Carrosel2.jpg", "Carrosel3.jpg"]
+  },
+  "faqImagens": ["Carrosel0.jpg", "Carrosel1.jpg", "Carrosel2.jpg", "Carrosel3.jpg"],
   "contato": {
     "instagram": "espacokarinebranco"
   },
@@ -119,7 +123,11 @@
   "videos": [
     {
       "titulo": "Meu super poder",
-      "descricao": "Manutenção não é só fazer a unha de novo — é cuidar dos detalhes para manter o resultado bonito.",
+      "descricao": "Transformar unhas — manutenção não é só fazer de novo, é cuidar dos detalhes para manter o resultado bonito.",
+      "destaque": false
+    },
+    {
+      "titulo": "Transformação",
       "destaque": false
     },
     {
