@@ -1,6 +1,7 @@
 {
   "tipo": "barbearia",
   "marca": "Vianna",
+  "logo": "logo.png",
   "tagline": "Imagem Masculina",
   "cidade": "Teresópolis · RJ",
   "fotos": { "hero": "snapinsta-1792763437011.jpg" },

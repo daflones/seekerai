@@ -156,6 +156,22 @@ config.seo = { ...defaults.seo, ...override.seo };
 config.avaliacoes = { ...defaults.avaliacoes, ...override.avaliacoes };
 config.booking = { ...defaults.booking, ...override.booking };
 config.nome = lead.nome;
+// logo: --logo sobe o arquivo; no config JSON aceita URL absoluta ou nome
+// de arquivo já publicado em site-assets/<slug>/.
+if (args.logo) {
+  const logoFile = resolve(args.logo);
+  if (!existsSync(logoFile)) { console.error(`Logo não existe: ${logoFile}`); process.exit(1); }
+  const ext = extname(logoFile).toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  const mime = ext === "svg" ? "image/svg+xml" : ext === "webp" ? "image/webp" : ext === "png" ? "image/png" : "image/jpeg";
+  const path = `${slug}/logo.${ext}`;
+  const { error: logoErr } = await db.storage.from("site-assets")
+    .upload(path, readFileSync(logoFile), { contentType: mime, upsert: true });
+  if (logoErr) { console.error("Falha no upload da logo:", logoErr.message); process.exit(1); }
+  config.logo = `${publicBase}/${path}`;
+  console.log(`  ↑ logo → ${publicBase}/${path}`);
+} else if (override.logo) {
+  config.logo = /^https?:/.test(override.logo) ? override.logo : `${publicBase}/${slug}/${override.logo}`;
+}
 // hero: config vence (aceita URL absoluta ou nome de arquivo enviado em --assets);
 // fallback: primeiro arquivo que pareça capa, senão a primeira foto.
 const heroWanted = override.fotos?.hero;
@@ -172,7 +188,8 @@ config.fotos = {
 if (videos.length || override.videos) {
   const meta = override.videos ?? [];
   config.videos = videos.map((src, i) => ({
-    src, titulo: meta[i]?.titulo ?? `Vídeo ${i + 1}`, descricao: meta[i]?.descricao,
+    src, titulo: meta[i]?.titulo ?? `Vídeo ${i + 1}`,
+    descricao: meta[i]?.descricao, destaque: meta[i]?.destaque,
   }));
   if (!videos.length) config.videos = meta;
 }

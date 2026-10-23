@@ -57,6 +57,10 @@
   background: linear-gradient(150deg, var(--bs-accent-2), var(--bs-accent));
   color: var(--bs-accent-ink); font-weight: 900; font-size: 19px;
 }
+.bshop-logo-img {
+  width: 34px; height: 34px; border-radius: 10px; object-fit: cover;
+  border: 1px solid var(--bs-line-2); background: #fff;
+}
 .bshop-nav-links { display: flex; gap: 26px; align-items: center; }
 .bshop-nav-links a { font-size: 13.5px; font-weight: 600; color: var(--bs-muted); letter-spacing: .04em; transition: color .2s; }
 .bshop-nav-links a:hover { color: var(--bs-text); }
@@ -129,7 +133,14 @@
   .bshop-hero-content { grid-template-columns: 1fr; }
   /* A equipe abre a experiência no celular — texto e CTAs vêm depois */
   .bshop-hero-photo { aspect-ratio: 4/5; max-height: 54vh; order: -1; }
-  .bshop-hero h1 { font-size: clamp(52px, 15vw, 84px); }
+  /* Texto centrado — nada "colado" na lateral */
+  .bshop-hero-main { text-align: center; }
+  .bshop-hero h1 { font-size: clamp(48px, 14vw, 76px); }
+  .bshop-hero-bottom { justify-content: center; }
+  .bshop-hero-bottom > div { display: flex; flex-direction: column; align-items: center; }
+  .bshop-hero-desc { margin-inline: auto; }
+  .bshop-hero-actions { justify-content: center; }
+  .bshop-scroll-hint { align-items: center; }
 }
 .bshop-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
@@ -147,6 +158,38 @@
 .bshop-hero-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-top: 26px; }
 .bshop-hero-desc { max-width: 460px; color: var(--bs-muted); font-size: 15px; line-height: 1.65; }
 .bshop-hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* Scroll hint com efeito shader — texto em gradiente animado
+   (ouro → bronze → grafite → preto) convidando a rolar a história. */
+.bshop-scroll-hint {
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  gap: 12px; cursor: pointer;
+}
+.bshop-shader-text {
+  font-weight: 800; font-size: 12.5px; letter-spacing: .32em; text-transform: uppercase;
+  background: linear-gradient(100deg,
+    #5b5342 0%, #a89c88 16%, #e8c98a 34%, #96794c 48%,
+    #241d12 60%, #c9a15c 78%, #6f6249 92%, #5b5342 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: bshop-shader 5.5s linear infinite;
+}
+.bshop-scroll-hint-line {
+  width: 1px; height: 36px; margin-left: 3px;
+  background: linear-gradient(var(--bs-accent), transparent);
+  transform-origin: top;
+  animation: bshop-hint-drop 1.9s ease-in-out infinite;
+}
+@keyframes bshop-shader { to { background-position: -260% 0; } }
+@keyframes bshop-hint-drop {
+  0%, 100% { transform: scaleY(.3); opacity: .45; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bshop-shader-text, .bshop-scroll-hint-line { animation: none; }
+  .bshop-shader-text { -webkit-text-fill-color: var(--bs-muted); color: var(--bs-muted); }
+}
 .bshop-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   padding: 15px 28px; border-radius: 999px; border: 0; cursor: pointer;
@@ -243,9 +286,11 @@
 .bshop-lightbox-close:hover { background: #ffffff30; }
 .bshop-lightbox-cap {
   position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
   font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
   color: var(--bs-muted);
 }
+.bshop-lightbox-swipe { font-style: normal; font-size: 10.5px; letter-spacing: .18em; color: #6f6452; }
 .bshop-lightbox-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
   width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--bs-line-2);

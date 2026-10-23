@@ -314,7 +314,9 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       {/* ---------- NAV ---------- */}
       <nav className={`bshop-nav${scrolled ? " is-scrolled" : ""}`}>
         <a className="bshop-logo" href="#top" onClick={anchor("#top")} aria-label={cfg.nome}>
-          <span className="bshop-logo-mark">{marca[0]}</span>{marca.toUpperCase()}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {cfg.logo ? <img className="bshop-logo-img" src={cfg.logo} alt="" /> : <span className="bshop-logo-mark">{marca[0]}</span>}
+          {marca.toUpperCase()}
         </a>
         <div className="bshop-nav-links">
           {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>História</a>}
@@ -375,14 +377,10 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
             <motion.div className="bshop-hero-actions"
               initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.9, ease: EASE }}>
-              <Magnetic>
-                <button className="bshop-btn bshop-btn-primary" onClick={() => openBook()}>
-                  <Scissors size={16} /> Agendar meu horário
-                </button>
-              </Magnetic>
-              <Magnetic>
-                <a className="bshop-btn bshop-btn-ghost" href="#historia" onClick={anchor("#historia")}>Nossa história</a>
-              </Magnetic>
+              <a className="bshop-scroll-hint" href="#historia" onClick={anchor("#historia")}>
+                <span className="bshop-shader-text">Role para conhecer nossa história</span>
+                <span className="bshop-scroll-hint-line" aria-hidden />
+              </a>
             </motion.div>
           </div>
           </div>
@@ -869,11 +867,26 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setLightbox(null)}>
-              <motion.img src={galeria[lightbox]} alt={`${cfg.nome} — foto ${lightbox + 1}`}
+              <motion.img key={lightbox} src={galeria[lightbox]} alt={`${cfg.nome} — foto ${lightbox + 1}`}
                 initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                drag={galeria.length > 1 ? "x" : false}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.16}
+                onDragEnd={(_, info) => {
+                  const swipe = Math.abs(info.offset.x) > 60 || Math.abs(info.velocity.x) > 450;
+                  if (!swipe) return;
+                  setLightbox(info.offset.x < 0
+                    ? (lightbox + 1) % galeria.length
+                    : (lightbox - 1 + galeria.length) % galeria.length);
+                }}
+                whileDrag={{ cursor: "grabbing" }}
+                style={{ touchAction: "pan-y", cursor: galeria.length > 1 ? "grab" : "default" }}
                 onClick={(e) => e.stopPropagation()} />
-              <span className="bshop-lightbox-cap">{cfg.nome} · {lightbox + 1}/{galeria.length}</span>
+              <span className="bshop-lightbox-cap">
+                {cfg.nome} · {lightbox + 1}/{galeria.length}
+                {galeria.length > 1 && <em className="bshop-lightbox-swipe">← arraste →</em>}
+              </span>
               {galeria.length > 1 && (
                 <>
                   <button className="bshop-lightbox-nav prev" aria-label="Anterior"

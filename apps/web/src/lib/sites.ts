@@ -15,6 +15,7 @@ export interface SiteConfig {
   tipo: "barbearia" | string;
   nome: string;
   marca: string;
+  logo?: string;
   tagline?: string;
   cidade?: string;
   tema?: { accent?: string };
