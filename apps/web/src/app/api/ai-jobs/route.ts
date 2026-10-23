@@ -64,6 +64,9 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
       lead_id: leadId, user_id: userId, tipo: payload.tipo,
       conteudo: data.conteudo, modelo: typeof data.modelo === "string" ? data.modelo : null,
     });
+    // Site premium publicado pela edge: url/slug pra UI oferecer o link direto.
+    const siteSlug = typeof data.siteSlug === "string" ? data.siteSlug : null;
+    const siteUrl = typeof data.siteUrl === "string" ? data.siteUrl : null;
     // Garante slug público pro site gerado (/site/<slug>).
     const { data: leadRow } = await admin.from("leads")
       .select("nome,cidade,bairro,dados").eq("id", leadId).maybeSingle();
@@ -80,7 +83,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
       await admin.from("leads").update({ dados: { ...dados, siteSlug: slug } }).eq("id", leadId);
     }
     await admin.from("ai_jobs")
-      .update({ status: "done", result: { modelo: data.modelo ?? null }, updated_at: new Date().toISOString() })
+      .update({ status: "done", result: { modelo: data.modelo ?? null, siteSlug, siteUrl }, updated_at: new Date().toISOString() })
       .eq("id", jobId);
   } catch {
     await admin.from("ai_jobs")

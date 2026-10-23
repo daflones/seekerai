@@ -37,7 +37,11 @@ const ACTIONS = new Set([
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
 const IMAGE_MODEL = optionalEnv("AI_IMAGE_MODEL") ?? "google/gemini-2.5-flash-image";
 const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "anthropic/claude-sonnet-4.5";
-const MAX_SITE_IMAGES = 3;
+const MAX_SITE_IMAGES = 8;
+// Alvo de mídia do site premium: 1 hero + galeria p/ corredor 3D e masonry.
+// O que o lead não tiver de imagem real a IA gera (até o teto abaixo).
+const SITE_IMAGE_TARGET = 6;
+const MAX_GENERATED_IMAGES = 5;
 
 // Fallback NVIDIA (build.nvidia.com) — gratuito, OpenAI-compatible.
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
@@ -172,21 +176,6 @@ function systemPromptFor(action: string, lang: string): string {
       return `Você é um estrategista de vendas B2B experiente. Analise o estabelecimento e produza: diagnóstico, oportunidades, ângulos de abordagem e próximos passos práticos. Responda OBRIGATORIAMENTE em ${L}, direto e acionável.`;
     case "sales_reply":
       return `Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em ${L} para o estabelecimento descrito. Sem emojis excessivos, sem promessas irreais.`;
-    case "generate_site":
-      return [
-        "Você é um diretor de arte e desenvolvedor front-end premiado (nível Awwwards).",
-        `Gere um site institucional completo em um único arquivo HTML autocontido, TODO o conteúdo em ${L}.`,
-        "REGRAS VISUAIS OBRIGATÓRIAS:",
-        "- Use EXCLUSIVAMENTE as URLs de imagem fornecidas no contexto para toda fotografia (hero, galeria, seções). Nunca placeholders, nunca unplash/picsum.",
-        "- PROIBIDO emojis em qualquer lugar — use ícones SVG inline discretos (lucide-style, stroke 1.5px) quando necessário.",
-        "- Tipografia editorial: Google Fonts (uma serif display + uma sans para corpo), hierarquia clara, tracking refinado.",
-        "- Paleta sofisticada derivada do negócio; fundos com profundidade (gradientes sutis, texturas), não cores chapadas.",
-        "- Layout com respiro: whitespace generoso, grid assimétrico, seções alternando claro/escuro.",
-        "- Micro-interações CSS puras (hover, reveal on scroll via IntersectionObserver em JS inline mínimo).",
-        "- Botão de contato/WhatsApp com link real quando telefone disponível.",
-        "- Responsivo mobile-first, HTML semântico e acessível (alt real, aria onde preciso).",
-        "Responda APENAS com o código HTML, sem comentários fora do código.",
-      ].join("\n");
     case "lead_assist":
       return [
         "Você é o copiloto de conversão do SeekerAi: um closer B2B experiente",
@@ -209,26 +198,6 @@ function systemPromptFor(action: string, lang: string): string {
     default:
       return `Responda em ${L}.`;
   }
-}
-
-/** Coleta URLs de imagem já presentes no contexto (resultado Apify/Places). */
-function contextImages(context: Record<string, unknown> | undefined): string[] {
-  if (!context) return [];
-  const images = new Set<string>();
-  for (const key of ["imagens", "images", "photos"]) {
-    const value = context[key];
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (typeof item === "string" && item.startsWith("http")) images.add(item);
-        else if (isRecord(item) && typeof item.url === "string" && item.url.startsWith("http")) {
-          images.add(item.url);
-        }
-      }
-    }
-  }
-  const single = context.imagem ?? context.imageUrl;
-  if (typeof single === "string" && single.startsWith("http")) images.add(single);
-  return [...images].slice(0, MAX_SITE_IMAGES);
 }
 
 /** Gera imagem via OpenRouter; se falhar, cai para a NVIDIA. Retorna data URL ou null. */
@@ -269,14 +238,392 @@ async function generateSiteImage(
   return nvidiaImage(imagePrompt);
 }
 
-function imagePromptsFor(context: Record<string, unknown> | undefined): string[] {
-  const nome = asString(context?.nome) ?? "estabelecimento local";
-  const categoria = asString(context?.categoria) ?? "negócio local";
-  return [
-    `Fotografia profissional de alta qualidade da fachada/ambiente de ${nome}, ${categoria} brasileiro. Luz natural quente, composição editorial, estilo fotografia comercial premium, sem texto ou marcas.`,
-    `Fotografia de detalhe do produto/serviço de ${nome} (${categoria}). Close-up apetitoso e elegante, fundo desfocado, iluminação de estúdio suave, estilo editorial premium, sem texto.`,
-    `Fotografia do interior/atendimento de ${nome}, ${categoria}. Ambiente acolhedor e sofisticado, pessoas desfocadas ao fundo, luz ambiente quente, estilo revista, sem texto.`,
+// ---------- pipeline do site premium (/site/<slug>) ----------
+// Em vez de um HTML blob em lead_outputs, generate_site publica uma linha
+// em `sites` (SiteConfig) + assets em site-assets/<slug>/ — renderizado
+// pelo React multi-tenant (barbearia dark / beleza editorial claro).
+
+const slugify = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "site";
+
+/** Tema visual por categoria do negócio. */
+function siteTipoFor(categoria: string | null): "barbearia" | "beleza" {
+  const c = (categoria ?? "").toLowerCase();
+  return /barbearia|barber|barbeiro/.test(c) ? "barbearia" : "beleza";
+}
+
+/** Resolve referências de imagem do lead/contexto em URLs baixáveis. */
+async function resolveLeadImageSources(
+  lead: Record<string, unknown>,
+  context: Record<string, unknown>,
+): Promise<string[]> {
+  const sources = new Set<string>();
+  const add = (v: unknown) => {
+    const s = asString(v, 1200);
+    if (s && s.startsWith("http")) sources.add(s);
+  };
+  // dados.imagens pode guardar urls do scrape/manual; contexto traz o que o front mandou.
+  const dados = isRecord(lead.dados) ? lead.dados : {};
+  for (const bag of [dados, context]) {
+    for (const key of ["imagens", "images", "photos"]) {
+      const arr = bag[key];
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (typeof item === "string") add(item);
+          else if (isRecord(item)) add(item.url ?? item.photoUri);
+        }
+      }
+    }
+  }
+  add(lead.imagem);
+  add(context.imagem);
+
+  // gphoto:places/.../photos/... precisa resolver via Places API.
+  const resolved = new Set<string>();
+  const googleKey = await getSecret("GOOGLE_PLACES_API_KEY");
+  for (const src of [asString(lead.imagem, 800), asString(context.imagem, 800)]) {
+    if (src?.startsWith("gphoto:") && googleKey) {
+      const ref = src.slice(7);
+      if (/^places\/[A-Za-z0-9_-]+\/photos\/[A-Za-z0-9_-]+$/.test(ref)) {
+        const res = await fetch(
+          `https://places.googleapis.com/v1/${ref}/media?maxWidthPx=1600&skipHttpRedirect=true&key=${googleKey}`,
+          { signal: AbortSignal.timeout(15_000) },
+        ).catch(() => null);
+        const data = res?.ok ? await res.json().catch(() => null) : null;
+        const uri = isRecord(data) ? asString(data.photoUri, 1200) : null;
+        if (uri) resolved.add(uri);
+      }
+    }
+  }
+  return [...resolved, ...sources].slice(0, MAX_SITE_IMAGES);
+}
+
+/** Baixa uma imagem remota → bytes, ou null se falhar. */
+async function fetchImageBytes(
+  url: string,
+): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(25_000) }).catch(() => null);
+  if (!res?.ok) return null;
+  const contentType = res.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+  if (!contentType.startsWith("image/")) return null;
+  return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
+}
+
+/** Upload pro bucket público site-assets, com retry — Storage falha intermitente. */
+async function uploadSiteAsset(
+  db: ReturnType<typeof serviceClient>,
+  slug: string,
+  name: string,
+  body: Uint8Array,
+  contentType: string,
+): Promise<string | null> {
+  const base = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/site-assets`;
+  let lastErr = "";
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const { error } = await db.storage.from("site-assets")
+      .upload(`${slug}/${name}`, body, { contentType, upsert: true });
+    if (!error) return `${base}/${slug}/${name}`;
+    lastErr = error.message;
+    await new Promise((r) => setTimeout(r, 700 * attempt));
+  }
+  console.error(`[site] upload ${name}:`, lastErr);
+  return null;
+}
+
+async function ensureSiteBucket(db: ReturnType<typeof serviceClient>): Promise<void> {
+  const { data: buckets } = await db.storage.listBuckets();
+  if (buckets?.some((b: { id: string }) => b.id === "site-assets")) return;
+  await db.storage.createBucket("site-assets", {
+    public: true,
+    fileSizeLimit: 52428800,
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"],
+  }).then(({ error }) => {
+    if (error && !/already exists|duplicate/i.test(error.message)) {
+      console.error("[site] bucket:", error.message);
+    }
+  });
+}
+
+/**
+ * PROMPT ESPECÍFICO dos assets do site — direção de arte por slot.
+ * O que o lead não tem de mídia real a IA preenche com isto:
+ * hero editorial, ambiente, detalhe do trabalho, resultado e textura.
+ * Inglês porque os modelos de imagem performam melhor; identidade real
+ * do negócio (nome/categoria/cidade) vai embutida na cena.
+ */
+function siteAssetPrompts(
+  lead: { nome: string; categoria: string | null; cidade: string | null },
+  tipo: "barbearia" | "beleza",
+): string[] {
+  const biz = `"${lead.nome}", a ${lead.categoria ?? "local business"} in ${lead.cidade ?? "Brazil"}, Brazil`;
+  const direction = tipo === "barbearia"
+    ? "Dark moody cinematic look: charcoal and graphite tones, warm amber rim light, subtle haze, brass and leather textures, premium barbershop atmosphere, shallow depth of field"
+    : "Bright editorial look: ivory and champagne tones, soft natural window light, airy elegant surfaces, delicate gold accents, premium beauty-studio atmosphere, shallow depth of field";
+  const scenes = [
+    `wide establishing shot of the interior of ${biz}, hero image for the website, inviting composition with clear focal point`,
+    `elegant interior detail of ${biz} — the client chair/station and ambient decor, magazine-style composition`,
+    `close-up of the signature work at ${biz} — tools and craft in action, hands only, no faces`,
+    `a finished result from ${biz} presented like a portfolio photograph, aspirational but believable`,
+    `flat-lay of the products and materials used at ${biz}, arranged with generous negative space`,
   ];
+  return scenes.map((scene) =>
+    `Award-winning editorial commercial photograph: ${scene}. ${direction}. ` +
+    "Photorealistic, shot on a 50mm lens, color-graded, high dynamic range. " +
+    "No text, no letters, no logos, no watermark, no visible faces."
+  );
+}
+
+/** SiteConfig determinístico — só fatos confirmados do lead. */
+function baseSiteConfig(lead: Record<string, unknown>, tipo: string): Record<string, unknown> {
+  const dados = isRecord(lead.dados) ? lead.dados : {};
+  const cidade = [asString(lead.cidade), asString(lead.uf)].filter(Boolean).join(" · ");
+  const instagram = asString(lead.instagram, 200);
+  const telefone = asString(lead.telefone, 60);
+  const whatsapp = lead.whatsapp === "sim" || dados.whatsapp === true
+    ? (telefone ?? "").replace(/\D/g, "") : undefined;
+  return {
+    tipo,
+    nome: asString(lead.nome, 150) ?? "Estabelecimento",
+    marca: asString(lead.nome, 150) ?? "Estabelecimento",
+    cidade: cidade || undefined,
+    contato: {
+      telefone: telefone ?? undefined,
+      whatsapp: whatsapp || undefined,
+      instagram: instagram
+        ? (instagram.startsWith("http") ? instagram : `https://instagram.com/${instagram.replace(/^@/, "")}`)
+        : undefined,
+      endereco: asString(lead.endereco, 300) ?? undefined,
+      mapsUrl: asString(lead.maps_url, 800) ?? asString(dados.mapsUrl, 800) ?? undefined,
+    },
+    horarios: { "0": null, "1": [["09:00", "19:00"]], "2": [["09:00", "19:00"]], "3": [["09:00", "19:00"]], "4": [["09:00", "19:00"]], "5": [["09:00", "19:00"]], "6": [["09:00", "14:00"]] },
+    horariosLabel: [["Segunda a sexta", "09:00 – 19:00"], ["Sábado", "09:00 – 14:00"], ["Domingo", "Fechado"]],
+    servicos: [],
+    avaliacoes: typeof lead.avaliacao === "number"
+      ? { nota: lead.avaliacao, total: typeof lead.total_avaliacoes === "number" ? lead.total_avaliacoes : 0, fonte: "Google" }
+      : undefined,
+    booking: { slotMin: 30, diasFuturos: 14, antecedenciaMin: 30 },
+    seo: { title: asString(lead.nome, 150) ?? undefined, description: asString(lead.endereco, 200) ?? undefined },
+  };
+}
+
+/** Sanitiza o patch de IA — aceita só campos conhecidos, com tetos. */
+function sanitizeConfigPatch(raw: unknown): Record<string, unknown> {
+  if (!isRecord(raw)) return {};
+  const patch: Record<string, unknown> = {};
+  const str = (v: unknown, max = 200) => asString(v, max) ?? undefined;
+
+  patch.tagline = str(raw.tagline, 120);
+  if (Array.isArray(raw.servicos)) {
+    patch.servicos = raw.servicos.filter(isRecord).slice(0, 12).map((s) => ({
+      nome: str(s.nome, 80) ?? "Serviço",
+      duracaoMin: typeof s.duracaoMin === "number" && s.duracaoMin >= 10 && s.duracaoMin <= 480
+        ? Math.round(s.duracaoMin) : null,
+      preco: null, // nunca inventa preço
+      categoria: str(s.categoria, 60),
+      descricao: str(s.descricao, 200),
+    })).filter((s) => s.nome !== "Serviço");
+    if (!(patch.servicos as unknown[]).length) delete patch.servicos;
+  }
+  if (isRecord(raw.historia)) {
+    const paragrafos = Array.isArray(raw.historia.paragrafos)
+      ? raw.historia.paragrafos.map((p) => str(p, 800)).filter(Boolean).slice(0, 3) as string[]
+      : [];
+    if (paragrafos.length) patch.historia = { titulo: str(raw.historia.titulo, 80) ?? "Nossa história", paragrafos };
+  }
+  if (Array.isArray(raw.diferenciais)) {
+    const d = raw.diferenciais.map((x) => str(x, 120)).filter(Boolean).slice(0, 6) as string[];
+    if (d.length) patch.diferenciais = d;
+  }
+  if (Array.isArray(raw.faq)) {
+    const f = raw.faq.filter(isRecord).slice(0, 8)
+      .map((x) => ({ q: str(x.q, 160), a: str(x.a, 500) }))
+      .filter((x) => x.q && x.a);
+    if (f.length) patch.faq = f;
+  }
+  if (Array.isArray(raw.horariosLabel)) {
+    const h = raw.horariosLabel.filter(Array.isArray).slice(0, 7)
+      .map((x) => [str(x[0], 60), str(x[1], 60)]).filter((x) => x[0] && x[1]);
+    if (h.length) patch.horariosLabel = h;
+  }
+  if (isRecord(raw.seo)) {
+    const desc = str(raw.seo.description, 160);
+    if (desc) patch.seo = { description: desc };
+  }
+  for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
+  return patch;
+}
+
+const CONFIG_PATCH_SYSTEM = [
+  "Você é um diretor de arte e copywriter sênior montando o SiteConfig JSON de um site premium.",
+  "Responda APENAS com JSON válido (sem markdown, sem comentários) neste formato exato:",
+  '{ "tagline": "frase curta de marca", "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null}],',
+  '  "historia": {"titulo":"…","paragrafos":["…","…"]}, "diferenciais":["…"],',
+  '  "faq":[{"q":"…","a":"…"}], "horariosLabel":[["Segunda a sexta","09:00 – 19:00"]], "seo":{"description":"…"} }',
+  "REGRAS:",
+  "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados). Não invente preços, profissionais, prêmios ou números.",
+  "- Se os serviços reais não estiverem claros, proponha os 4-8 serviços mais típicos da categoria, com duracaoMin plausível (30-120) e preco SEMPRE null.",
+  "- tagline: elegante, max 8 palavras, no tom do negócio.",
+  "- historia: 2 parágrafos acolhedores sobre a proposta do espaço — sem inventar datas/fatos; pode falar de proposta e experiência, não de biografia.",
+  "- faq: 4-6 perguntas práticas (agendamento, formas de pagamento, duração, preparo) com respostas honestas e genéricas.",
+  "- seo.description: 1 frase com nome + categoria + cidade.",
+  "- Todo o texto em português brasileiro, sem emojis.",
+].join("\n");
+
+async function configPatchFromAi(
+  apiKey: string,
+  lead: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const facts = {
+    nome: lead.nome, categoria: lead.categoria, cidade: lead.cidade, uf: lead.uf,
+    endereco: lead.endereco, avaliacao: lead.avaliacao, totalAvaliacoes: lead.total_avaliacoes,
+    instagram: lead.instagram, temWhatsApp: lead.whatsapp === "sim",
+  };
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
+      "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi",
+    },
+    body: JSON.stringify({
+      model: SITE_MODEL,
+      max_tokens: 2500,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: CONFIG_PATCH_SYSTEM },
+        { role: "user", content: `Estabelecimento:\n${JSON.stringify(facts)}` },
+      ],
+    }),
+    signal: AbortSignal.timeout(90_000),
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.error("[site-config] openrouter falhou:", res?.status ?? "network");
+    return {};
+  }
+  const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+  const choices = data && Array.isArray(data.choices) ? data.choices : [];
+  const content = isRecord(choices[0]) && isRecord(choices[0].message)
+    ? choices[0].message.content : null;
+  if (typeof content !== "string") return {};
+  try {
+    return sanitizeConfigPatch(JSON.parse(content.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim()));
+  } catch {
+    return {};
+  }
+}
+
+/** Card HTML que vai pro lead_outputs — o workspace renderiza em iframe. */
+function siteCardHtml(slug: string, nome: string, hero: string | null): string {
+  const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0e0b08;color:#f5ead9;font-family:system-ui,sans-serif}
+.card{max-width:420px;width:calc(100% - 48px);text-align:center;padding:32px 28px;border:1px solid #3a3128;border-radius:18px;background:#171310}
+.card img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;margin-bottom:18px}
+h1{font-size:20px;margin:0 0 6px}p{color:#a89880;font-size:13px;margin:0 0 20px}
+a{display:inline-block;padding:12px 26px;border-radius:99px;background:#c9a869;color:#17110a;font-weight:700;text-decoration:none;font-size:14px}
+</style></head><body><div class="card">${hero ? `<img src="${esc(hero)}" alt="">` : ""}
+<h1>Site publicado</h1><p>${esc(nome)} · /site/${esc(slug)}</p>
+<a href="/site/${esc(slug)}" target="_top">Abrir site</a></div></body></html>`;
+}
+
+/**
+ * Publica o site premium do lead: imagens reais primeiro, IA preenche o
+ * que faltar (hero/corredor 3D), SiteConfig com fatos + patch de IA.
+ * Retorna slug + urls publicadas, ou lança HttpError.
+ */
+async function publishPremiumSite(
+  db: ReturnType<typeof serviceClient>,
+  apiKey: string,
+  leadId: string,
+  context: Record<string, unknown>,
+): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number }> {
+  const { data: lead } = await db.from("leads").select("*").eq("id", leadId).maybeSingle();
+  if (!lead) throw httpError(404, "Lead não encontrado");
+
+  const dados = isRecord(lead.dados) ? lead.dados : {};
+  const nome = asString(lead.nome, 150) ?? "estabelecimento";
+  const tipo = siteTipoFor(asString(lead.categoria, 150));
+
+  // Slug: o do lead se já existir; senão nome+bairro/cidade sem colidir.
+  let slug = asString(dados.siteSlug, 80) ??
+    slugify([nome, asString(lead.bairro, 80) ?? asString(lead.cidade, 80)].filter(Boolean).join(" "));
+  const { data: owner } = await db.from("sites").select("lead_id").eq("slug", slug).maybeSingle();
+  if (owner && owner.lead_id !== leadId) {
+    const base = slug;
+    for (let i = 2; i < 20; i++) {
+      slug = `${base}-${i}`;
+      const { data: clash } = await db.from("sites").select("slug").eq("slug", slug).maybeSingle();
+      if (!clash) break;
+    }
+  }
+
+  await ensureSiteBucket(db);
+
+  // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
+  const sources = await resolveLeadImageSources(lead, context);
+  const publicUrls: { url: string; real: boolean }[] = [];
+  {
+    const downloads = await Promise.all(sources.map(fetchImageBytes));
+    let i = 0;
+    for (const dl of downloads) {
+      if (!dl) continue;
+      const ext = dl.contentType.includes("png") ? "png" : dl.contentType.includes("webp") ? "webp" : "jpg";
+      const url = await uploadSiteAsset(db, slug, `real-${++i}.${ext}`, dl.bytes, dl.contentType);
+      if (url) publicUrls.push({ url, real: true });
+    }
+  }
+
+  // 2) Gap-fill com IA — prompt específico por slot, direção de arte do tema.
+  const faltando = Math.min(SITE_IMAGE_TARGET - publicUrls.length, MAX_GENERATED_IMAGES);
+  if (faltando > 0) {
+    const prompts = siteAssetPrompts(
+      { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) }, tipo,
+    ).slice(0, faltando);
+    const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p)));
+    let i = 0;
+    for (const img of generated) {
+      if (!img) continue;
+      let dl: { bytes: Uint8Array; contentType: string } | null = null;
+      const m = img.match(/^data:image\/(jpeg|png|webp);base64,(.+)$/s);
+      if (m) {
+        dl = { bytes: Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)), contentType: `image/${m[1]}` };
+      } else if (img.startsWith("http")) {
+        dl = await fetchImageBytes(img);
+      }
+      if (!dl) continue;
+      const ext = dl.contentType.includes("png") ? "png" : dl.contentType.includes("webp") ? "webp" : "jpg";
+      const url = await uploadSiteAsset(db, slug, `ai-${++i}.${ext}`, dl.bytes, dl.contentType);
+      if (url) publicUrls.push({ url, real: false });
+    }
+  }
+
+  // 3) SiteConfig: base determinística + patch de IA (paralelo às imagens seria
+  // ideal, mas o modelo é rápido — ~20s; mantém o código linear e legível).
+  const config = baseSiteConfig(lead, tipo);
+  const patch = await configPatchFromAi(apiKey, lead);
+  Object.assign(config, patch);
+  if (patch.seo) config.seo = { ...(isRecord(config.seo) ? config.seo : {}), ...patch.seo };
+  config.fotos = {
+    hero: publicUrls[0]?.url,
+    galeria: publicUrls.slice(1).map((x) => x.url),
+  };
+
+  // 4) Publica.
+  const { error: siteErr } = await db.from("sites").upsert(
+    { slug, tipo, nome, lead_id: leadId, config, publicado: true },
+    { onConflict: "slug" },
+  );
+  if (siteErr) throw httpError(502, `Falha ao publicar site: ${siteErr.message}`);
+  await db.from("leads").update({ dados: { ...dados, siteSlug: slug } }).eq("id", leadId);
+
+  return {
+    slug,
+    nome,
+    siteUrl: `/site/${slug}`,
+    hero: publicUrls[0]?.url ?? null,
+    modelo: SITE_MODEL,
+    geradas: publicUrls.filter((x) => !x.real).length,
+    reais: publicUrls.filter((x) => x.real).length,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -319,29 +666,29 @@ Deno.serve(async (req) => {
         return json({ conteudo: enhanced, modelo: NVIDIA_TEXT_MODEL, creditosCobrados: reservation.cost });
       }
 
-      // Pipeline de imagens para generate_site: reais do scrape + geradas se faltar.
-      const imageUrls: string[] = [];
+      // Site premium: publica linha em `sites` + assets no Storage e devolve
+      // um card pro lead_outputs — a experiência real vive em /site/<slug>.
       if (action === "generate_site") {
-        imageUrls.push(...contextImages(context));
-        const faltando = Math.min(2, MAX_SITE_IMAGES - imageUrls.length);
-        if (faltando > 0) {
-          const prompts = imagePromptsFor(context);
-          // Paralelo — senão cada imagem soma ~30-60s e estoura o tempo da function.
-          const enhanced = await Promise.all(
-            prompts.slice(0, faltando).map((p) => enhanceImagePrompt(p, context)),
-          );
-          const generated = await Promise.all(
-            enhanced.map((p) => generateSiteImage(apiKey, p)),
-          );
-          imageUrls.push(...generated.filter((u): u is string => typeof u === "string"));
+        let site: Awaited<ReturnType<typeof publishPremiumSite>>;
+        try {
+          site = await publishPremiumSite(db, apiKey, businessRef, context);
+        } catch (err) {
+          await settleAction(db, user.id, requestRef, "refunded");
+          throw err;
         }
+        await settleAction(db, user.id, requestRef, "completed");
+        return json({
+          conteudo: siteCardHtml(site.slug, site.nome, site.hero),
+          siteSlug: site.slug,
+          siteUrl: site.siteUrl,
+          imagensReais: site.reais,
+          imagensGeradas: site.geradas,
+          modelo: site.modelo,
+          creditosCobrados: reservation.cost,
+        });
       }
 
-      const model = action === "generate_image"
-        ? IMAGE_MODEL
-        : action === "generate_site"
-          ? SITE_MODEL
-          : TEXT_MODEL;
+      const model = action === "generate_image" ? IMAGE_MODEL : TEXT_MODEL;
 
       // Imagem avulsa: o pedido do usuário vira prompt em inglês otimizado
       // com a identidade do estabelecimento embutida.
@@ -349,12 +696,8 @@ Deno.serve(async (req) => {
         ? await enhanceImagePrompt(prompt, context)
         : null;
 
-      const userContent = action === "generate_site"
-        ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}\n\n` +
-          `URLs de imagem disponíveis (use TODAS nos <img> apropriados — hero primeiro):\n` +
-          imageUrls.map((u, i) => `${i + 1}. ${u}`).join("\n")
-        : action === "generate_image"
-          ? enhancedImagePrompt!
+      const userContent = action === "generate_image"
+        ? enhancedImagePrompt!
         : body.context
           ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
           : prompt;
@@ -376,7 +719,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model,
           modalities: action === "generate_image" ? ["image", "text"] : undefined,
-          max_tokens: action === "generate_site" ? 12000 : action === "lead_assist" ? 1200 : undefined,
+          max_tokens: action === "lead_assist" ? 1200 : undefined,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -384,7 +727,7 @@ Deno.serve(async (req) => {
         }),
         // Sem timeout o OpenRouter pode segurar a conexão até o gateway cortar.
         // Site precisa de mais tempo: o HTML completo são milhares de tokens.
-        signal: AbortSignal.timeout(action === "generate_site" ? 200_000 : 60_000),
+        signal: AbortSignal.timeout(60_000),
       }).catch(() => null);
       const orStatus = res?.status ?? 0;
       if (res?.ok) {
@@ -417,8 +760,8 @@ Deno.serve(async (req) => {
           ? await nvidiaChat(
             systemPrompt,
             userContent,
-            action === "generate_site" ? 12000 : action === "lead_assist" ? 1200 : undefined,
-            action === "generate_site" ? 200_000 : 120_000,
+            action === "lead_assist" ? 1200 : undefined,
+            120_000,
           )
           : null;
         if (nv) {
@@ -447,15 +790,11 @@ Deno.serve(async (req) => {
           .filter((u): u is string => typeof u === "string")
         : [];
 
-      let conteudo = typeof message.content === "string" ? message.content : null;
-      if (conteudo && action === "generate_site") {
-        conteudo = conteudo.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim();
-      }
+      const conteudo = typeof message.content === "string" ? message.content : null;
 
       return json({
         conteudo,
         imagens: images.length > 0 ? images : undefined,
-        imagensUsadas: action === "generate_site" ? imageUrls : undefined,
         modelo,
         creditosCobrados: reservation.cost,
       });

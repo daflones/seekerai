@@ -62,6 +62,31 @@ Exemplo completo de config: `site-templates/configs/barbearia-vianna.json`
 `site-templates/configs/espaco-karine-branco.json` (beleza: categorias de
 serviço, profissionais, depoimento em print, FAQ real do carrossel).
 
+## Geração automática (plataforma)
+
+O botão "Site" do lead chama `generate_site` na edge `ai-generate`, que
+agora **publica um site premium** (linha em `sites` + `/site/<slug>`) em
+vez de um HTML blob:
+
+1. Carrega o lead (`businessRef`) — nome, categoria, endereço, telefone,
+   avaliação, imagem, dados.imagens.
+2. Tema por categoria: `barbearia*` → dark; demais → `beleza` (editorial claro).
+3. Imagens reais primeiro: `lead.imagem` (resolve `gphoto:` via Places;
+   URLs do Google/Apify expiram → baixa e re-hospeda em `site-assets/<slug>/`),
+   mais `imagens`/`photos` do contexto/dados (máx. 8).
+4. **Gap-fill com IA** até 6 imagens (hero + galeria/corredor 3D), máx. 5
+   geradas — prompts por slot (hero, ambiente, detalhe, resultado, flat-lay)
+   com direção de arte por tema, em `siteAssetPrompts()` no index.ts.
+5. `SiteConfig`: base determinística (só fatos do lead) + patch do
+   `AI_SITE_MODEL` (tagline, serviços, história, diferenciais, faq,
+   horariosLabel, seo.description) — `sanitizeConfigPatch` aceita só campos
+   conhecidos, `preco` sempre null. Se a IA falhar, publica com a base.
+6. Upsert em `sites` + `leads.dados.siteSlug`; devolve `siteSlug`/`siteUrl`
+   no job result e um card em `lead_outputs` (link pro site, iframe no workspace).
+
+Para refinar um site gerado, publique por cima com `apply-site.mjs` +
+`--config`/`--assets` — mesmo slug, config artesanal vence o gerado.
+
 ## Componentes 21st.dev utilizados
 
 | Fonte | Uso |
