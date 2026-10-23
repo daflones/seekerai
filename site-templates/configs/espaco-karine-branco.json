@@ -1,0 +1,140 @@
+{
+  "tipo": "beleza",
+  "marca": "Karine Branco",
+  "logo": "logo.jpg",
+  "tagline": "Espaço de beleza",
+  "cidade": "Bom Retiro · Teresópolis",
+  "fotos": { "hero": "resultado-2.jpg", "excluir": ["elogio.jpg"] },
+  "contato": {
+    "instagram": "espacokarinebranco"
+  },
+  "horarios": {
+    "0": null,
+    "1": null,
+    "2": [["09:00", "19:00"]],
+    "3": [["09:00", "19:00"]],
+    "4": [["09:00", "19:00"]],
+    "5": [["09:00", "19:00"]],
+    "6": [["09:00", "19:00"]]
+  },
+  "horariosLabel": [
+    ["Terça a sábado", "09:00 – 19:00"],
+    ["Segunda e domingo", "Fechado"]
+  ],
+  "servicos": [
+    { "nome": "Design de sobrancelhas", "duracaoMin": null, "preco": null, "categoria": "Sobrancelhas" },
+    { "nome": "Design com henna", "duracaoMin": null, "preco": null, "categoria": "Sobrancelhas" },
+    { "nome": "Design com tintura", "duracaoMin": null, "preco": null, "categoria": "Sobrancelhas" },
+    { "nome": "Manicure", "duracaoMin": null, "preco": null, "categoria": "Unhas" },
+    { "nome": "Pedicure", "duracaoMin": null, "preco": null, "categoria": "Unhas" },
+    { "nome": "Manutenção de unhas", "duracaoMin": null, "preco": null, "categoria": "Unhas" },
+    { "nome": "Cílios", "duracaoMin": null, "preco": null, "categoria": "Cílios" },
+    { "nome": "Cursos de beleza", "duracaoMin": null, "preco": null, "categoria": "Cursos" }
+  ],
+  "profissionais": [
+    { "nome": "Karine" },
+    { "nome": "Júlia" }
+  ],
+  "historia": {
+    "titulo": "Um lugar para você se cuidar",
+    "paragrafos": [
+      "No coração do <strong>Bom Retiro</strong>, o Espaço Karine Branco nasceu para ser mais que um salão: é um lugar para você respirar, desacelerar e sair se sentindo ainda mais você.",
+      "O espaço é amplo, aconchegante e pensado nos detalhes — da música boa ao <strong>cappuccino com biscoitinhos</strong> que te espera na chegada. Aqui, ninguém te apressa e ninguém te empurra serviço: o atendimento é do jeito que deveria ser sempre.",
+      "Sobrancelhas, cílios, unhas e cursos de beleza — tudo com o cuidado de quem entende que manutenção não é só fazer de novo: é preservar o resultado bonito, dia após dia.",
+      "E para facilitar, dá pra <strong>estacionar o carro em frente</strong>. Chega, relaxa, e deixa o resto com a gente."
+    ]
+  },
+  "diferenciais": [
+    "Cappuccino e biscoitinhos",
+    "Espaço amplo e aconchegante",
+    "Estacionamento em frente",
+    "Atendimento sem pressão",
+    "Agende pelo WhatsApp",
+    "Cursos de beleza"
+  ],
+  "avaliacoes": {
+    "nota": 5.0,
+    "total": 5,
+    "fonte": "Google",
+    "print": "elogio.jpg",
+    "itens": [
+      {
+        "autor": "Vitória Costa",
+        "nota": 5,
+        "texto": "Sempre sou muito bem recebida, o ambiente é gostoso, acolhedor, com música boa, aquele cappuccino delicioso e até uns biscoitinhos. Confio de olhos fechados no trabalho e sempre saio satisfeita.",
+        "quando": "Este ano"
+      },
+      {
+        "autor": "Victoria Mariana",
+        "nota": 5,
+        "texto": "A Karine é uma excelente profissional, tem as mãos super delicadas e presta um atendimento ótimo! O espaço é muito aconchegante e ela trata as clientes muito bem.",
+        "quando": "Este mês"
+      },
+      {
+        "autor": "Thiago Abreu",
+        "nota": 5,
+        "texto": "Excelente opção para design de sobrancelhas, manicure e pedicure. Tem lugar para estacionar o carro em frente. As pessoas são simpáticas, atenciosas e o preço é justo.",
+        "quando": "Este mês"
+      },
+      {
+        "autor": "whitney borges",
+        "nota": 5,
+        "texto": "Amo o espaço Karine Branco, espaço confortável, ótimas profissionais e muito simpáticas!",
+        "quando": "Há 2 meses"
+      },
+      {
+        "autor": "Grigorii Salikhov",
+        "nota": 5,
+        "texto": "O espaço é amplo, agradável e muito bem localizado. Atendimento excelente, sem insistência em oferecer serviços adicionais. Uma excelente opção de salão de beleza em Teresópolis.",
+        "quando": "Este mês"
+      }
+    ]
+  },
+  "faq": [
+    {
+      "q": "Você vai afinar minha sobrancelha?",
+      "a": "Claro que não — só se você quiser! Sempre conversamos antes para entender o que combina com você."
+    },
+    {
+      "q": "Qual a diferença entre henna e tintura?",
+      "a": "A henna pigmenta mais a pele e pouco os pelos; a tintura pigmenta principalmente o pelo. Na hora, a gente te ajuda a escolher a melhor opção pro seu caso."
+    },
+    {
+      "q": "Quanto tempo dura a henna na sobrancelha?",
+      "a": "Em média de 3 a 7 dias, dependendo da tonalidade desejada."
+    },
+    {
+      "q": "Qual o intervalo ideal entre um design e outro?",
+      "a": "O ideal é de 15 a 20 dias, dependendo do seu ciclo."
+    },
+    {
+      "q": "Posso fazer a sobrancelha mesmo tendo poucos pelos?",
+      "a": "Deve! Quanto mais você faz, mais estimula o crescimento."
+    },
+    {
+      "q": "Posso usar ácidos no rosto antes ou depois do procedimento?",
+      "a": "Se for só design com henna, pode sim — mas dependendo do ácido e de como sua pele está, não recomendamos. Converse com a gente antes."
+    }
+  ],
+  "videos": [
+    {
+      "titulo": "Meu super poder",
+      "descricao": "Manutenção não é só fazer a unha de novo — é cuidar dos detalhes para manter o resultado bonito.",
+      "destaque": false
+    },
+    {
+      "titulo": "O cuidado em cada detalhe",
+      "descricao": "Um pouco do nosso dia a dia de atendimento no espaço.",
+      "destaque": true
+    },
+    {
+      "titulo": "No espaço",
+      "destaque": false
+    }
+  ],
+  "booking": { "slotMin": 60, "diasFuturos": 14, "antecedenciaMin": 60 },
+  "seo": {
+    "title": "Espaço Karine Branco — Salão de Beleza em Teresópolis",
+    "description": "Sobrancelhas, cílios, unhas e cursos no Bom Retiro, Teresópolis. Espaço aconchegante, atendimento sem pressa. Agende pelo WhatsApp."
+  }
+}

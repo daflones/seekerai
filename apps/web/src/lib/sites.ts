@@ -9,6 +9,8 @@ export interface SiteServico {
   nome: string;
   duracaoMin: number | null;
   preco: number | null;
+  categoria?: string;
+  descricao?: string;
 }
 
 export interface SiteConfig {
@@ -40,6 +42,8 @@ export interface SiteConfig {
     total: number;
     fonte: string;
     itens?: { autor: string; nota?: number; texto: string; quando?: string }[];
+    /** Print/depoimento real em imagem (ex.: recado de cliente no WhatsApp). */
+    print?: string;
   };
   faq?: { q: string; a: string }[];
   booking: { slotMin: number; diasFuturos: number; antecedenciaMin: number };

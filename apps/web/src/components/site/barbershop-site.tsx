@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AnimatePresence, motion, useReducedMotion, useScroll,
@@ -10,130 +10,28 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import {
   ArrowLeft, ArrowRight, ArrowUp, CalendarDays, Clock,
-  Instagram, MapPin, Menu, MessageCircle, Phone, Play, Scissors, Sparkles, X,
+  Instagram, MapPin, Menu, MessageCircle, Phone, Scissors, Sparkles, X,
 } from "lucide-react";
-import type { SiteConfig, SiteServico } from "@/lib/sites";
+import type { SiteConfig } from "@/lib/sites";
 import { ImageStreamHero } from "./image-stream-hero";
+import {
+  CountUp, DOWS, EASE, FadeUp, fmtDate, fmtMoney, Magnetic, RevealText, Spotlight,
+  useBooking, useOverlayLock, VideoCard,
+} from "./primitives";
 import "./site.css";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
-
-const DOWS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const fmtDate = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short" });
-const fmtMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-interface Booking {
-  servico: SiteServico | null;
-  profissional: string | null;
-  data: Date | null;
-  hora: string | null;
-  nome: string;
-  telefone: string;
-}
-
-function toMin(t: string) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
-function toHHMM(min: number) { return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`; }
-
-/* ----------------------------------------------------------------------
-   MagneticButton — primitivo portado de 21st.dev/@jahed/motion-footer
-   (GSAP, physics-based: translate + tilt + elastic release)
----------------------------------------------------------------------- */
-function Magnetic({ children, className = "", strength = 0.4 }: {
-  children: React.ReactNode; className?: string; strength?: number;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const reduced = useReducedMotion();
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || reduced) return;
-    const move = (e: MouseEvent) => {
-      const r = el.getBoundingClientRect();
-      const x = e.clientX - r.left - r.width / 2;
-      const y = e.clientY - r.top - r.height / 2;
-      gsap.to(el, {
-        x: x * strength, y: y * strength,
-        rotationX: -y * 0.12, rotationY: x * 0.12, scale: 1.05,
-        ease: "power2.out", duration: 0.4,
-      });
-    };
-    const leave = () => gsap.to(el, {
-      x: 0, y: 0, rotationX: 0, rotationY: 0, scale: 1,
-      ease: "elastic.out(1, 0.3)", duration: 1.2,
-    });
-    el.addEventListener("mousemove", move);
-    el.addEventListener("mouseleave", leave);
-    return () => { el.removeEventListener("mousemove", move); el.removeEventListener("mouseleave", leave); };
-  }, [reduced, strength]);
-
-  return <div ref={ref} className={`bshop-magnetic ${className}`} style={{ transformStyle: "preserve-3d" }}>{children}</div>;
-}
-
-/* ----------------------------------------------------------------------
-   RevealText — efeito "text reveal" (palavra a palavra, blur + rise)
-   padrão kuratlielia/text-reveal do 21st.dev, em framer-motion.
----------------------------------------------------------------------- */
-function RevealText({ text, className = "", delay = 0, once = true }: {
-  text: string; className?: string; delay?: number; once?: boolean;
-}) {
-  const reduced = useReducedMotion();
-  if (reduced) return <span className={className}>{text}</span>;
-  return (
-    <span className={className} aria-label={text} role="text">
-      {text.split(" ").map((w, i) => (
-        <motion.span
-          key={i}
-          style={{ display: "inline-block", whiteSpace: "pre" }}
-          initial={{ opacity: 0, y: 22, filter: "blur(10px)" }}
-          whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          viewport={{ once, margin: "-8% 0px" }}
-          transition={{ duration: 0.65, delay: delay + i * 0.055, ease: EASE }}
-        >{w}{" "}</motion.span>
-      ))}
-    </span>
-  );
-}
-
-/* Fade/slide genérico ao entrar na viewport */
-function FadeUp({ children, className = "", delay = 0, y = 28 }: {
-  children: React.ReactNode; className?: string; delay?: number; y?: number;
-}) {
-  return (
-    <motion.div className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-10% 0px" }}
-      transition={{ duration: 0.8, delay, ease: EASE }}
-    >{children}</motion.div>
-  );
-}
-
-/* Card com spotlight que segue o cursor (efeito "glow card") */
-function Spotlight({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  return (
-    <div ref={ref} className={`bshop-spotlight ${className}`}
-      onMouseMove={(e) => {
-        const r = ref.current?.getBoundingClientRect();
-        if (!r) return;
-        ref.current!.style.setProperty("--mx", `${e.clientX - r.left}px`);
-        ref.current!.style.setProperty("--my", `${e.clientY - r.top}px`);
-      }}>
-      {children}
-    </div>
-  );
-}
 
 export function BarbershopSite({ slug, config }: { slug: string; config: SiteConfig }) {
   const cfg = config;
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const [bookOpen, setBookOpen] = useState(false);
-  const [step, setStep] = useState(0);
-  const [bk, setBk] = useState<Booking>({ servico: null, profissional: null, data: null, hora: null, nome: "", telefone: "" });
-  const [erro, setErro] = useState("");
+  const {
+    bookOpen, setBookOpen, step, bk, setBk, erro, waNumber,
+    pros, hasPros, dias, slots, stepsTotal, dataStep, horaStep, finalStep,
+    openBook, next, back, dataLabel,
+  } = useBooking(config);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const heroImgRef = useRef<HTMLImageElement>(null);
@@ -143,43 +41,11 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
   const reduced = useReducedMotion();
   const { scrollYProgress } = useScroll();
 
-  const waNumber = (cfg.contato.whatsapp ?? cfg.contato.telefone ?? "").replace(/\D/g, "");
   const marca = cfg.marca || cfg.nome;
-  const pros = cfg.profissionais ?? [];
-  const hasPros = pros.length > 0;
   const galeria = cfg.fotos.galeria;
   const videosAll = cfg.videos ?? [];
   const destaqueVideo = videosAll.find((v) => v.destaque) ?? videosAll[0] ?? null;
   const outrosVideos = videosAll.filter((v) => v !== destaqueVideo);
-
-  // ---------- dias/horários disponíveis ----------
-  const dias = useMemo(() => {
-    const out: { d: Date; aberto: boolean }[] = [];
-    const now = new Date();
-    for (let i = 0; i < (cfg.booking.diasFuturos || 14); i++) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-      out.push({ d, aberto: Boolean(cfg.horarios[String(d.getDay())]?.length) });
-    }
-    return out;
-  }, [cfg]);
-
-  const slots = useMemo(() => {
-    if (!bk.data) return [];
-    const janelas = cfg.horarios[String(bk.data.getDay())] ?? [];
-    const dur = bk.servico?.duracaoMin ?? cfg.booking.slotMin;
-    const stepMin = cfg.booking.slotMin || 30;
-    const now = new Date();
-    const isToday = bk.data.toDateString() === now.toDateString();
-    const minNow = now.getHours() * 60 + now.getMinutes() + (cfg.booking.antecedenciaMin || 0);
-    const out: string[] = [];
-    for (const [abre, fecha] of janelas) {
-      for (let m = toMin(abre); m + dur <= toMin(fecha); m += stepMin) {
-        if (isToday && m < minNow) continue;
-        out.push(toHHMM(m));
-      }
-    }
-    return out;
-  }, [bk.data, bk.servico, cfg]);
 
   // ---------- Lenis smooth scroll + ScrollTrigger ----------
   useEffect(() => {
@@ -232,61 +98,10 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
   }, []);
 
   // ---------- scroll-lock + Escape para lightbox e modal de agendamento ----------
-  const overlayOpen = lightbox !== null || bookOpen;
-  useEffect(() => {
-    if (!overlayOpen) return;
-    const sbw = window.innerWidth - document.documentElement.clientWidth;
-    const prevOverflow = document.body.style.overflow;
-    const prevPad = document.body.style.paddingRight;
-    document.body.style.overflow = "hidden";
-    if (sbw > 0) document.body.style.paddingRight = `${sbw}px`;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setLightbox(null); setBookOpen(false); }
-      if (lightbox !== null && e.key === "ArrowRight") setLightbox((i) => (i === null ? null : (i + 1) % galeria.length));
-      if (lightbox !== null && e.key === "ArrowLeft") setLightbox((i) => (i === null ? null : (i - 1 + galeria.length) % galeria.length));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      document.body.style.paddingRight = prevPad;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [overlayOpen, galeria.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ---------- booking flow (modal — a reserva acontece no fim da narrativa) ----------
-  const stepsTotal = hasPros ? 5 : 4;
-  const openBook = (servico?: SiteServico) => {
-    if (servico) setBk((b) => ({ ...b, servico }));
-    setStep(0); setErro(""); setBookOpen(true);
-  };
-  const dataStep = hasPros ? 2 : 1;
-  const horaStep = hasPros ? 3 : 2;
-  const finalStep = hasPros ? 4 : 3;
-  const next = () => {
-    setErro("");
-    if (step === 0 && !bk.servico) return setErro("Escolha um serviço pra continuar.");
-    if (hasPros && step === 1 && bk.profissional === null) return setErro("Escolha um profissional ou 'Sem preferência'.");
-    if (step === dataStep && !bk.data) return setErro("Escolha uma data.");
-    if (step === horaStep && !bk.hora) return setErro("Escolha um horário.");
-    if (step === finalStep) return enviarWhats();
-    setStep(step + 1);
-  };
-  const back = () => { setErro(""); setStep(Math.max(0, step - 1)); };
-
-  const dataLabel = bk.data ? `${DOWS[bk.data.getDay()]}, ${fmtDate.format(bk.data)}` : "—";
-  const waMsg = () => [
-    `Olá! Quero agendar na ${cfg.nome} 💈`,
-    `• Serviço: ${bk.servico?.nome}`,
-    bk.profissional && bk.profissional !== "Sem preferência" ? `• Profissional: ${bk.profissional}` : null,
-    `• Data: ${dataLabel}`,
-    `• Horário: ${bk.hora}`,
-    bk.nome ? `• Nome: ${bk.nome}` : null,
-    bk.telefone ? `• Telefone: ${bk.telefone}` : null,
-  ].filter(Boolean).join("\n");
-  const enviarWhats = () => {
-    if (!bk.nome.trim()) return setErro("Informe seu nome pra identificar o agendamento.");
-    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg())}`, "_blank", "noopener");
-  };
+  useOverlayLock(lightbox !== null || bookOpen, {
+    onEscape: () => { setLightbox(null); setBookOpen(false); },
+    lightbox: { index: lightbox, total: galeria.length, go: setLightbox },
+  });
 
   const marqueeItems = [
     ...(cfg.servicos ?? []).map((s) => s.nome),
@@ -909,49 +724,5 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
   );
 }
 
-/* Card de vídeo com overlay de play estilizado.
-   `tall` = formato reel 9:16 grande (destaque da história);
-   `reel` = formato compacto pra esteira horizontal. */
-function VideoCard({ v, tall, reel }: {
-  v: { src: string; titulo: string; descricao?: string };
-  tall?: boolean; reel?: boolean;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-  return (
-    <div className={`bshop-video${tall ? " tall" : ""}${reel ? " reel" : ""}`}>
-      <div className="bshop-video-frame">
-        <video ref={videoRef} src={v.src} controls={playing} playsInline preload="metadata"
-          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
-        {!playing && (
-          <button className="bshop-video-play" aria-label={`Assistir: ${v.titulo}`}
-            onClick={() => videoRef.current?.play()}>
-            <span className="bshop-video-playbtn"><Play size={reel ? 18 : 22} fill="currentColor" /></span>
-          </button>
-        )}
-      </div>
-      <div className="bshop-video-info">
-        <strong>{v.titulo}</strong>
-        {v.descricao && !reel && <p>{v.descricao}</p>}
-      </div>
-    </div>
-  );
-}
-
-/* Contador animado da nota (5.0) */
-function CountUp({ to }: { to: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const reduced = useReducedMotion();
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || reduced) { if (el) el.textContent = to.toFixed(1); return; }
-    const obj = { v: 0 };
-    const tween = gsap.to(obj, {
-      v: to, duration: 1.6, ease: "power3.out",
-      scrollTrigger: { trigger: el, start: "top 88%", once: true },
-      onUpdate: () => { el.textContent = obj.v.toFixed(1); },
-    });
-    return () => { tween.kill(); };
-  }, [to, reduced]);
-  return <span ref={ref}>0.0</span>;
-}
+/* Componentes compartilhados em ./primitives (Magnetic, RevealText, FadeUp,
+   Spotlight, VideoCard, CountUp, useBooking, useOverlayLock). */

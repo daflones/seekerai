@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadSite } from "@/lib/sites";
 import { BarbershopSite } from "@/components/site/barbershop-site";
+import { BeautySite } from "@/components/site/beauty-site";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function SitePage({ params }: Props) {
   if (!/^[a-z0-9-]{2,80}$/.test(slug)) notFound();
   const site = await loadSite(slug);
   if (site) {
-    if (site.tipo === "barbearia") return <BarbershopSite slug={slug} config={site.config} />;
+    if (site.tipo === "beleza") return <BeautySite slug={slug} config={site.config} />;
     return <BarbershopSite slug={slug} config={site.config} />;
   }
 

@@ -11,15 +11,29 @@ scripts/apply-site.mjs               → sobe mídia pro Storage + grava a linha
 site-templates/configs/<x>.json      → config de override do estabelecimento
 apps/web/src/app/site/[slug]/page.tsx     → SSR: sites → React site | fallback: lead_outputs (HTML)
 apps/web/src/lib/sites.ts                 → tipo SiteConfig + loadSite()
-apps/web/src/components/site/barbershop-site.tsx → render do tipo "barbearia"
-apps/web/src/components/site/site.css     → tema (.bshop-*, tokens --bs-*)
+apps/web/src/components/site/primitives.tsx     → primitivos compartilhados
+                                                  (Magnetic, RevealText, FadeUp, Spotlight,
+                                                  VideoCard, CountUp, useBooking, useOverlayLock)
+apps/web/src/components/site/barbershop-site.tsx → render do tipo "barbearia" (.bshop)
+apps/web/src/components/site/site.css           → tema escuro/dourado (.bshop-*, tokens --bs-*)
+apps/web/src/components/site/beauty-site.tsx    → render do tipo "beleza" (.bbeauty)
+apps/web/src/components/site/beauty.css         → tema claro champagne/marfim (.bbeauty-*, --bb-*)
+apps/web/src/components/site/image-stream-hero.tsx → corredor 3D de fotos (compartilhado)
 bucket Supabase `site-assets/<slug>/`     → fotos/vídeos do estabelecimento (leitura pública)
 ```
 
 - **Multi-tenant**: `slug` → `loadSite()` → `config` tipado (`SiteConfig`
   em `lib/sites.ts`). Slug desconhecido → 404. `publicado=false` → 404.
-- **Tipos de negócio**: `sites.tipo` escolhe o render. `barbearia` pronto;
-  `unha`/`sobrancelha`/`cilios`/`salao` — componentes próprios no mesmo padrão.
+- **Tipos de negócio**: `sites.tipo` escolhe o render. `barbearia` (tema
+  escuro/dourado, Bebas Neue) e `beleza` (tema claro champagne/marfim,
+  Cormorant Garamond) prontos — mesma engenharia, identidades próprias.
+- **Novos campos no config**: `logo` (arquivo/URL do monograma),
+  `servicos[].categoria` (agrupa em menu editorial), `servicos[].descricao`,
+  `avaliacoes.print` (depoimento em imagem), `fotos.excluir` (arquivos
+  enviados que não entram na galeria), `videos[].destaque` (vídeo principal
+  da seção de história).
+- `--logo <arquivo>` sobe o monograma pra `site-assets/<slug>/logo.<ext>`;
+  no config, `"logo": "logo.jpg"` resolve pro mesmo destino.
 - **Legado**: slug sem linha em `sites` cai no mecanismo antigo
   (`leads.dados.siteSlug` → `lead_outputs.conteudo`), então sites antigos
   gerados por IA continuam servidos.
@@ -44,7 +58,9 @@ node ../../scripts/apply-site.mjs \
    já linka pro site novo.
 
 Exemplo completo de config: `site-templates/configs/barbearia-vianna.json`
-(horarios, servicos, historia, avaliacoes, faq, seo, videos, booking).
+(horarios, servicos, historia, avaliacoes, faq, seo, videos, booking) e
+`site-templates/configs/espaco-karine-branco.json` (beleza: categorias de
+serviço, profissionais, depoimento em print, FAQ real do carrossel).
 
 ## Componentes 21st.dev utilizados
 

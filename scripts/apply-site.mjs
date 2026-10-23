@@ -172,6 +172,13 @@ if (args.logo) {
 } else if (override.logo) {
   config.logo = /^https?:/.test(override.logo) ? override.logo : `${publicBase}/${slug}/${override.logo}`;
 }
+// avaliacoes.print: depoimento em imagem (URL absoluta ou nome de arquivo
+// publicado em site-assets/<slug>/ — ex.: print de elogio no WhatsApp).
+if (override.avaliacoes?.print) {
+  config.avaliacoes.print = /^https?:/.test(override.avaliacoes.print)
+    ? override.avaliacoes.print
+    : `${publicBase}/${slug}/${override.avaliacoes.print}`;
+}
 // hero: config vence (aceita URL absoluta ou nome de arquivo enviado em --assets);
 // fallback: primeiro arquivo que pareça capa, senão a primeira foto.
 const heroWanted = override.fotos?.hero;
@@ -181,9 +188,14 @@ const heroPick = heroWanted
       : fotos.find((f) => f.endsWith("/" + heroWanted) || f.endsWith(heroWanted)))
   : (fotos.find((f) => /equipe|hero|capa|cover|team/i.test(f)) ?? fotos[0]);
 if (heroWanted && !heroPick) console.log(`  · aviso: hero "${heroWanted}" não achado nos assets`);
+// fotos.excluir: nomes de arquivo enviados que não entram no masonry
+// (ex.: print de depoimento usado só na seção de avaliações).
+const excluir = new Set(
+  (override.fotos?.excluir ?? []).map((n) => `${publicBase}/${slug}/${n}`),
+);
 config.fotos = {
   hero: heroPick,
-  galeria: fotos.length ? fotos.filter((f) => f !== heroPick) : (override.fotos?.galeria ?? []),
+  galeria: fotos.length ? fotos.filter((f) => f !== heroPick && !excluir.has(f)) : (override.fotos?.galeria ?? []),
 };
 if (videos.length || override.videos) {
   const meta = override.videos ?? [];
