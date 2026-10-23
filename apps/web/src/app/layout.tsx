@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, THEME_COOKIE } from "@/lib/i18n/shared";
 import "@fontsource-variable/dm-sans";
@@ -69,8 +70,30 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang={htmlLang} data-theme={theme}>
       <body>
+        {/* Google Tag Manager (noscript) — logo após a abertura do <body>. */}
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-KG2R7LSQ"
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+            title="Google Tag Manager"
+          />
+        </noscript>
         <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
         {children}
+        {/* Google Tag Manager — injetado no <head> o mais alto possível. */}
+        <Script
+          id="gtm"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-KG2R7LSQ');`,
+          }}
+        />
       </body>
     </html>
   );

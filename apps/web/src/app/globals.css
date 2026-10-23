@@ -405,6 +405,12 @@ select option { background: var(--panel); color: var(--white); }
 .faq-list summary > svg { color: var(--violet-light); transition: transform .2s; }
 .faq-list details[open] summary > svg { transform: rotate(180deg); }
 .faq-list details > p { font-size: 12px; color: var(--muted); padding-bottom: 24px; line-height: 1.9; }
+/* FAQ em seção clara: --white é texto claro (tema dark) — inverte pro ink do papel. */
+.light-section .faq-list { border-top-color: color-mix(in srgb, var(--paper-ink) 12%, transparent); }
+.light-section .faq-list details { border-bottom-color: color-mix(in srgb, var(--paper-ink) 12%, transparent); }
+.light-section .faq-list summary { color: var(--paper-ink); }
+.light-section .faq-list summary > svg { color: var(--violet); }
+.light-section .faq-list details > p { color: color-mix(in srgb, var(--paper-ink) 62%, transparent); }
 .final-cta { position: relative; overflow: hidden; isolation: isolate; padding-block: 110px; text-align: center; background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--violet) 20%, transparent), transparent 65%), var(--ink); }
 .final-cta .eyebrow { font-size: 8px; }
 .final-cta h2 { font-size: clamp(36px, 4.5vw, 58px); line-height: 1.2; }
@@ -675,6 +681,14 @@ select option { background: var(--panel); color: var(--white); }
   .final-cta p { font-size: 12px; max-width: 260px; margin-inline: auto; line-height: 1.8; }
   .final-cta .button { font-size: 11px; padding-inline: 18px; }
   .final-note { font-size: 8px; }
+  .cta-benefits { flex-direction: column; align-items: center; gap: 10px; margin-top: 22px; }
+  .cta-plans { grid-template-columns: 1fr; max-width: 340px; gap: 9px; }
+  /* Linha compacta: nome + cta à esquerda, preço à direita. */
+  .cta-plan { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; padding: 13px 15px; }
+  .cta-plan strong { font-size: 12px; }
+  .cta-plan-price { font-size: 14px; margin-left: auto; text-align: right; }
+  .cta-plan em { margin-top: 0; font-size: 10px; }
+  .cta-wordmark { margin: 44px 0 -60px; font-size: clamp(64px, 21vw, 110px); }
   .footer { padding-top: 35px; padding-bottom: 95px; }
   .footer-top { flex-wrap: wrap; gap: 30px 60px; padding-bottom: 30px; }
   .footer-top > div:first-child { flex-basis: 100%; }
