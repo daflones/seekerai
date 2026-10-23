@@ -5,7 +5,7 @@
    Classes CSS aceitam prefixo `ns` pra cada tema aplicar o seu. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { animate, motion, useInView, useReducedMotion } from "framer-motion";
 import { gsap } from "gsap";
 import { Play } from "lucide-react";
 import type { SiteConfig, SiteServico } from "@/lib/sites";
@@ -104,21 +104,23 @@ export function Spotlight({ children, className = "" }: { children: React.ReactN
   );
 }
 
-/* Contador animado (ex.: nota 5.0) */
+/* Contador animado (ex.: nota 5.0) — dispara quando o elemento entra
+   na viewport (useInView é mais confiável que ScrollTrigger no mobile). */
 export function CountUp({ to }: { to: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const reduced = useReducedMotion();
+  const inView = useInView(ref, { once: true, amount: 0.6 });
   useEffect(() => {
     const el = ref.current;
-    if (!el || reduced) { if (el) el.textContent = to.toFixed(1); return; }
-    const obj = { v: 0 };
-    const tween = gsap.to(obj, {
-      v: to, duration: 1.6, ease: "power3.out",
-      scrollTrigger: { trigger: el, start: "top 88%", once: true },
-      onUpdate: () => { el.textContent = obj.v.toFixed(1); },
+    if (!el) return;
+    if (reduced) { el.textContent = to.toFixed(1); return; }
+    if (!inView) return;
+    const controls = animate(0, to, {
+      duration: 1.6, ease: EASE,
+      onUpdate: (v) => { el.textContent = v.toFixed(1); },
     });
-    return () => { tween.kill(); };
-  }, [to, reduced]);
+    return () => controls.stop();
+  }, [inView, to, reduced]);
   return <span ref={ref}>0.0</span>;
 }
 
@@ -132,7 +134,10 @@ export function VideoCard({ v, tall, reel, ns = "bshop" }: {
   return (
     <div className={`${ns}-video${tall ? " tall" : ""}${reel ? " reel" : ""}`}>
       <div className={`${ns}-video-frame`}>
-        <video ref={videoRef} src={v.src} controls={playing} playsInline preload="metadata"
+        {/* #t=0.08: o browser mostra o frame de ~80ms como poster —
+            sem isso o card fica preto até os metadados carregarem. */}
+        <video ref={videoRef} src={`${v.src}#t=0.08`} controls={playing} playsInline preload="metadata"
+          onLoadedMetadata={(e) => { const v2 = e.currentTarget; if (v2.currentTime === 0) v2.currentTime = 0.08; }}
           onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
         {!playing && (
           <button className={`${ns}-video-play`} aria-label={`Assistir: ${v.titulo}`}
