@@ -21,6 +21,7 @@ const leadItem = z.object({
   instagram: z.string().max(200).nullish(),
   lat: z.number().nullish(),
   lng: z.number().nullish(),
+  pais: z.string().max(2).nullish(),
   siteCheck: z.object({
     estado: z.enum(["bom", "ok", "desatualizado", "fora"]),
     sinais: z.array(z.string().max(120)).max(8),
@@ -46,6 +47,7 @@ const leadSchema = z.object({
   instagram: z.string().max(200).nullish(),
   lat: z.number().nullish(),
   lng: z.number().nullish(),
+  pais: z.string().max(2).nullish(),
   dados: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -94,7 +96,10 @@ export async function POST(request: NextRequest) {
       instagram: item.instagram ?? null,
       lat: item.lat ?? null,
       lng: item.lng ?? null,
-      dados: item.siteCheck ? { siteCheck: item.siteCheck } : {},
+      dados: {
+        ...(item.siteCheck ? { siteCheck: item.siteCheck } : {}),
+        ...(item.pais ? { pais: item.pais } : {}),
+      },
     }));
     // place_id nulo nunca colide; unique (user_id, place_id) ignora duplicados.
     const { data: saved, error: bulkError } = await session.supabase
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest) {
     instagram: b.instagram ?? null,
     lat: b.lat ?? null,
     lng: b.lng ?? null,
-    dados: b.dados ?? {},
+    dados: { ...(b.dados ?? {}), ...(b.pais ? { pais: b.pais } : {}) },
   };
 
   // place_id nulo nunca colide; quando presente, o unique (user_id, place_id)

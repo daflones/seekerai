@@ -32,6 +32,7 @@ const FIELD_MASK = [
   "places.businessStatus",
   "places.primaryTypeDisplayName",
   "places.regularOpeningHours.openNow",
+  "places.addressComponents",
   "places.photos",
 ].join(",");
 
@@ -59,6 +60,7 @@ interface NormalizedPlace {
   categoria: string | null;
   mapsUrl: string | null;
   imagem: string | null;
+  pais: string | null;
   lat: number | null;
   lng: number | null;
   whatsapp: boolean | null;
@@ -95,13 +97,20 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
   }
   return (Array.isArray(data.places) ? data.places : []).map((p) => {
     const place = isRecord(p) ? p : {};
+    // País/cidade/bairro saem dos addressComponents — alimenta o código de
+    // discagem correto pra verificação de WhatsApp em qualquer país.
+    const comps = (Array.isArray(place.addressComponents) ? place.addressComponents : [])
+      .filter(isRecord);
+    const comp = (...types: string[]) =>
+      comps.find((c) => Array.isArray(c.types) && types.some((t) => c.types.includes(t)));
     return {
       id: asString(place.id, 300),
       nome: isRecord(place.displayName) ? asString(place.displayName.text) : null,
       endereco: asString(place.formattedAddress),
-      bairro: null,
-      cidade: null,
-      uf: null,
+      bairro: asString(comp("neighborhood", "sublocality_level_1")?.longText, 150),
+      cidade: asString(comp("locality", "postal_town", "administrative_area_level_2")?.longText, 150),
+      uf: asString(comp("administrative_area_level_1")?.shortText, 50),
+      pais: asString(comp("country")?.shortText, 2)?.toUpperCase() ?? null,
       // Internacional primeiro: vem com "+DDI" e alimenta a verificação de WhatsApp.
       telefone: asString(place.internationalPhoneNumber ?? place.nationalPhoneNumber),
       site: asString(place.websiteUri, 500),
@@ -173,6 +182,7 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
       imagem: asString(p.imageUrl, 800),
       lat: typeof loc.lat === "number" ? loc.lat : null,
       lng: typeof loc.lng === "number" ? loc.lng : null,
+      pais: asString(p.countryCode, 2)?.toUpperCase() ?? null,
       whatsapp: null,
       instagram: asString(p.instagramUrl ?? p.instagram, 300) ?? null,
     };
@@ -301,9 +311,11 @@ async function scanWebsites(places: NormalizedPlace[]): Promise<void> {
 
 /** Verifica em lote quais números têm WhatsApp via Evolution API (grátis). */
 async function checkWhatsapps(places: NormalizedPlace[], regionCode: string): Promise<void> {
-  const cc = callingCodeFor(regionCode);
+  // Código de discagem por estabelecimento (país detectado) — busca em
+  // qualquer país verifica o número certo, não só o da região do usuário.
+  const ccFor = (p: NormalizedPlace) => callingCodeFor(p.pais ?? regionCode);
   const numbers = places
-    .map((p) => toE164(p.telefone, cc))
+    .map((p) => toE164(p.telefone, ccFor(p)))
     .filter((d): d is string => d !== null);
   if (numbers.length === 0) return;
   try {
@@ -332,7 +344,7 @@ async function checkWhatsapps(places: NormalizedPlace[], regionCode: string): Pr
       }
     }
     for (const place of places) {
-      const phone = toE164(place.telefone, cc);
+      const phone = toE164(place.telefone, ccFor(place));
       place.whatsapp = phone ? exists.get(phone) ?? null : null;
     }
   } catch (err) {

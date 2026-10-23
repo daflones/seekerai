@@ -51,6 +51,7 @@ export interface PlaceResult {
   imagem: string | null;
   lat: number | null;
   lng: number | null;
+  pais?: string | null;
   whatsapp: boolean | null;
   instagram: string | null;
   siteCheck?: {
