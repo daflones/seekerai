@@ -1,0 +1,76 @@
+{
+  "tipo": "barbearia",
+  "marca": "Vianna",
+  "tagline": "Imagem Masculina",
+  "cidade": "Teresópolis · RJ",
+  "fotos": { "hero": "snapinsta-1792763437011.jpg" },
+  "contato": {
+    "instagram": "_barbeariavianna_"
+  },
+  "horarios": {
+    "0": null,
+    "1": [["09:00", "19:30"]],
+    "2": [["09:00", "19:30"]],
+    "3": [["09:00", "19:30"]],
+    "4": [["09:00", "19:30"]],
+    "5": [["09:00", "19:30"]],
+    "6": [["09:00", "19:30"]]
+  },
+  "horariosLabel": [
+    ["Segunda a sábado", "09:00 – 19:30"],
+    ["Domingo", "Fechado"]
+  ],
+  "servicos": [
+    { "nome": "Corte", "duracaoMin": 40, "preco": null },
+    { "nome": "Barba", "duracaoMin": 30, "preco": null },
+    { "nome": "Corte + Barba", "duracaoMin": 70, "preco": null },
+    { "nome": "Sobrancelha", "duracaoMin": 15, "preco": null },
+    { "nome": "Acabamento", "duracaoMin": 15, "preco": null },
+    { "nome": "Pigmentação", "duracaoMin": 30, "preco": null }
+  ],
+  "historia": {
+    "titulo": "5 anos de Vianna",
+    "paragrafos": [
+      "Uma história que começou com <strong>dois irmãos, um sonho</strong> e muita vontade de fazer acontecer. Anos aprendendo a profissão, conquistando clientes e entendendo que crescer significa continuar investindo e evoluindo.",
+      "Muita coisa mudou desde o começo: a estrutura, os equipamentos, os produtos e a experiência em cada atendimento. São 5 anos de cortes, resenhas, amizades, desafios e conquistas.",
+      "<strong>Não buscamos apenas atender mais. Buscamos atender melhor.</strong> Porque no final não é só sobre o corte — é sobre a experiência, o cuidado e o resultado que você leva daqui."
+    ]
+  },
+  "diferenciais": [
+    "Bons produtos e equipamentos de qualidade",
+    "Conforto e cuidado em cada serviço",
+    "Aceita cartão e pagamento por aproximação",
+    "Ambiente para toda a família",
+    "Banheiro no local"
+  ],
+  "avaliacoes": {
+    "nota": 5,
+    "total": 137,
+    "fonte": "Google",
+    "itens": [
+      { "autor": "Pedro Santos", "nota": 5, "texto": "Todos os barbeiros muito educados e prestativos, cortam muito bem.", "quando": "há 5 dias" },
+      { "autor": "Valter Fontenelet", "nota": 5, "texto": "Sempre bem recebido com alegria, carinho e amor! Sucesso pra vocês.", "quando": "há 6 dias" },
+      { "autor": "Luciana Carneiro", "nota": 5, "texto": "Excelente atendimento.", "quando": "há 6 dias" },
+      { "autor": "Marcio Moura", "nota": 5, "texto": "Equipe nota 10.", "quando": "há 1 semana" }
+    ]
+  },
+  "faq": [
+    { "q": "Preciso agendar ou posso só chegar?", "a": "Atendemos por ordem de chegada das 9h às 19h30 — mas agendar pelo WhatsApp garante seu horário sem espera." },
+    { "q": "Quais formas de pagamento vocês aceitam?", "a": "Cartão de crédito, débito e pagamento por aproximação (NFC)." },
+    { "q": "Posso levar meu filho?", "a": "Pode! O espaço é preparado para receber toda a família." },
+    { "q": "Vocês abrem domingo?", "a": "Não — atendemos de segunda a sábado, das 9h às 19h30." }
+  ],
+  "videos": [
+    { "titulo": "Cada detalhe conta", "descricao": "Bons produtos, equipamentos de qualidade e cuidado em cada serviço." },
+    { "titulo": "5 anos de Vianna", "descricao": "Gratidão à equipe e aos clientes por esses anos compartilhados." },
+    { "titulo": "Nossa história", "descricao": "De dois irmãos e um sonho — a uma equipe que atende a cidade há 5 anos." },
+    { "titulo": "Um dia na barbearia", "descricao": "A rotina, o ambiente e a experiência Vianna." },
+    { "titulo": "Cortes para toda a família", "descricao": "Até os menores clientes saem satisfeitos." },
+    { "titulo": "Vianna em ação", "descricao": "Nossos barbeiros em atendimento." }
+  ],
+  "booking": { "slotMin": 30, "diasFuturos": 14, "antecedenciaMin": 30 },
+  "seo": {
+    "title": "Barbearia Vianna — Imagem Masculina | Teresópolis RJ",
+    "description": "Cortes, barba e cuidado masculino em Teresópolis. 5.0 no Google com 137 avaliações. Agende pelo WhatsApp em 30 segundos."
+  }
+}
