@@ -200,26 +200,28 @@ function systemPromptFor(action: string, lang: string): string {
   }
 }
 
-/** Gera imagem via OpenRouter; se falhar, cai para a NVIDIA. Retorna data URL ou null. */
+/** Gera imagem via OpenRouter; se falhar (ou não houver chave), cai pra NVIDIA. */
 async function generateSiteImage(
-  apiKey: string,
+  apiKey: string | null,
   imagePrompt: string,
 ): Promise<string | null> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
-      "X-Title": "SeekerAi",
-    },
-    body: JSON.stringify({
-      model: IMAGE_MODEL,
-      modalities: ["image", "text"],
-      messages: [{ role: "user", content: imagePrompt }],
-    }),
-    signal: AbortSignal.timeout(90_000),
-  }).catch(() => null);
+  const res = apiKey
+    ? await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+        "X-Title": "SeekerAi",
+      },
+      body: JSON.stringify({
+        model: IMAGE_MODEL,
+        modalities: ["image", "text"],
+        messages: [{ role: "user", content: imagePrompt }],
+      }),
+      signal: AbortSignal.timeout(90_000),
+    }).catch(() => null)
+    : null;
   if (res?.ok) {
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     const choices = Array.isArray(data.choices) ? data.choices : [];
@@ -232,7 +234,7 @@ async function generateSiteImage(
         if (typeof url === "string") return url;
       }
     }
-  } else {
+  } else if (apiKey) {
     console.error("[site-image] openrouter falhou:", res?.status ?? "network");
   }
   return nvidiaImage(imagePrompt);
@@ -470,44 +472,67 @@ const CONFIG_PATCH_SYSTEM = [
 ].join("\n");
 
 async function configPatchFromAi(
-  apiKey: string,
+  apiKey: string | null,
   lead: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
+): Promise<{ patch: Record<string, unknown>; modelo: string }> {
   const facts = {
     nome: lead.nome, categoria: lead.categoria, cidade: lead.cidade, uf: lead.uf,
     endereco: lead.endereco, avaliacao: lead.avaliacao, totalAvaliacoes: lead.total_avaliacoes,
     instagram: lead.instagram, temWhatsApp: lead.whatsapp === "sim",
   };
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
-      "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi",
-    },
-    body: JSON.stringify({
-      model: SITE_MODEL,
-      max_tokens: 2500,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: CONFIG_PATCH_SYSTEM },
-        { role: "user", content: `Estabelecimento:\n${JSON.stringify(facts)}` },
-      ],
-    }),
-    signal: AbortSignal.timeout(90_000),
-  }).catch(() => null);
-  if (!res?.ok) {
-    console.error("[site-config] openrouter falhou:", res?.status ?? "network");
-    return {};
+  const userContent = `Estabelecimento:\n${JSON.stringify(facts)}`;
+
+  // OpenRouter primeiro; NVIDIA gratuita se falhar ou não houver chave.
+  let content: unknown = null;
+  let modelo = SITE_MODEL;
+  if (apiKey) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
+        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi",
+      },
+      body: JSON.stringify({
+        model: SITE_MODEL,
+        max_tokens: 2500,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: CONFIG_PATCH_SYSTEM },
+          { role: "user", content: userContent },
+        ],
+      }),
+      signal: AbortSignal.timeout(90_000),
+    }).catch(() => null);
+    if (res?.ok) {
+      const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+      const choices = data && Array.isArray(data.choices) ? data.choices : [];
+      content = isRecord(choices[0]) && isRecord(choices[0].message)
+        ? choices[0].message.content : null;
+    } else {
+      console.error("[site-config] openrouter falhou:", res?.status ?? "network");
+    }
   }
-  const data = await res.json().catch(() => null) as Record<string, unknown> | null;
-  const choices = data && Array.isArray(data.choices) ? data.choices : [];
-  const content = isRecord(choices[0]) && isRecord(choices[0].message)
-    ? choices[0].message.content : null;
-  if (typeof content !== "string") return {};
+  if (typeof content !== "string" || !content.trim()) {
+    const nv = await nvidiaChat(CONFIG_PATCH_SYSTEM, userContent, 2500, 120_000);
+    const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
+    const nvContent = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
+      ? nvChoices[0].message.content : null;
+    if (typeof nvContent === "string" && nvContent.trim()) {
+      content = nvContent;
+      modelo = NVIDIA_TEXT_MODEL;
+      console.log("[site-config] respondido via NVIDIA (fallback)");
+    }
+  }
+  if (typeof content !== "string") return { patch: {}, modelo: "base" };
   try {
-    return sanitizeConfigPatch(JSON.parse(content.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim()));
+    return {
+      patch: sanitizeConfigPatch(
+        JSON.parse(content.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim()),
+      ),
+      modelo,
+    };
   } catch {
-    return {};
+    return { patch: {}, modelo: "base" };
   }
 }
 
@@ -532,7 +557,7 @@ a{display:inline-block;padding:12px 26px;border-radius:99px;background:#c9a869;c
  */
 async function publishPremiumSite(
   db: ReturnType<typeof serviceClient>,
-  apiKey: string,
+  apiKey: string | null,
   leadId: string,
   context: Record<string, unknown>,
 ): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number }> {
@@ -596,10 +621,9 @@ async function publishPremiumSite(
     }
   }
 
-  // 3) SiteConfig: base determinística + patch de IA (paralelo às imagens seria
-  // ideal, mas o modelo é rápido — ~20s; mantém o código linear e legível).
+  // 3) SiteConfig: base determinística + patch de IA (OpenRouter → NVIDIA).
   const config = baseSiteConfig(lead, tipo);
-  const patch = await configPatchFromAi(apiKey, lead);
+  const { patch, modelo } = await configPatchFromAi(apiKey, lead);
   Object.assign(config, patch);
   if (patch.seo) config.seo = { ...(isRecord(config.seo) ? config.seo : {}), ...patch.seo };
   config.fotos = {
@@ -620,7 +644,7 @@ async function publishPremiumSite(
     nome,
     siteUrl: `/site/${slug}`,
     hero: publicUrls[0]?.url ?? null,
-    modelo: SITE_MODEL,
+    modelo,
     geradas: publicUrls.filter((x) => !x.real).length,
     reais: publicUrls.filter((x) => x.real).length,
   };
@@ -656,7 +680,11 @@ Deno.serve(async (req) => {
     });
 
     try {
-      const apiKey = await requireSecret("OPENROUTER_API_KEY");
+      // generate_site não exige OpenRouter — a NVIDIA assume texto e imagem
+      // quando a chave falta ou o provedor falha. Demais ações ainda exigem.
+      const apiKey = action === "generate_site"
+        ? await getSecret("OPENROUTER_API_KEY")
+        : await requireSecret("OPENROUTER_API_KEY");
       const context = isRecord(body.context) ? body.context : {};
 
       // Só o prompt — a pessoa copia e usa na IA que quiser (grátis).
