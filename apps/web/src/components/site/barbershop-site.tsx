@@ -129,6 +129,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [bookOpen, setBookOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [bk, setBk] = useState<Booking>({ servico: null, profissional: null, data: null, hora: null, nome: "", telefone: "" });
   const [erro, setErro] = useState("");
@@ -226,18 +227,19 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // ---------- lightbox: scroll-lock + Escape (padrão masonry-lightbox) ----------
+  // ---------- scroll-lock + Escape para lightbox e modal de agendamento ----------
+  const overlayOpen = lightbox !== null || bookOpen;
   useEffect(() => {
-    if (lightbox === null) return;
+    if (!overlayOpen) return;
     const sbw = window.innerWidth - document.documentElement.clientWidth;
     const prevOverflow = document.body.style.overflow;
     const prevPad = document.body.style.paddingRight;
     document.body.style.overflow = "hidden";
     if (sbw > 0) document.body.style.paddingRight = `${sbw}px`;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightbox(null);
-      if (e.key === "ArrowRight") setLightbox((i) => (i === null ? null : (i + 1) % galeria.length));
-      if (e.key === "ArrowLeft") setLightbox((i) => (i === null ? null : (i - 1 + galeria.length) % galeria.length));
+      if (e.key === "Escape") { setLightbox(null); setBookOpen(false); }
+      if (lightbox !== null && e.key === "ArrowRight") setLightbox((i) => (i === null ? null : (i + 1) % galeria.length));
+      if (lightbox !== null && e.key === "ArrowLeft") setLightbox((i) => (i === null ? null : (i - 1 + galeria.length) % galeria.length));
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -245,14 +247,13 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       document.body.style.paddingRight = prevPad;
       window.removeEventListener("keydown", onKey);
     };
-  }, [lightbox !== null, galeria.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [overlayOpen, galeria.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---------- booking flow ----------
+  // ---------- booking flow (modal — a reserva acontece no fim da narrativa) ----------
   const stepsTotal = hasPros ? 5 : 4;
-  const goBook = (servico?: SiteServico) => {
+  const openBook = (servico?: SiteServico) => {
     if (servico) setBk((b) => ({ ...b, servico }));
-    setStep(0); setErro("");
-    scrollTo("#agendar");
+    setStep(0); setErro(""); setBookOpen(true);
   };
   const dataStep = hasPros ? 2 : 1;
   const horaStep = hasPros ? 3 : 2;
@@ -292,6 +293,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
   return (
     <div className="bshop" ref={rootRef}>
+      <div className="bshop-ambient" aria-hidden><i className="orb-a" /><i className="orb-b" /><i className="orb-c" /></div>
       <div className="bshop-grain" aria-hidden />
       <motion.div className="bshop-progress" style={{ scaleX: scrollYProgress }} aria-hidden />
       {cfg.seo && (
@@ -311,12 +313,11 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           <span className="bshop-logo-mark">{marca[0]}</span>{marca.toUpperCase()}
         </a>
         <div className="bshop-nav-links">
-          <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
-          <a href="#galeria" onClick={anchor("#galeria")}>Galeria</a>
           {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>História</a>}
-          <a href="#agendar" onClick={anchor("#agendar")}>Agendar</a>
+          <a href="#galeria" onClick={anchor("#galeria")}>Galeria</a>
+          <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
           <a href="#contato" onClick={anchor("#contato")}>Contato</a>
-          <a className="bshop-nav-cta" href="#agendar" onClick={anchor("#agendar")}>Agendar horário</a>
+          <button className="bshop-nav-cta" onClick={() => openBook()}>Agendar horário</button>
         </div>
         <button className="bshop-nav-burger" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -327,11 +328,11 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           <motion.div className="bshop-mobile-menu"
             initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25, ease: EASE }}>
-            <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
-            <a href="#galeria" onClick={anchor("#galeria")}>Galeria</a>
             {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>História</a>}
-            <a href="#agendar" onClick={anchor("#agendar")}>Agendar</a>
+            <a href="#galeria" onClick={anchor("#galeria")}>Galeria</a>
+            <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
             <a href="#contato" onClick={anchor("#contato")}>Contato</a>
+            <button className="bshop-mobile-cta" onClick={() => { setMenuOpen(false); openBook(); }}>Agendar horário</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -370,12 +371,12 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.9, ease: EASE }}>
               <Magnetic>
-                <button className="bshop-btn bshop-btn-primary" onClick={() => goBook()}>
+                <button className="bshop-btn bshop-btn-primary" onClick={() => openBook()}>
                   <Scissors size={16} /> Agendar meu horário
                 </button>
               </Magnetic>
               <Magnetic>
-                <a className="bshop-btn bshop-btn-ghost" href="#servicos" onClick={anchor("#servicos")}>Ver serviços</a>
+                <a className="bshop-btn bshop-btn-ghost" href="#historia" onClick={anchor("#historia")}>Nossa história</a>
               </Magnetic>
             </motion.div>
           </div>
@@ -401,39 +402,31 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </div>
       </div>
 
-      {/* ---------- SERVIÇOS ---------- */}
-      <section className="bshop-section" id="servicos">
-        <div className="bshop-wrap">
-          <div className="bshop-section-head">
-            <FadeUp y={16}><span className="bshop-eyebrow">Serviços</span></FadeUp>
-            <h2 className="bshop-h2">
-              <RevealText text="O que a gente faz" /> <em><RevealText text="de melhor" delay={0.25} /></em>
-            </h2>
+      {/* ---------- HISTÓRIA + VÍDEOS (a narrativa vem antes da vitrine) ---------- */}
+      {(cfg.historia || (cfg.videos?.length ?? 0) > 0) && (
+        <section className="bshop-section" id="historia">
+          <div className="bshop-wrap">
+            <div className="bshop-story">
+              <div className="bshop-story-text">
+                <div className="bshop-section-head">
+                  <FadeUp y={16}><span className="bshop-eyebrow">Nossa história</span></FadeUp>
+                  <h2 className="bshop-h2"><RevealText text={cfg.historia?.titulo ?? "De onde viemos"} /></h2>
+                </div>
+                {(cfg.historia?.paragrafos ?? []).map((p, i) => (
+                  <FadeUp key={i} delay={i * 0.08}><p dangerouslySetInnerHTML={{ __html: p }} /></FadeUp>
+                ))}
+              </div>
+              <div className="bshop-videos">
+                {(cfg.videos ?? []).map((v, i) => (
+                  <FadeUp key={i} delay={i * 0.1}>
+                    <VideoCard v={v} />
+                  </FadeUp>
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="bshop-services">
-            {(cfg.servicos ?? []).map((s, i) => (
-              <motion.article key={s.nome} className="bshop-service-wrap"
-                initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
-                whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                viewport={{ once: true, margin: "-8% 0px" }}
-                transition={{ duration: 0.6, delay: (i % 6) * 0.07, ease: EASE }}>
-                <Spotlight className="bshop-service">
-                  <h3>{s.nome}</h3>
-                  <div className="bshop-service-meta">
-                    {s.duracaoMin && <span><Clock size={11} style={{ verticalAlign: -1 }} /> ~{s.duracaoMin} min</span>}
-                  </div>
-                  <div className="bshop-service-price">
-                    {s.preco ? <strong>{fmtMoney.format(s.preco)}</strong> : <span className="ask">Valor no balcão</span>}
-                    <button className="bshop-service-book" onClick={() => goBook(s)}>
-                      Agendar <ArrowRight size={13} />
-                    </button>
-                  </div>
-                </Spotlight>
-              </motion.article>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ---------- GALERIA (masonry-lightbox adaptado: @ayushmxxn) ---------- */}
       {galeria.length > 0 && (
@@ -464,31 +457,37 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </section>
       )}
 
-      {/* ---------- HISTÓRIA + VÍDEOS ---------- */}
-      {(cfg.historia || (cfg.videos?.length ?? 0) > 0) && (
-        <section className="bshop-section" id="historia">
-          <div className="bshop-wrap">
-            <div className="bshop-story">
-              <div className="bshop-story-text">
-                <div className="bshop-section-head">
-                  <FadeUp y={16}><span className="bshop-eyebrow">Nossa história</span></FadeUp>
-                  <h2 className="bshop-h2"><RevealText text={cfg.historia?.titulo ?? "De onde viemos"} /></h2>
-                </div>
-                {(cfg.historia?.paragrafos ?? []).map((p, i) => (
-                  <FadeUp key={i} delay={i * 0.08}><p dangerouslySetInnerHTML={{ __html: p }} /></FadeUp>
-                ))}
-              </div>
-              <div className="bshop-videos">
-                {(cfg.videos ?? []).map((v, i) => (
-                  <FadeUp key={i} delay={i * 0.1}>
-                    <VideoCard v={v} />
-                  </FadeUp>
-                ))}
-              </div>
-            </div>
+      {/* ---------- SERVIÇOS (vitrine — agendar só no fim, via modal) ---------- */}
+      <section className="bshop-section" id="servicos">
+        <div className="bshop-wrap">
+          <div className="bshop-section-head">
+            <FadeUp y={16}><span className="bshop-eyebrow">Serviços</span></FadeUp>
+            <h2 className="bshop-h2">
+              <RevealText text="O que a gente faz" /> <em><RevealText text="de melhor" delay={0.25} /></em>
+            </h2>
           </div>
-        </section>
-      )}
+          <div className="bshop-services">
+            {(cfg.servicos ?? []).map((s, i) => (
+              <motion.article key={s.nome} className="bshop-service-wrap"
+                initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
+                whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                viewport={{ once: true, margin: "-8% 0px" }}
+                transition={{ duration: 0.6, delay: (i % 6) * 0.07, ease: EASE }}>
+                <Spotlight className="bshop-service">
+                  <span className="bshop-service-num">{String(i + 1).padStart(2, "0")}</span>
+                  <h3>{s.nome}</h3>
+                  <div className="bshop-service-meta">
+                    {s.duracaoMin && <span><Clock size={11} style={{ verticalAlign: -1 }} /> ~{s.duracaoMin} min</span>}
+                  </div>
+                  <div className="bshop-service-price">
+                    {s.preco ? <strong>{fmtMoney.format(s.preco)}</strong> : <span className="ask">Valor no balcão</span>}
+                  </div>
+                </Spotlight>
+              </motion.article>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ---------- DIFERENCIAIS ---------- */}
       {(cfg.diferenciais?.length ?? 0) > 0 && (
@@ -543,125 +542,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </section>
       )}
 
-      {/* ---------- AGENDAMENTO ---------- */}
-      <section className="bshop-section bshop-booking" id="agendar">
-        <div className="bshop-wrap">
-          <div className="bshop-section-head center">
-            <FadeUp y={16}><span className="bshop-eyebrow">Agendamento</span></FadeUp>
-            <h2 className="bshop-h2"><RevealText text="Reserve em" /> <em><RevealText text="30 segundos" delay={0.25} /></em></h2>
-            <FadeUp delay={0.35}><p className="bshop-section-sub">Escolha, confirme e a gente te espera. A reserva chega direto no nosso WhatsApp.</p></FadeUp>
-          </div>
-          <FadeUp>
-            <div className="bshop-booking-card">
-              <div className="bshop-steps">{Array.from({ length: stepsTotal }).map((_, i) => <i key={i} className={i <= step ? "on" : ""} />)}</div>
-
-              <AnimatePresence mode="wait">
-                <motion.div key={step}
-                  initial={{ opacity: 0, x: reduced ? 0 : 26 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: reduced ? 0 : -26 }}
-                  transition={{ duration: 0.3, ease: EASE }}>
-
-                  {step === 0 && (
-                    <>
-                      <h3 className="bshop-step-title">1. Escolha o serviço</h3>
-                      <div className="bshop-pick-grid">
-                        {cfg.servicos.map((s) => (
-                          <button key={s.nome} className={`bshop-pick${bk.servico?.nome === s.nome ? " on" : ""}`}
-                            onClick={() => setBk((b) => ({ ...b, servico: s, hora: null }))}>
-                            <strong>{s.nome}</strong>
-                            <small>{s.duracaoMin ? `~${s.duracaoMin} min` : ""}{s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}</small>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  {hasPros && step === 1 && (
-                    <>
-                      <h3 className="bshop-step-title">2. Escolha o profissional</h3>
-                      <div className="bshop-pick-grid">
-                        <button className={`bshop-pick${bk.profissional === "Sem preferência" ? " on" : ""}`}
-                          onClick={() => setBk((b) => ({ ...b, profissional: "Sem preferência" }))}>
-                          <strong>Sem preferência</strong><small>Primeiro disponível</small>
-                        </button>
-                        {pros.map((p) => (
-                          <button key={p.nome} className={`bshop-pick${bk.profissional === p.nome ? " on" : ""}`}
-                            onClick={() => setBk((b) => ({ ...b, profissional: p.nome }))}>
-                            <strong>{p.nome}</strong><small>{p.especialidade ?? "Barbeiro"}</small>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  {step === dataStep && (
-                    <>
-                      <h3 className="bshop-step-title">{hasPros ? "3" : "2"}. Escolha a data</h3>
-                      <div className="bshop-days">
-                        {dias.map(({ d, aberto }) => (
-                          <button key={d.toISOString()} disabled={!aberto}
-                            className={`bshop-day${bk.data?.toDateString() === d.toDateString() ? " on" : ""}${aberto ? "" : " off"}`}
-                            onClick={() => aberto && setBk((b) => ({ ...b, data: d, hora: null }))}>
-                            <div className="dow">{DOWS[d.getDay()]}</div>
-                            <div className="num">{d.getDate()}</div>
-                            <div className="mon">{fmtDate.format(d).split(" ")[2] ?? ""}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  {step === horaStep && (
-                    <>
-                      <h3 className="bshop-step-title">{hasPros ? "4" : "3"}. Escolha o horário</h3>
-                      {slots.length === 0
-                        ? <p className="bshop-book-error">Sem horários livres nesse dia — escolhe outra data.</p>
-                        : <div className="bshop-slots">
-                            {slots.map((h) => (
-                              <button key={h} className={`bshop-slot${bk.hora === h ? " on" : ""}`}
-                                onClick={() => setBk((b) => ({ ...b, hora: h }))}>{h}</button>
-                            ))}
-                          </div>}
-                    </>
-                  )}
-
-                  {step === finalStep && (
-                    <>
-                      <h3 className="bshop-step-title">{hasPros ? "5" : "4"}. Confirme no WhatsApp</h3>
-                      <dl className="bshop-summary">
-                        <div><dt>Serviço</dt><dd>{bk.servico?.nome}{bk.servico?.preco ? ` — ${fmtMoney.format(bk.servico.preco)}` : ""}</dd></div>
-                        {bk.profissional && bk.profissional !== "Sem preferência" && <div><dt>Profissional</dt><dd>{bk.profissional}</dd></div>}
-                        <div><dt>Data</dt><dd>{dataLabel}</dd></div>
-                        <div><dt>Horário</dt><dd>{bk.hora}</dd></div>
-                      </dl>
-                      <div className="bshop-field">
-                        <label htmlFor="bk-nome">Seu nome</label>
-                        <input id="bk-nome" value={bk.nome} onChange={(e) => setBk((b) => ({ ...b, nome: e.target.value }))} placeholder="Como te chamamos?" />
-                      </div>
-                      <div className="bshop-field">
-                        <label htmlFor="bk-tel">Seu WhatsApp (opcional)</label>
-                        <input id="bk-tel" type="tel" value={bk.telefone} onChange={(e) => setBk((b) => ({ ...b, telefone: e.target.value }))} placeholder="(21) 90000-0000" />
-                      </div>
-                    </>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-
-              {erro && <p className="bshop-book-error">{erro}</p>}
-              <div className="bshop-book-actions">
-                {step > 0
-                  ? <button className="bshop-btn-back" onClick={back}><ArrowLeft size={13} style={{ verticalAlign: -2 }} /> Voltar</button>
-                  : <span />}
-                <button className="bshop-btn bshop-btn-primary" onClick={next}>
-                  {step === finalStep ? <><MessageCircle size={15} /> Enviar no WhatsApp</> : <>Continuar <ArrowRight size={15} /></>}
-                </button>
-              </div>
-              <p className="bshop-book-msg">A mensagem é montada com suas escolhas — é só enviar e a gente confirma na hora.</p>
-            </div>
-          </FadeUp>
-        </div>
-      </section>
+      {/* ---------- AGENDAMENTO → modal (a reserva é o final da narrativa) ---------- */}
 
       {/* ---------- LOCALIZAÇÃO ---------- */}
       <section className="bshop-section" id="contato">
@@ -766,7 +647,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           <div className="bshop-footer-body" ref={footBodyRef}>
             <h2 className="bshop-footer-h2">Bora renovar<br />o <em>visual?</em></h2>
             <div className="bshop-footer-pills">
-              <Magnetic><a className="bshop-pill primary" href="#agendar" onClick={anchor("#agendar")}><Scissors size={15} /> Agendar agora</a></Magnetic>
+              <Magnetic><button className="bshop-pill primary" onClick={() => openBook()}><Scissors size={15} /> Agendar agora</button></Magnetic>
               {waNumber && <Magnetic><a className="bshop-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
               {cfg.contato.mapsUrl && <Magnetic><a className="bshop-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> Como chegar</a></Magnetic>}
               {cfg.contato.instagram && <Magnetic><a className="bshop-pill" href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
@@ -794,6 +675,137 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           target="_blank" rel="noopener" aria-label="Chamar no WhatsApp">
           <MessageCircle size={26} />
         </a>
+      )}
+
+      {/* ---------- Modal de agendamento (mesmo fluxo, estilo pills do footer) ---------- */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {bookOpen && (
+            <motion.div className="bshop-book-modal-bg"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={() => setBookOpen(false)}>
+              <motion.div className="bshop-booking-card bshop-book-modal"
+                initial={{ opacity: 0, y: 42, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 30, scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                onClick={(e) => e.stopPropagation()}>
+                <button className="bshop-modal-close" aria-label="Fechar" onClick={() => setBookOpen(false)}><X size={17} /></button>
+                <div className="bshop-book-modal-head">
+                  <span className="bshop-eyebrow">Agendamento</span>
+                  <h2 className="bshop-modal-h2">Reserve em <em>30 segundos</em></h2>
+                </div>
+                <div className="bshop-steps">{Array.from({ length: stepsTotal }).map((_, i) => <i key={i} className={i <= step ? "on" : ""} />)}</div>
+
+                <AnimatePresence mode="wait">
+                  <motion.div key={step}
+                    initial={{ opacity: 0, x: reduced ? 0 : 26 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: reduced ? 0 : -26 }}
+                    transition={{ duration: 0.3, ease: EASE }}>
+
+                    {step === 0 && (
+                      <>
+                        <h3 className="bshop-step-title">1. Escolha o serviço</h3>
+                        <div className="bshop-pick-grid">
+                          {cfg.servicos.map((s) => (
+                            <button key={s.nome} className={`bshop-pick${bk.servico?.nome === s.nome ? " on" : ""}`}
+                              onClick={() => setBk((b) => ({ ...b, servico: s, hora: null }))}>
+                              <strong>{s.nome}</strong>
+                              <small>{s.duracaoMin ? `~${s.duracaoMin} min` : ""}{s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}</small>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {hasPros && step === 1 && (
+                      <>
+                        <h3 className="bshop-step-title">2. Escolha o profissional</h3>
+                        <div className="bshop-pick-grid">
+                          <button className={`bshop-pick${bk.profissional === "Sem preferência" ? " on" : ""}`}
+                            onClick={() => setBk((b) => ({ ...b, profissional: "Sem preferência" }))}>
+                            <strong>Sem preferência</strong><small>Primeiro disponível</small>
+                          </button>
+                          {pros.map((p) => (
+                            <button key={p.nome} className={`bshop-pick${bk.profissional === p.nome ? " on" : ""}`}
+                              onClick={() => setBk((b) => ({ ...b, profissional: p.nome }))}>
+                              <strong>{p.nome}</strong><small>{p.especialidade ?? "Barbeiro"}</small>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {step === dataStep && (
+                      <>
+                        <h3 className="bshop-step-title">{hasPros ? "3" : "2"}. Escolha a data</h3>
+                        <div className="bshop-days">
+                          {dias.map(({ d, aberto }) => (
+                            <button key={d.toISOString()} disabled={!aberto}
+                              className={`bshop-day${bk.data?.toDateString() === d.toDateString() ? " on" : ""}${aberto ? "" : " off"}`}
+                              onClick={() => aberto && setBk((b) => ({ ...b, data: d, hora: null }))}>
+                              <div className="dow">{DOWS[d.getDay()]}</div>
+                              <div className="num">{d.getDate()}</div>
+                              <div className="mon">{fmtDate.format(d).split(" ")[2] ?? ""}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {step === horaStep && (
+                      <>
+                        <h3 className="bshop-step-title">{hasPros ? "4" : "3"}. Escolha o horário</h3>
+                        {slots.length === 0
+                          ? <p className="bshop-book-error">Sem horários livres nesse dia — escolhe outra data.</p>
+                          : <div className="bshop-slots">
+                              {slots.map((h) => (
+                                <button key={h} className={`bshop-slot${bk.hora === h ? " on" : ""}`}
+                                  onClick={() => setBk((b) => ({ ...b, hora: h }))}>{h}</button>
+                              ))}
+                            </div>}
+                      </>
+                    )}
+
+                    {step === finalStep && (
+                      <>
+                        <h3 className="bshop-step-title">{hasPros ? "5" : "4"}. Confirme no WhatsApp</h3>
+                        <dl className="bshop-summary">
+                          <div><dt>Serviço</dt><dd>{bk.servico?.nome}{bk.servico?.preco ? ` — ${fmtMoney.format(bk.servico.preco)}` : ""}</dd></div>
+                          {bk.profissional && bk.profissional !== "Sem preferência" && <div><dt>Profissional</dt><dd>{bk.profissional}</dd></div>}
+                          <div><dt>Data</dt><dd>{dataLabel}</dd></div>
+                          <div><dt>Horário</dt><dd>{bk.hora}</dd></div>
+                        </dl>
+                        <div className="bshop-field">
+                          <label htmlFor="bk-nome">Seu nome</label>
+                          <input id="bk-nome" value={bk.nome} onChange={(e) => setBk((b) => ({ ...b, nome: e.target.value }))} placeholder="Como te chamamos?" />
+                        </div>
+                        <div className="bshop-field">
+                          <label htmlFor="bk-tel">Seu WhatsApp (opcional)</label>
+                          <input id="bk-tel" type="tel" value={bk.telefone} onChange={(e) => setBk((b) => ({ ...b, telefone: e.target.value }))} placeholder="(21) 90000-0000" />
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+
+                {erro && <p className="bshop-book-error">{erro}</p>}
+                <div className="bshop-book-actions">
+                  {step > 0
+                    ? <button className="bshop-btn-back" onClick={back}><ArrowLeft size={13} style={{ verticalAlign: -2 }} /> Voltar</button>
+                    : <span />}
+                  <button className="bshop-btn bshop-btn-primary" onClick={next}>
+                    {step === finalStep ? <><MessageCircle size={15} /> Enviar no WhatsApp</> : <>Continuar <ArrowRight size={15} /></>}
+                  </button>
+                </div>
+                <p className="bshop-book-msg">A mensagem é montada com suas escolhas — é só enviar e a gente confirma na hora.</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
 
       {/* ---------- Lightbox (portal + nav por setas) ---------- */}

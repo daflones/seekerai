@@ -61,9 +61,16 @@
 .bshop-nav-links a { font-size: 13.5px; font-weight: 600; color: var(--bs-muted); letter-spacing: .04em; transition: color .2s; }
 .bshop-nav-links a:hover { color: var(--bs-text); }
 .bshop-nav-cta {
-  padding: 10px 20px; border-radius: 999px;
+  padding: 10px 20px; border-radius: 999px; border: 0; cursor: pointer;
   background: linear-gradient(150deg, var(--bs-accent-2), var(--bs-accent));
   color: var(--bs-accent-ink); font-weight: 800; font-size: 13px; letter-spacing: .05em;
+  transition: transform .2s, box-shadow .2s;
+}
+.bshop-nav-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 26px -10px #c9a15c88; }
+.bshop-mobile-cta {
+  margin: 8px 4px 4px; padding: 14px; border-radius: 12px; border: 0; cursor: pointer;
+  background: linear-gradient(150deg, var(--bs-accent-2), var(--bs-accent));
+  color: var(--bs-accent-ink); font-weight: 800; font-size: 15px;
 }
 .bshop-nav-burger { display: none; background: none; border: 0; color: var(--bs-text); padding: 8px; cursor: pointer; }
 .bshop-mobile-menu { display: none; }
@@ -158,12 +165,17 @@
 }
 .bshop-service:hover { transform: translateY(-4px); border-color: var(--bs-line-2); background: var(--bs-panel-2); }
 .bshop-service h3 { font-family: var(--bs-font-display); font-size: 26px; letter-spacing: .06em; margin: 0; text-transform: uppercase; }
+.bshop-service-num {
+  position: absolute; top: 14px; right: 16px;
+  font-family: var(--bs-font-display); font-size: 30px; line-height: 1;
+  color: transparent; -webkit-text-stroke: 1px var(--bs-line-2);
+  transition: -webkit-text-stroke .3s;
+}
+.bshop-service:hover .bshop-service-num { -webkit-text-stroke: 1px var(--bs-accent); }
 .bshop-service-meta { display: flex; gap: 10px; font-size: 12.5px; color: var(--bs-muted); }
-.bshop-service-price { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 14px; }
+.bshop-service-price { margin-top: auto; display: flex; align-items: center; gap: 10px; padding-top: 14px; }
 .bshop-service-price strong { font-size: 20px; color: var(--bs-accent-2); font-weight: 800; }
 .bshop-service-price .ask { font-size: 12.5px; color: var(--bs-muted); }
-.bshop-service-book { font-size: 12.5px; font-weight: 800; color: var(--bs-accent-2); display: inline-flex; align-items: center; gap: 5px; }
-.bshop-service-book:hover { text-decoration: underline; }
 
 /* ---------- Galeria (masonry-lightbox adaptado) ---------- */
 .bshop-gallery { columns: 3; column-gap: 14px; }
@@ -263,8 +275,28 @@
 .bshop-review p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--bs-text); }
 .bshop-review footer { margin-top: auto; display: flex; justify-content: space-between; font-size: 12px; color: var(--bs-muted); }
 
-/* ---------- Agendamento ---------- */
-.bshop-booking { background: var(--bs-bg-2); border-block: 1px solid var(--bs-line); }
+/* ---------- Agendamento (modal) ---------- */
+.bshop-book-modal-bg {
+  position: fixed; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center;
+  background: #000000c9; backdrop-filter: blur(14px); padding: 20px;
+}
+.bshop-book-modal {
+  position: relative; width: min(640px, 100%); max-height: 88dvh; overflow-y: auto;
+  scrollbar-width: thin;
+}
+.bshop-modal-close {
+  position: absolute; top: 16px; right: 16px; z-index: 2;
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--bs-line-2);
+  background: #ffffff12; color: var(--bs-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.bshop-modal-close:hover { color: var(--bs-text); background: #ffffff22; }
+.bshop-book-modal-head { margin-bottom: 22px; }
+.bshop-modal-h2 {
+  font-family: var(--bs-font-display); font-size: clamp(30px, 5vw, 44px);
+  line-height: .95; margin: 0; text-transform: uppercase;
+}
+.bshop-modal-h2 em { font-style: normal; color: var(--bs-accent-2); }
 .bshop-booking-card {
   max-width: 720px; margin-inline: auto; border-radius: 24px;
   background: var(--bs-panel); border: 1px solid var(--bs-line-2);
@@ -427,6 +459,28 @@
   .bshop * { transition-duration: .01ms !important; }
 }
 
+/* ---------- Ambiente: orbs douradas flutuando atrás do conteúdo ---------- */
+.bshop-ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bshop-ambient i { position: absolute; border-radius: 50%; filter: blur(90px); }
+.bshop-ambient .orb-a {
+  width: 46vw; height: 46vw; left: -14vw; top: 10vh;
+  background: radial-gradient(circle, #c9a15c16, transparent 65%);
+  animation: bs-orb-a 26s ease-in-out infinite alternate;
+}
+.bshop-ambient .orb-b {
+  width: 40vw; height: 40vw; right: -12vw; top: 46vh;
+  background: radial-gradient(circle, #e8c98a10, transparent 65%);
+  animation: bs-orb-b 32s ease-in-out infinite alternate;
+}
+.bshop-ambient .orb-c {
+  width: 34vw; height: 34vw; left: 30vw; top: 72vh;
+  background: radial-gradient(circle, #c9a15c0d, transparent 65%);
+  animation: bs-orb-a 38s ease-in-out infinite alternate-reverse;
+}
+@keyframes bs-orb-a { to { transform: translate(9vw, 14vh) scale(1.15); } }
+@keyframes bs-orb-b { to { transform: translate(-8vw, -12vh) scale(0.9); } }
+.bshop-hero, .bshop-marquee, .bshop-section { position: relative; z-index: 1; }
+
 /* ---------- Textura de filme / grain overlay ---------- */
 .bshop-grain {
   position: fixed; inset: -50%; z-index: 70; pointer-events: none;
@@ -499,7 +553,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bshop-grain, .bshop-heart, .bshop-hero-scroll { animation: none !important; }
+  .bshop-grain, .bshop-heart, .bshop-hero-scroll, .bshop-ambient i { animation: none !important; }
 }
 
 @media (max-width: 640px) {
