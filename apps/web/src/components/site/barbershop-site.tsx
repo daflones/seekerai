@@ -13,6 +13,7 @@ import {
   Instagram, MapPin, Menu, MessageCircle, Phone, Play, Scissors, Sparkles, X,
 } from "lucide-react";
 import type { SiteConfig, SiteServico } from "@/lib/sites";
+import { ImageStreamHero } from "./image-stream-hero";
 import "./site.css";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
@@ -344,6 +345,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           {cfg.fotos.hero && <img ref={heroImgRef} src={cfg.fotos.hero} alt={`${cfg.nome} — equipe e ambiente`} />}
         </div>
         <div className="bshop-hero-content bshop-wrap">
+          <div className="bshop-hero-main">
           <motion.span className="bshop-eyebrow"
             initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: 0.15, ease: EASE }}>
@@ -380,6 +382,22 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               </Magnetic>
             </motion.div>
           </div>
+          </div>
+
+          {/* Foto emoldurada — a equipe inteira, sem crop (fundo vira ambiência) */}
+          {cfg.fotos.hero && (
+            <motion.figure className="bshop-hero-photo"
+              initial={{ opacity: 0, y: 40, rotate: 2.5, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
+              transition={{ duration: 1.1, delay: 0.45, ease: EASE }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={cfg.fotos.hero} alt={`Equipe da ${cfg.nome}`} />
+              <figcaption className="bshop-hero-photo-cap">
+                {cfg.avaliacoes && <span className="stars">★★★★★ {cfg.avaliacoes.nota.toFixed(1)}</span>}
+                <span>A equipe · {cfg.cidade ?? cfg.nome}</span>
+              </figcaption>
+            </motion.figure>
+          )}
         </div>
         <motion.div className="bshop-hero-scroll" aria-hidden
           animate={reduced ? {} : { y: [0, 8, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}>
@@ -425,6 +443,24 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {/* ---------- CORREDOR 3D (image-stream-hero do 21st.dev, adaptado) ---------- */}
+      {galeria.length > 0 && (
+        <section className="bshop-corridor" aria-label="Fotos da barbearia em movimento">
+          <ImageStreamHero
+            images={galeria.map((src, i) => ({ src, alt: `${cfg.nome} — foto ${i + 1}` }))}
+            cards={9}
+            speed={22}
+            className="bshop-corridor-stream">
+            <div className="bshop-corridor-overlay">
+              <FadeUp><span className="bshop-eyebrow">O dia a dia</span></FadeUp>
+              <h2 className="bshop-corridor-title">
+                <RevealText text="Cada corte conta" /> <em><RevealText text="uma história" delay={0.3} /></em>
+              </h2>
+            </div>
+          </ImageStreamHero>
         </section>
       )}
 
