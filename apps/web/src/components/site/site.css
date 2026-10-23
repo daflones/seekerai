@@ -6,7 +6,9 @@
    pills, giant text) adaptada a barbearias e negócios de beleza.
    ============================================================ */
 
-.bshop {
+/* Variáveis do tema — também aplicadas nos overlays de portal
+   (modal/lightbox montam no document.body, fora da div .bshop). */
+.bshop, .bshop-book-modal-bg, .bshop-lightbox {
   --bs-bg: #0b0908;
   --bs-bg-2: #12100d;
   --bs-panel: #17130f;
@@ -23,13 +25,17 @@
   --bs-radius: 18px;
   --bs-font-display: "Bebas Neue", "Archivo", sans-serif;
   --bs-font-body: "Manrope", "Inter", system-ui, sans-serif;
-  background: var(--bs-bg);
   color: var(--bs-text);
   font-family: var(--bs-font-body);
+}
+.bshop {
+  background: var(--bs-bg);
   min-height: 100dvh;
   overflow-x: clip;
   scroll-behavior: smooth;
 }
+.bshop-book-modal-bg *, .bshop-lightbox * { box-sizing: border-box; }
+.bshop-book-modal-bg button, .bshop-lightbox button { font-family: inherit; }
 .bshop * { box-sizing: border-box; }
 .bshop img, .bshop video { max-width: 100%; display: block; }
 .bshop a { color: inherit; text-decoration: none; }
