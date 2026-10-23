@@ -45,7 +45,9 @@ const MAX_GENERATED_IMAGES = 5;
 
 // Fallback NVIDIA (build.nvidia.com) — gratuito, OpenAI-compatible.
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
-const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "z-ai/glm-5.3-flash";
+// gpt-oss-20b: responde JSON direto em ~8s. GLM "flash" gasta ~140s em
+// reasoning_content e estoura o budget de ~150s da function.
+const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
 const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-labs/flux.2-klein-4b";
 
 /** Chat de texto na NVIDIA — mesmo formato OpenAI. Retorna o JSON ou null. */
@@ -134,7 +136,8 @@ async function enhanceImagePrompt(
       "Reply with ONLY the image prompt — no explanations.",
     ].filter(Boolean).join("\n"),
     userPrompt,
-    500,
+    // GLM gasta tokens em reasoning_content — folga pra resposta não truncar.
+    1500,
   ).catch(() => null);
   const choices = res && Array.isArray(res.choices) ? res.choices : [];
   const content = isRecord(choices[0]) && isRecord(choices[0].message)
@@ -357,13 +360,32 @@ function siteAssetPrompts(
   lead: { nome: string; categoria: string | null; cidade: string | null },
   tipo: "barbearia" | "beleza",
 ): string[] {
-  const biz = `"${lead.nome}", a ${lead.categoria ?? "local business"} in ${lead.cidade ?? "Brazil"}, Brazil`;
+  // Sem o nome literal do negócio e com categoria em inglês: modelos de
+  // imagem renderizam palavras do prompt como letreiro/embalagem na foto.
+  const CAT_EN: Record<string, string> = {
+    padaria: "bakery", barbearia: "barbershop", restaurante: "restaurant",
+    pizzaria: "pizzeria", "salão de beleza": "beauty salon", "salao de beleza": "beauty salon",
+    academia: "fitness gym", "clínica de estética": "aesthetics clinic", "clinica de estetica": "aesthetics clinic",
+    "loja de roupas": "clothing store", farmácia: "pharmacy", farmacia: "pharmacy",
+    "oficina mecânica": "auto repair shop", "oficina mecanica": "auto repair shop",
+    petshop: "pet shop", "pet shop": "pet shop", confeitaria: "patisserie",
+    café: "specialty coffee shop", cafeteria: "specialty coffee shop",
+    "estúdio de tatuagem": "tattoo studio", floricultura: "flower shop",
+    "consultório odontológico": "dental clinic", hamburgueria: "burger restaurant",
+    "açaí": "açaí bowl shop", sushi: "sushi restaurant", churrascaria: "brazilian steakhouse",
+    "estética automotiva": "car detailing studio", lavanderia: "laundromat",
+  };
+  const catKey = (lead.categoria ?? "").toLowerCase().trim();
+  const catEn = CAT_EN[catKey] ?? CAT_EN[catKey.replace(/\s*-\s*.*/, "")] ?? lead.categoria ?? "local business";
+  // Nem nome nem cidade no texto do prompt: qualquer substantivo próprio
+  // vira letreiro/marca d'água na imagem gerada.
+  const biz = `a Brazilian ${catEn}`;
   const direction = tipo === "barbearia"
     ? "Dark moody cinematic look: charcoal and graphite tones, warm amber rim light, subtle haze, brass and leather textures, premium barbershop atmosphere, shallow depth of field"
     : "Bright editorial look: ivory and champagne tones, soft natural window light, airy elegant surfaces, delicate gold accents, premium beauty-studio atmosphere, shallow depth of field";
   const scenes = [
     `wide establishing shot of the interior of ${biz}, hero image for the website, inviting composition with clear focal point`,
-    `elegant interior detail of ${biz} — the client chair/station and ambient decor, magazine-style composition`,
+    `elegant interior detail of ${biz} — the client chair or service station and ambient decor, magazine-style composition`,
     `close-up of the signature work at ${biz} — tools and craft in action, hands only, no faces`,
     `a finished result from ${biz} presented like a portfolio photograph, aspirational but believable`,
     `flat-lay of the products and materials used at ${biz}, arranged with generous negative space`,
@@ -371,7 +393,7 @@ function siteAssetPrompts(
   return scenes.map((scene) =>
     `Award-winning editorial commercial photograph: ${scene}. ${direction}. ` +
     "Photorealistic, shot on a 50mm lens, color-graded, high dynamic range. " +
-    "No text, no letters, no logos, no watermark, no visible faces."
+    "Strictly no readable text anywhere: no letters, words or numbers on signage, packaging, labels, fabrics, paper or surfaces. No logos, no watermark. No visible faces."
   );
 }
 
@@ -513,7 +535,7 @@ async function configPatchFromAi(
     }
   }
   if (typeof content !== "string" || !content.trim()) {
-    const nv = await nvidiaChat(CONFIG_PATCH_SYSTEM, userContent, 2500, 120_000);
+    const nv = await nvidiaChat(CONFIG_PATCH_SYSTEM, userContent, 3000, 90_000);
     const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
     const nvContent = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
       ? nvChoices[0].message.content : null;
@@ -583,6 +605,10 @@ async function publishPremiumSite(
 
   await ensureSiteBucket(db);
 
+  // Patch de config roda EM PARALELO com as imagens — são independentes,
+  // e a function tem ~150s de wall-clock no gateway.
+  const patchPromise = configPatchFromAi(apiKey, lead);
+
   // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
   const sources = await resolveLeadImageSources(lead, context);
   const publicUrls: { url: string; real: boolean }[] = [];
@@ -604,6 +630,10 @@ async function publishPremiumSite(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) }, tipo,
     ).slice(0, faltando);
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p)));
+    // Uma segunda chance pras que falharem — provedores falham intermitente.
+    await Promise.all(generated.map(async (img, i) => {
+      if (img === null) generated[i] = await generateSiteImage(apiKey, prompts[i]);
+    }));
     let i = 0;
     for (const img of generated) {
       if (!img) continue;
@@ -623,7 +653,7 @@ async function publishPremiumSite(
 
   // 3) SiteConfig: base determinística + patch de IA (OpenRouter → NVIDIA).
   const config = baseSiteConfig(lead, tipo);
-  const { patch, modelo } = await configPatchFromAi(apiKey, lead);
+  const { patch, modelo } = await patchPromise;
   Object.assign(config, patch);
   if (patch.seo) config.seo = { ...(isRecord(config.seo) ? config.seo : {}), ...patch.seo };
   config.fotos = {
