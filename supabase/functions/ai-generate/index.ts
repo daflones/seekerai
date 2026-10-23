@@ -49,6 +49,11 @@ const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 // reasoning_content e estoura o budget de ~150s da function.
 const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
 const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-labs/flux.2-klein-4b";
+// Modelos de visão pra descrever fotos reais — gemini pago primeiro;
+// free do OpenRouter cobre quando a conta está sem crédito.
+const VISION_MODELS = (optionalEnv("VISION_MODEL")
+  ?? "google/gemini-2.5-flash,google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free")
+  .split(",").map((s) => s.trim()).filter(Boolean);
 
 /** Chat de texto na NVIDIA — mesmo formato OpenAI. Retorna o JSON ou null. */
 async function nvidiaChat(
@@ -87,9 +92,9 @@ async function nvidiaChat(
 }
 
 /** Imagem na NVIDIA (genai/FLUX). Retorna data URL ou null. */
-async function nvidiaImage(prompt: string): Promise<string | null> {
+async function nvidiaImage(prompt: string, errors?: string[]): Promise<string | null> {
   const key = await getSecret("NVIDIA_API_KEY");
-  if (!key) return null;
+  if (!key) { errors?.push("nvidia:sem-chave"); return null; }
   const res = await fetch(`https://ai.api.nvidia.com/v1/genai/${NVIDIA_IMAGE_MODEL}`, {
     method: "POST",
     headers: {
@@ -98,7 +103,8 @@ async function nvidiaImage(prompt: string): Promise<string | null> {
       accept: "application/json",
     },
     body: JSON.stringify({
-      prompt: prompt.slice(0, 10_000),
+      // flux.2-klein rejeita prompt > 800 chars (422) — corta com folga.
+      prompt: prompt.slice(0, 790),
       width: 1024, height: 1024,
       cfg_scale: 1, samples: 1,
       seed: Math.floor(Math.random() * 2_147_483_647),
@@ -107,12 +113,15 @@ async function nvidiaImage(prompt: string): Promise<string | null> {
     signal: AbortSignal.timeout(120_000),
   }).catch(() => null);
   if (!res?.ok) {
-    console.error("[nvidia] imagem falhou:", res?.status ?? "network");
+    const body = res ? (await res.text().catch(() => "")).slice(0, 160) : "";
+    console.error("[nvidia] imagem falhou:", res?.status ?? "network", body);
+    errors?.push(`nvidia:${res?.status ?? "network"}${body ? ` ${body.slice(0, 120)}` : ""}`);
     return null;
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
   const b64 = isRecord(artifacts[0]) ? asString(artifacts[0].base64, 8_000_000) : null;
+  if (!b64) errors?.push("nvidia:sem-artifact");
   return b64 ? `data:image/jpeg;base64,${b64}` : null;
 }
 
@@ -207,6 +216,7 @@ function systemPromptFor(action: string, lang: string): string {
 async function generateSiteImage(
   apiKey: string | null,
   imagePrompt: string,
+  errors?: string[],
 ): Promise<string | null> {
   const res = apiKey
     ? await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -239,8 +249,58 @@ async function generateSiteImage(
     }
   } else if (apiKey) {
     console.error("[site-image] openrouter falhou:", res?.status ?? "network");
+    errors?.push(`openrouter:${res?.status ?? "network"}`);
   }
-  return nvidiaImage(imagePrompt);
+  return nvidiaImage(imagePrompt, errors);
+}
+
+const REF_DESCRIBE_PROMPT =
+  "Describe this photo of a local business in 2-3 short sentences for an image-generation art director: " +
+  "what kind of place it is, what's visible (interior, facade, products, people at work), " +
+  "materials and color palette, lighting mood and overall style. " +
+  "Do NOT mention business names or any visible text. Be concrete and visual.";
+
+/**
+ * Descreve uma foto real do estabelecimento (visão) pra servir de
+ * referência visual nos prompts de gap-fill — OpenRouter → NVIDIA.
+ */
+async function describeReferenceImage(
+  apiKey: string | null,
+  imageUrl: string,
+): Promise<string | null> {
+  const content = [
+    { type: "image_url", image_url: { url: imageUrl } },
+    { type: "text", text: REF_DESCRIBE_PROMPT },
+  ];
+  const extract = (data: Record<string, unknown>): string | null => {
+    const choices = Array.isArray(data.choices) ? data.choices : [];
+    const c = isRecord(choices[0]) && isRecord(choices[0].message)
+      ? choices[0].message.content
+      : null;
+    return typeof c === "string" && c.trim().length > 15 ? c.trim() : null;
+  };
+  if (apiKey) {
+    for (const model of VISION_MODELS) {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+          "X-Title": "SeekerAi",
+        },
+        body: JSON.stringify({ model, max_tokens: 220, messages: [{ role: "user", content }] }),
+        signal: AbortSignal.timeout(45_000),
+      }).catch(() => null);
+      if (!res?.ok) {
+        console.error("[site-vision] openrouter falhou:", model, res?.status ?? "network");
+        continue;
+      }
+      const out = extract((await res.json().catch(() => ({}))) as Record<string, unknown>);
+      if (out) return out;
+    }
+  }
+  return null;
 }
 
 // ---------- pipeline do site premium (/site/<slug>) ----------
@@ -359,6 +419,7 @@ async function ensureSiteBucket(db: ReturnType<typeof serviceClient>): Promise<v
 function siteAssetPrompts(
   lead: { nome: string; categoria: string | null; cidade: string | null },
   tipo: "barbearia" | "beleza",
+  visualRef?: string | null,
 ): string[] {
   // Sem o nome literal do negócio e com categoria em inglês: modelos de
   // imagem renderizam palavras do prompt como letreiro/embalagem na foto.
@@ -381,19 +442,26 @@ function siteAssetPrompts(
   // vira letreiro/marca d'água na imagem gerada.
   const biz = `a Brazilian ${catEn}`;
   const direction = tipo === "barbearia"
-    ? "Dark moody cinematic look: charcoal and graphite tones, warm amber rim light, subtle haze, brass and leather textures, premium barbershop atmosphere, shallow depth of field"
-    : "Bright editorial look: ivory and champagne tones, soft natural window light, airy elegant surfaces, delicate gold accents, premium beauty-studio atmosphere, shallow depth of field";
+    ? "dark moody cinematic look, charcoal and amber tones, brass and leather textures, shallow depth of field"
+    : "bright editorial look, ivory and champagne tones, soft window light, delicate gold accents, shallow depth of field";
   const scenes = [
-    `wide establishing shot of the interior of ${biz}, hero image for the website, inviting composition with clear focal point`,
-    `elegant interior detail of ${biz} — the client chair or service station and ambient decor, magazine-style composition`,
-    `close-up of the signature work at ${biz} — tools and craft in action, hands only, no faces`,
-    `a finished result from ${biz} presented like a portfolio photograph, aspirational but believable`,
-    `flat-lay of the products and materials used at ${biz}, arranged with generous negative space`,
+    `wide establishing shot of the interior of ${biz}, hero image, clear focal point`,
+    `interior detail of ${biz} — the client chair or service station and ambient decor`,
+    `close-up of the signature work at ${biz} — tools and craft in action, hands only`,
+    `a finished result from ${biz} presented like a portfolio photograph`,
+    `flat-lay of the products and materials used at ${biz}, generous negative space`,
   ];
+  // Descrição das fotos reais do lugar (visão) — o gerado deve parecer
+  // com o estabelecimento de verdade, não com um negócio genérico.
+  // FLUX.2-klein limita prompt em 800 chars — regra "sem texto" vai na
+  // frente pra nunca ser cortada pelo slice de segurança.
+  const ref = visualRef
+    ? ` Match the real place: ${visualRef.slice(0, 320)}`
+    : "";
   return scenes.map((scene) =>
-    `Award-winning editorial commercial photograph: ${scene}. ${direction}. ` +
-    "Photorealistic, shot on a 50mm lens, color-graded, high dynamic range. " +
-    "Strictly no readable text anywhere: no letters, words or numbers on signage, packaging, labels, fabrics, paper or surfaces. No logos, no watermark. No visible faces."
+    "Strictly no readable text, letters, numbers, signage, logos or watermark anywhere. No visible faces. " +
+    `Editorial commercial photograph: ${scene}, ${direction}.${ref} ` +
+    "Photorealistic, 50mm lens, color-graded, high dynamic range."
   );
 }
 
@@ -582,7 +650,7 @@ async function publishPremiumSite(
   apiKey: string | null,
   leadId: string,
   context: Record<string, unknown>,
-): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number }> {
+): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number; imagemErros: string[] }> {
   const { data: lead } = await db.from("leads").select("*").eq("id", leadId).maybeSingle();
   if (!lead) throw httpError(404, "Lead não encontrado");
 
@@ -624,15 +692,25 @@ async function publishPremiumSite(
   }
 
   // 2) Gap-fill com IA — prompt específico por slot, direção de arte do tema.
+  const imgErrors: string[] = [];
   const faltando = Math.min(SITE_IMAGE_TARGET - publicUrls.length, MAX_GENERATED_IMAGES);
   if (faltando > 0) {
+    // Descreve até 2 fotos reais (Maps/Instagram) pra dar referência visual
+    // do que gerar e como — ambiente, produtos, paleta do lugar de verdade.
+    let visualRef: string | null = null;
+    const refs = await Promise.all(
+      publicUrls.slice(0, 2).map((x) => describeReferenceImage(apiKey, x.url)),
+    );
+    const desc = refs.filter((d): d is string => Boolean(d)).join(" ").slice(0, 700).trim();
+    if (desc) visualRef = desc;
+
     const prompts = siteAssetPrompts(
-      { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) }, tipo,
+      { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) }, tipo, visualRef,
     ).slice(0, faltando);
-    const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p)));
+    const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.
     await Promise.all(generated.map(async (img, i) => {
-      if (img === null) generated[i] = await generateSiteImage(apiKey, prompts[i]);
+      if (img === null) generated[i] = await generateSiteImage(apiKey, prompts[i], imgErrors);
     }));
     let i = 0;
     for (const img of generated) {
@@ -677,6 +755,7 @@ async function publishPremiumSite(
     modelo,
     geradas: publicUrls.filter((x) => !x.real).length,
     reais: publicUrls.filter((x) => x.real).length,
+    imagemErros: imgErrors.slice(0, 8),
   };
 }
 
@@ -741,6 +820,7 @@ Deno.serve(async (req) => {
           siteUrl: site.siteUrl,
           imagensReais: site.reais,
           imagensGeradas: site.geradas,
+          imagemErros: site.imagemErros,
           modelo: site.modelo,
           creditosCobrados: reservation.cost,
         });

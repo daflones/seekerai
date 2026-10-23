@@ -84,6 +84,7 @@ console.log(`edge: ${res.status} em ${Math.round((Date.now() - t0) / 1000)}s`);
 console.log(JSON.stringify({
   siteSlug: data.siteSlug, siteUrl: data.siteUrl, modelo: data.modelo,
   imagensReais: data.imagensReais, imagensGeradas: data.imagensGeradas,
+  imagemErros: data.imagemErros,
   creditosCobrados: data.creditosCobrados, erro: data.erro ?? data.error,
 }, null, 2));
 
