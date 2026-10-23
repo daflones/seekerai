@@ -16,12 +16,14 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { requireSecret } from "../_shared/secrets.ts";
+import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
 interface CheckBody {
   phone?: string;
   businessRef?: string;
   serviceSlug?: string;
   requestRef?: string;
+  countryCode?: string;
 }
 
 Deno.serve(async (req) => {
@@ -30,14 +32,15 @@ Deno.serve(async (req) => {
     const user = await requireUser(req);
     const body = await readJson<CheckBody>(req);
 
-    const digits = asString(body.phone, 30)?.replace(/\D/g, "") ?? "";
+    const raw = asString(body.phone, 40);
     const service = asString(body.serviceSlug, 60);
     const businessRef = asString(body.businessRef, 300);
     const requestRef = asString(body.requestRef, 150);
-    if (digits.length < 10 || digits.length > 15 || !service || !businessRef || !requestRef) {
+    const cc = callingCodeFor(asString(body.countryCode, 2));
+    const phone = toE164(raw, cc);
+    if (!phone || !service || !businessRef || !requestRef) {
       throw httpError(400, "Informe phone, serviceSlug, businessRef e requestRef");
     }
-    const phone = digits.startsWith("55") ? digits : `55${digits}`;
 
     const inputHash = await sha256Hex(JSON.stringify({ phone, businessRef, service }));
     const db = serviceClient();

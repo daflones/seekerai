@@ -18,6 +18,7 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { getSetting, requireSecret } from "../_shared/secrets.ts";
+import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
 const FIELD_MASK = [
   "places.id",
@@ -101,7 +102,8 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
       bairro: null,
       cidade: null,
       uf: null,
-      telefone: asString(place.nationalPhoneNumber ?? place.internationalPhoneNumber),
+      // Internacional primeiro: vem com "+DDI" e alimenta a verificação de WhatsApp.
+      telefone: asString(place.internationalPhoneNumber ?? place.nationalPhoneNumber),
       site: asString(place.websiteUri, 500),
       avaliacao: typeof place.rating === "number" ? place.rating : null,
       totalAvaliacoes:
@@ -298,11 +300,11 @@ async function scanWebsites(places: NormalizedPlace[]): Promise<void> {
 }
 
 /** Verifica em lote quais números têm WhatsApp via Evolution API (grátis). */
-async function checkWhatsapps(places: NormalizedPlace[]): Promise<void> {
+async function checkWhatsapps(places: NormalizedPlace[], regionCode: string): Promise<void> {
+  const cc = callingCodeFor(regionCode);
   const numbers = places
-    .map((p) => p.telefone?.replace(/\D/g, "") ?? "")
-    .filter((d) => d.length >= 10 && d.length <= 15)
-    .map((d) => (d.startsWith("55") ? d : `55${d}`));
+    .map((p) => toE164(p.telefone, cc))
+    .filter((d): d is string => d !== null);
   if (numbers.length === 0) return;
   try {
     const base = (await requireSecret("EVOLUTION_API_URL")).replace(/\/+$/, "");
@@ -330,9 +332,8 @@ async function checkWhatsapps(places: NormalizedPlace[]): Promise<void> {
       }
     }
     for (const place of places) {
-      const digits = place.telefone?.replace(/\D/g, "") ?? "";
-      const phone = digits.startsWith("55") ? digits : `55${digits}`;
-      place.whatsapp = exists.get(phone) ?? null;
+      const phone = toE164(place.telefone, cc);
+      place.whatsapp = phone ? exists.get(phone) ?? null : null;
     }
   } catch (err) {
     // Evolution indisponível não derruba a busca — whatsapp fica nulo.
@@ -406,7 +407,7 @@ Deno.serve(async (req) => {
       // varredura dos sites + ordenação priorizando oportunidades.
       for (const place of resultados) extractInstagram(place);
       await Promise.all([
-        checkWhatsapps(resultados),
+        checkWhatsapps(resultados, regionCode),
         scanWebsites(resultados),
       ]);
       resultados.sort((a, b) => {
