@@ -148,6 +148,9 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
   const pros = cfg.profissionais ?? [];
   const hasPros = pros.length > 0;
   const galeria = cfg.fotos.galeria;
+  const videosAll = cfg.videos ?? [];
+  const destaqueVideo = videosAll.find((v) => v.destaque) ?? videosAll[0] ?? null;
+  const outrosVideos = videosAll.filter((v) => v !== destaqueVideo);
 
   // ---------- dias/horários disponíveis ----------
   const dias = useMemo(() => {
@@ -420,7 +423,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </div>
       </div>
 
-      {/* ---------- HISTÓRIA + VÍDEOS (a narrativa vem antes da vitrine) ---------- */}
+      {/* ---------- HISTÓRIA + VÍDEO EM DESTAQUE + REELS ---------- */}
       {(cfg.historia || (cfg.videos?.length ?? 0) > 0) && (
         <section className="bshop-section" id="historia">
           <div className="bshop-wrap">
@@ -434,14 +437,28 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                   <FadeUp key={i} delay={i * 0.08}><p dangerouslySetInnerHTML={{ __html: p }} /></FadeUp>
                 ))}
               </div>
-              <div className="bshop-videos">
-                {(cfg.videos ?? []).map((v, i) => (
-                  <FadeUp key={i} delay={i * 0.1}>
-                    <VideoCard v={v} />
-                  </FadeUp>
-                ))}
-              </div>
+              {destaqueVideo && (
+                <FadeUp delay={0.15} className="bshop-story-feature">
+                  <VideoCard v={destaqueVideo} tall />
+                </FadeUp>
+              )}
             </div>
+            {outrosVideos.length > 0 && (
+              <div className="bshop-reels-wrap">
+                <FadeUp y={14}><span className="bshop-eyebrow bshop-eyebrow-solo">Nos reels</span></FadeUp>
+                <div className="bshop-reels">
+                  {outrosVideos.map((v, i) => (
+                    <motion.div key={i} className="bshop-reel"
+                      initial={reduced ? false : { opacity: 0, x: 40 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true, margin: "-40px" }}
+                      transition={{ duration: 0.55, delay: i * 0.07, ease: EASE }}>
+                      <VideoCard v={v} reel />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -879,25 +896,30 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
   );
 }
 
-/* Card de vídeo com overlay de play estilizado */
-function VideoCard({ v }: { v: { src: string; titulo: string; descricao?: string } }) {
+/* Card de vídeo com overlay de play estilizado.
+   `tall` = formato reel 9:16 grande (destaque da história);
+   `reel` = formato compacto pra esteira horizontal. */
+function VideoCard({ v, tall, reel }: {
+  v: { src: string; titulo: string; descricao?: string };
+  tall?: boolean; reel?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   return (
-    <div className="bshop-video">
+    <div className={`bshop-video${tall ? " tall" : ""}${reel ? " reel" : ""}`}>
       <div className="bshop-video-frame">
         <video ref={videoRef} src={v.src} controls={playing} playsInline preload="metadata"
           onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
         {!playing && (
           <button className="bshop-video-play" aria-label={`Assistir: ${v.titulo}`}
             onClick={() => videoRef.current?.play()}>
-            <span className="bshop-video-playbtn"><Play size={22} fill="currentColor" /></span>
+            <span className="bshop-video-playbtn"><Play size={reel ? 18 : 22} fill="currentColor" /></span>
           </button>
         )}
       </div>
       <div className="bshop-video-info">
         <strong>{v.titulo}</strong>
-        {v.descricao && <p>{v.descricao}</p>}
+        {v.descricao && !reel && <p>{v.descricao}</p>}
       </div>
     </div>
   );

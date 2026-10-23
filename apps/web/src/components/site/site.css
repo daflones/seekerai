@@ -255,11 +255,28 @@
 .bshop-lightbox-nav.next { right: 18px; }
 
 /* ---------- História / vídeos ---------- */
-.bshop-story { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(24px, 5vw, 64px); align-items: start; }
+.bshop-story { display: grid; grid-template-columns: 1.1fr .9fr; gap: clamp(24px, 5vw, 64px); align-items: start; }
 @media (max-width: 900px) { .bshop-story { grid-template-columns: 1fr; } }
 .bshop-story-text p { color: var(--bs-muted); line-height: 1.8; font-size: 15px; margin: 0 0 14px; }
 .bshop-story-text p strong { color: var(--bs-text); }
-.bshop-videos { display: flex; flex-direction: column; gap: 16px; }
+.bshop-story-feature { position: sticky; top: 96px; }
+@media (max-width: 900px) { .bshop-story-feature { position: static; } }
+.bshop-video.tall video { aspect-ratio: 9/16; max-height: 78vh; }
+.bshop-video.tall { border-color: var(--bs-line-2); box-shadow: 0 36px 80px -32px #000d; }
+
+/* Esteira horizontal de reels (snap-scroll, estilo Instagram) */
+.bshop-reels-wrap { margin-top: clamp(36px, 5vw, 56px); }
+.bshop-eyebrow-solo::before { display: none; }
+.bshop-reels {
+  display: flex; gap: 14px; overflow-x: auto; padding: 6px 2px 18px;
+  scroll-snap-type: x mandatory; scrollbar-width: thin; scrollbar-color: var(--bs-line-2) transparent;
+}
+.bshop-reel { flex: 0 0 auto; width: clamp(180px, 22vw, 240px); scroll-snap-align: start; }
+.bshop-video.reel video { aspect-ratio: 9/16; }
+.bshop-video.reel .bshop-video-info { padding: 10px 14px; }
+.bshop-video.reel .bshop-video-playbtn { width: 52px; height: 52px; }
+.bshop-video.reel .bshop-video-play { background: linear-gradient(180deg, #0004, #000a); }
+
 .bshop-video {
   border-radius: var(--bs-radius); overflow: hidden; border: 1px solid var(--bs-line);
   background: var(--bs-panel); transition: border-color .3s, box-shadow .3s;

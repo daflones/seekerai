@@ -63,7 +63,7 @@
   "videos": [
     { "titulo": "Cada detalhe conta", "descricao": "Bons produtos, equipamentos de qualidade e cuidado em cada serviço." },
     { "titulo": "5 anos de Vianna", "descricao": "Gratidão à equipe e aos clientes por esses anos compartilhados." },
-    { "titulo": "Nossa história", "descricao": "De dois irmãos e um sonho — a uma equipe que atende a cidade há 5 anos." },
+    { "titulo": "Nossa história", "descricao": "De dois irmãos e um sonho — a uma equipe que atende a cidade há 5 anos.", "destaque": true },
     { "titulo": "Um dia na barbearia", "descricao": "A rotina, o ambiente e a experiência Vianna." },
     { "titulo": "Vianna em ação", "descricao": "Nossos barbeiros em atendimento." },
     { "titulo": "Cortes para toda a família", "descricao": "Até os menores clientes saem satisfeitos." }

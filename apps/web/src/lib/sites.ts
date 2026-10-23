@@ -31,7 +31,7 @@ export interface SiteConfig {
   servicos: SiteServico[];
   profissionais?: { nome: string; especialidade?: string; foto?: string }[];
   fotos: { hero?: string; galeria: string[] };
-  videos?: { src: string; titulo: string; descricao?: string }[];
+  videos?: { src: string; titulo: string; descricao?: string; destaque?: boolean }[];
   historia?: { titulo: string; paragrafos: string[] };
   diferenciais?: string[];
   avaliacoes?: {
