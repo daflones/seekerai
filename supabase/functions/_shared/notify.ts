@@ -9,7 +9,9 @@
 import { asString, isRecord, serviceClient } from "./common.ts";
 import { getSecret } from "./secrets.ts";
 
-const ADMIN_NUMBER_FALLBACK = "5521968053672";
+// LID do número do dono — contas LID-migradas não recebem envio pro
+// JID @s.whatsapp.net pela Evolution 2.3.7 (resolve quando atualizar o server).
+const ADMIN_NUMBER_FALLBACK = "29421146759233@lid";
 
 export interface NotifyUser {
   id?: string | null;
