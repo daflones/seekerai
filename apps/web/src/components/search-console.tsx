@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BookmarkPlus, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone, Search, Star,
+  Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
+  Search, SlidersHorizontal, Star, Users,
 } from "lucide-react";
 import { placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { formatPotential } from "@/lib/catalog";
@@ -16,6 +17,10 @@ import { FancySelect } from "./fancy-select";
 
 const PAGE_SIZE = 9;
 const STORE_KEY = "seekerai_search_v1";
+
+function fmtCompact(n: number, lang: string): string {
+  return new Intl.NumberFormat(lang === "pt" ? "pt-BR" : lang, { notation: "compact", maximumFractionDigits: 1 }).format(n);
+}
 
 interface SearchResponse {
   resultados: PlaceResult[];
@@ -86,6 +91,8 @@ export function SearchConsole({
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [chips, setChips] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState("oportunidade");
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Persistência: resultado e job ativo sobrevivem a troca de página/aba.
@@ -269,8 +276,34 @@ export function SearchConsole({
     return (results ?? []).map((_, i) => i).filter((i) => !saved[i]);
   }
 
-  const pageCount = results ? Math.max(1, Math.ceil(results.length / PAGE_SIZE)) : 1;
-  const pageItems = results ? results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : [];
+  // Filtros de oportunidade — dados do Instagram vem do scrape da busca.
+  const FILTER_CHIPS: { key: string; label: string; test: (p: PlaceResult) => boolean }[] = [
+    { key: "semSite", label: t.fNoSite, test: (p) => !p.site },
+    { key: "comWa", label: t.fWa, test: (p) => p.whatsapp === true },
+    { key: "semIg", label: t.fNoIg, test: (p) => !p.instagram },
+    { key: "igFraco", label: t.fIgWeak, test: (p) => Boolean(p.instagram) && (p.ig?.seguidores ?? 0) < 5000 },
+    { key: "poucasCurtidas", label: t.fLowLikes, test: (p) => Boolean(p.instagram) && (p.ig?.curtidas ?? 0) < 30 },
+  ];
+  const SORTS: { value: string; label: string; by: (a: PlaceResult, b: PlaceResult) => number }[] = [
+    { value: "oportunidade", label: t.sortOpp, by: () => 0 },
+    { value: "seguidores", label: t.sortFollowers, by: (a, b) => (a.ig?.seguidores ?? Infinity) - (b.ig?.seguidores ?? Infinity) },
+    { value: "curtidas", label: t.sortLikes, by: (a, b) => (a.ig?.curtidas ?? Infinity) - (b.ig?.curtidas ?? Infinity) },
+    { value: "nota", label: t.sortRating, by: (a, b) => (b.avaliacao ?? 0) - (a.avaliacao ?? 0) },
+  ];
+  function toggleChip(key: string) {
+    setChips((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+    setPage(1);
+  }
+  const filtered = (results ?? [])
+    .filter((p) => FILTER_CHIPS.every((c) => !chips.has(c.key) || c.test(p)))
+    .sort(SORTS.find((s) => s.value === sort)?.by ?? SORTS[0].by);
+
+  const pageCount = results ? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)) : 1;
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const selectableCount = results ? results.filter((_, i) => !saved[i]).length : 0;
 
   return <div className="seek-console">
@@ -361,6 +394,23 @@ export function SearchConsole({
       </button>}
     </div>}
 
+    {results !== null && results.length > 0 && <div className="seek-filters" role="group" aria-label={t.filters}>
+      <span className="seek-filters-label"><SlidersHorizontal size={12} />{t.filters}</span>
+      {FILTER_CHIPS.map((c) => (
+        <button key={c.key} type="button"
+          className={`seek-chip${chips.has(c.key) ? " active" : ""}`}
+          aria-pressed={chips.has(c.key)}
+          onClick={() => toggleChip(c.key)}>
+          {c.label}
+        </button>
+      ))}
+      <span className="seek-filters-sort">
+        <FancySelect ariaLabel={t.sortBy} value={sort} onChange={(v) => { setSort(v); setPage(1); }}
+          groups={[{ label: t.sortBy, options: SORTS.map((s) => ({ value: s.value, label: s.label })) }]} />
+      </span>
+    </div>}
+    {results !== null && filtered.length === 0 && !busy && <p className="seek-empty">{t.noneHere}</p>}
+
     <div className="seek-grid">
       {pageItems.map((p) => {
         const i = results!.indexOf(p);
@@ -391,9 +441,20 @@ export function SearchConsole({
                 <span className="seek-badge seek-site-note" title={check.sinais}>{check.sinais.split(" · ")[0]}</span>}
               {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.waOk}</span>}
               {p.whatsapp === false && p.telefone && <span className="seek-badge">{t.waNo}</span>}
-              {p.instagram && <a className="seek-badge" href={`https://instagram.com/${p.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{p.instagram}</a>}
+              {p.instagram && !p.ig && <a className="seek-badge" href={`https://instagram.com/${p.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{p.instagram}</a>}
               {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">{t.closed}</span>}
             </div>
+            {p.ig && <a className="seek-ig" href={`https://instagram.com/${p.instagram!.replace(/^@/, "")}`}
+              target="_blank" rel="noopener noreferrer" title={p.ig.bio ?? p.instagram ?? ""}>
+              {p.ig.foto
+                // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
+                ? <img className="seek-ig-pic" src={p.ig.foto} alt="" loading="lazy" />
+                : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
+              <span className="seek-ig-handle">{p.instagram}</span>
+              {p.ig.seguidores !== null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(p.ig.seguidores, lang)} {t.igFollowers}</span>}
+              {p.ig.posts !== null && <span className="seek-ig-stat">{fmtCompact(p.ig.posts, lang)} {t.igPosts}</span>}
+              {p.ig.curtidas !== null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(p.ig.curtidas, lang)} {t.igLikes}</span>}
+            </a>}
             <div className="seek-card-actions">
               {saved[i]
                 ? <Link className="button button-glass button-small" href={`/app/leads/${saved[i]}`}><CheckCircle2 size={14} />{t.viewLead}</Link>

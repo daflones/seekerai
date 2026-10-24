@@ -95,6 +95,24 @@ a.seek-badge:hover { border-color: #a879d166; }
 .seek-badge-gap { color: var(--warn); border-color: #c89b4e33; background: #c89b4e10; }
 .seek-card-actions { display: flex; align-items: center; gap: 14px; margin-top: auto; padding-top: 12px; }
 
+/* ── Filtros de oportunidade ── */
+.seek-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 14px 0 4px; }
+.seek-filters-label { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.seek-chip { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); background: #a879d108; border: 1px solid #a879d12b; cursor: pointer; transition: all .15s; font-family: inherit; }
+.seek-chip:hover { border-color: #a879d166; color: var(--white); }
+.seek-chip.active { color: var(--white); background: #a879d125; border-color: #a879d15c; }
+.seek-filters-sort { margin-left: auto; min-width: 168px; }
+.seek-filters-sort .fs-btn { padding: 6px 11px; font-size: 11px; }
+
+/* ── Mini-card do Instagram no resultado ── */
+.seek-ig { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 9px; padding: 8px 10px; border-radius: 9px; background: #a879d108; border: 1px solid #a879d12b; text-decoration: none; transition: border-color .15s; }
+.seek-ig:hover { border-color: #a879d166; }
+.seek-ig-pic { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #a879d12b; }
+.seek-ig-pic-empty { display: inline-flex; align-items: center; justify-content: center; background: #a879d125; color: var(--violet-light); }
+.seek-ig-handle { font-size: 11px; font-weight: 600; color: var(--white); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seek-ig-stat { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.seek-ig-stat svg { opacity: .7; flex-shrink: 0; }
+
 /* ── Pipeline de leads ── */
 .lead-filters { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 30px; }
 .lead-filters button { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid #a879d12b; background: #a879d108; padding: 7px 14px; border-radius: 999px; }

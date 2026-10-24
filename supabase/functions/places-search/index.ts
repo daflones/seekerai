@@ -20,6 +20,8 @@ import {
 import { getSetting, requireSecret } from "../_shared/secrets.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
@@ -65,7 +67,19 @@ interface NormalizedPlace {
   lng: number | null;
   whatsapp: boolean | null;
   instagram: string | null;
+  /** Dados do perfil do Instagram — preenchido pelo enrichInstagram. */
+  ig?: IgProfile | null;
   siteCheck?: SiteCheck | null;
+}
+
+interface IgProfile {
+  seguidores: number | null;
+  posts: number | null;
+  /** Média de curtidas dos últimos posts (engajamento do perfil). */
+  curtidas: number | null;
+  foto: string | null;
+  bio: string | null;
+  verificado: boolean;
 }
 
 interface SiteCheck {
@@ -207,8 +221,88 @@ function extractInstagram(place: NormalizedPlace): void {
   }
 }
 
+const APIFY_IG_ACTOR = "apify~instagram-scraper";
+
+async function igApifyCall(token: string, body: Record<string, unknown>, timeoutMs: number): Promise<unknown[]> {
+  const res = await fetch(
+    `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${Math.round(timeoutMs / 1000)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs + 15_000),
+    },
+  ).catch(() => null);
+  if (!res?.ok) {
+    console.error("[ig-enrich] apify falhou:", res?.status ?? "network");
+    return [];
+  }
+  const items = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(items) ? items : [];
+}
+
+/**
+ * Enriquecimento Instagram: depois que o Maps revela o @, uma chamada
+ * batelada no instagram-scraper traz perfil (seguidores/posts/foto/bio)
+ * e os últimos posts (média de curtidas + mídia/legendas pro site).
+ * Capado em 8 perfis e corrido com timeout — nunca derruba a busca.
+ */
+async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
+  const comIg = places.filter((p) => p.instagram).slice(0, 8);
+  if (!comIg.length) return;
+  let token: string;
+  try {
+    token = await requireSecret("APIFY_API_TOKEN");
+  } catch {
+    return;
+  }
+  const urls = comIg.map((p) => `https://www.instagram.com/${p.instagram!.replace(/^@/, "")}/`);
+  // Uma chamada só: "details" volta rápido (~10s) e já traz latestPosts
+  // com curtidas — o resultsType "posts" estoura o tempo e nunca retorna.
+  const details = await Promise.race([
+    igApifyCall(token, { directUrls: urls, resultsType: "details", resultsLimit: comIg.length }, 55_000),
+    sleep(48_000).then(() => [] as unknown[]),
+  ]);
+
+  const profiles = new Map<string, Record<string, unknown>>();
+  for (const d of details) {
+    if (!isRecord(d)) continue;
+    const uname = asString(d.username, 80)?.toLowerCase();
+    if (uname) profiles.set(uname, d);
+  }
+  for (const p of comIg) {
+    const uname = p.instagram!.replace(/^@/, "").toLowerCase();
+    const prof = profiles.get(uname);
+    if (!prof) continue;
+    const recent = (Array.isArray(prof.latestPosts) ? prof.latestPosts : [])
+      .filter(isRecord);
+    const likes = recent
+      .map((post) => (typeof post.likesCount === "number" ? post.likesCount : null))
+      .filter((n): n is number => n !== null);
+    p.ig = {
+      seguidores: typeof prof.followersCount === "number" ? prof.followersCount : null,
+      posts: typeof prof.postsCount === "number" ? prof.postsCount
+        : recent.length || null,
+      curtidas: likes.length ? Math.round(likes.reduce((a, b) => a + b, 0) / likes.length) : null,
+      foto: asString(prof.profilePicUrl, 1000),
+      bio: asString(prof.biography, 600),
+      verificado: prof.verified === true,
+    };
+  }
+}
+
+/** Extrai o @ do Instagram dos links do HTML (grátis — já baixado no scan). */
+function instagramFromHtml(html: string): string | null {
+  const match = html.match(
+    /instagram\.com\/(?!p\/|reel|explore|stories|tv)([A-Za-z0-9._]{2,40})/i,
+  );
+  if (!match) return null;
+  const handle = match[1].replace(/\.+$/, "");
+  return /^[A-Za-z0-9._]{2,40}$/.test(handle) ? `@${handle}` : null;
+}
+
 /** Acessa o site do estabelecimento e extrai sinais de qualidade/atualização. */
-async function scanWebsite(site: string): Promise<SiteCheck> {
+async function scanWebsite(site: string): Promise<SiteCheck & { instagram?: string | null }> {
   const url = site.startsWith("http") ? site : `https://${site}`;
   let html = "";
   let finalUrl = url;
@@ -289,7 +383,7 @@ async function scanWebsite(site: string): Promise<SiteCheck> {
     ? "ok"
     : "bom";
   if (sinais.length === 0) sinais.push("site moderno e bem mantido");
-  return { estado, sinais };
+  return { estado, sinais, instagram: instagramFromHtml(html) };
 }
 
 /** Varre os sites em lotes para não estourar o tempo da function. */
@@ -300,7 +394,10 @@ async function scanWebsites(places: NormalizedPlace[]): Promise<void> {
     await Promise.all(
       comSite.slice(i, i + batch).map(async (p) => {
         try {
-          p.siteCheck = await scanWebsite(p.site!);
+          const { instagram, ...check } = await scanWebsite(p.site!);
+          p.siteCheck = check;
+          // O @ descoberto no site alimenta o scrape de perfil adiante.
+          if (instagram && !p.instagram) p.instagram = instagram;
         } catch {
           p.siteCheck = null;
         }
@@ -415,13 +512,16 @@ Deno.serve(async (req) => {
         ? await searchApify(query)
         : await searchGooglePlaces(query, regionCode);
 
-      // Enriquecimento: Instagram separado + WhatsApp em lote (grátis) +
-      // varredura dos sites + ordenação priorizando oportunidades.
+      // Enriquecimento: WhatsApp em lote (grátis) + varredura dos sites
+      // (que também descobre o @ do Instagram no HTML) — depois o scrape
+      // batelado dos perfis (seguidores, curtidas, foto) com cap curto pra
+      // não deixar a busca refém do actor de IG.
       for (const place of resultados) extractInstagram(place);
       await Promise.all([
         checkWhatsapps(resultados, regionCode),
         scanWebsites(resultados),
       ]);
+      await Promise.race([enrichInstagram(resultados), sleep(55_000)]);
       resultados.sort((a, b) => {
         const score = (p: NormalizedPlace) =>
           (p.telefone ? 4 : 0) + (p.whatsapp === true ? 2 : 0) +

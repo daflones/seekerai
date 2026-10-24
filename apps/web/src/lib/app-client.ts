@@ -54,6 +54,15 @@ export interface PlaceResult {
   pais?: string | null;
   whatsapp: boolean | null;
   instagram: string | null;
+  /** Perfil do Instagram enriquecido no scrape da busca. */
+  ig?: {
+    seguidores: number | null;
+    posts: number | null;
+    curtidas: number | null;
+    foto: string | null;
+    bio: string | null;
+    verificado: boolean;
+  } | null;
   siteCheck?: {
     estado: "bom" | "ok" | "desatualizado" | "fora";
     sinais: string[];

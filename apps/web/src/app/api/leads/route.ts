@@ -19,6 +19,14 @@ const leadItem = z.object({
   imagem: z.string().max(800).nullish(),
   whatsapp: z.boolean().nullish(),
   instagram: z.string().max(200).nullish(),
+  ig: z.object({
+    seguidores: z.number().nullish(),
+    posts: z.number().nullish(),
+    curtidas: z.number().nullish(),
+    foto: z.string().max(1000).nullish(),
+    bio: z.string().max(600).nullish(),
+    verificado: z.boolean().nullish(),
+  }).nullish(),
   lat: z.number().nullish(),
   lng: z.number().nullish(),
   pais: z.string().max(2).nullish(),
@@ -98,6 +106,7 @@ export async function POST(request: NextRequest) {
       lng: item.lng ?? null,
       dados: {
         ...(item.siteCheck ? { siteCheck: item.siteCheck } : {}),
+        ...(item.ig ? { ig: item.ig } : {}),
         ...(item.pais ? { pais: item.pais } : {}),
       },
     }));

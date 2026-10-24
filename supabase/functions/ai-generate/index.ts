@@ -541,7 +541,12 @@ async function fetchPlaceInstagram(lead: Record<string, unknown>): Promise<strin
         ...(placeId?.startsWith("ChIJ") ? { placeIds: [placeId] }
           : { searchStringsArray: [`${nome} ${cidade}`.trim()] }),
         maxCrawledPlacesPerSearch: 1,
-        scrapeSocialMediaProfiles: true,
+        scrapeSocialMediaProfiles: {
+          facebooks: false, instagrams: true, youtubes: false, tiktoks: false,
+          twitters: false, linkedins: false, pinterests: false, discords: false,
+          githubs: false, patreons: false, telegrams: false, mediums: false,
+          spotifys: false, threads: false,
+        },
         maxReviews: 0,
         language: "pt-BR",
       }),
@@ -959,9 +964,17 @@ async function publishPremiumSite(
   const patchPromise = (async () => {
     const ig = await Promise.race([igPromise, sleep(35_000).then(() => null)]);
     const captions = ig?.captions?.slice(0, 8).join("\n---\n") ?? "";
-    return configPatchFromAi(apiKey, lead, captions
-      ? `\nLegendas reais do Instagram do estabelecimento (use pra inferir serviços, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}`
-      : "");
+    // Métricas/bio raspadas na busca e salvas no lead enriquecem o contexto.
+    const igMeta = (lead.dados as Record<string, unknown> | null)?.ig as
+      { bio?: string | null; seguidores?: number | null; posts?: number | null } | undefined;
+    const facts: string[] = [];
+    if (igMeta?.bio) facts.push(`Bio do Instagram: ${asString(igMeta.bio, 400)}`);
+    if (igMeta?.seguidores) facts.push(`Seguidores no Instagram: ${igMeta.seguidores} (${igMeta.posts ?? 0} posts)`);
+    const extra = [
+      facts.length ? `Dados reais do Instagram:\n${facts.join("\n")}` : "",
+      captions ? `Legendas reais do Instagram do estabelecimento (use pra inferir serviços, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}` : "",
+    ].filter(Boolean).join("\n\n");
+    return configPatchFromAi(apiKey, lead, extra ? `\n${extra}` : "");
   })();
 
   // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
@@ -974,6 +987,12 @@ async function publishPremiumSite(
     for (const u of ig.images) {
       if (sources.length < MAX_SITE_IMAGES && !sources.includes(u)) sources.push(u);
     }
+  }
+  // Foto de perfil do Instagram (raspada na busca) — logo/fachada real.
+  const igFoto = ((lead.dados as Record<string, unknown> | null)?.ig as
+    { foto?: string | null } | undefined)?.foto;
+  if (igFoto && sources.length < MAX_SITE_IMAGES && !sources.includes(igFoto)) {
+    sources.push(igFoto);
   }
   const publicUrls: { url: string; real: boolean }[] = [];
   {
