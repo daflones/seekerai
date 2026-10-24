@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Check, Copy, Download, ExternalLink, Eye, ImagePlus, Instagram, Loader2,
-  Lock, MapPin, MessageSquareText, Phone, Sparkles, Star, Trash2, Globe,
+  Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
+  Lock, MapPin, MessageSquareText, Phone, Sparkles, Star, Trash2, Globe, Users,
   MessageCircle, FileText, MonitorSmartphone,
 } from "lucide-react";
-import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { promptFor } from "@/lib/ai-prompts";
 import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
@@ -66,6 +66,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const siteCheck = (lead as LeadRow & {
     dados?: { siteCheck?: { estado?: string; sinais?: string[] } | null } | null;
   }).dados?.siteCheck ?? null;
+  const ig = (lead as LeadRow & {
+    dados?: { ig?: { seguidores?: number | null; posts?: number | null; curtidas?: number | null; foto?: string | null; bio?: string | null } | null } | null;
+  }).dados?.ig ?? null;
   const siteCheckLabel = siteCheck?.estado === "desatualizado" ? t.labels.siteOld
     : siteCheck?.estado === "fora" ? t.labels.siteOut
     : siteCheck?.estado === "bom" ? t.labels.siteBom
@@ -366,9 +369,21 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
             title={(siteCheck!.sinais ?? []).join(" · ")}>
             {siteCheckLabel}
           </span>}
-          {lead.instagram && <a className="seek-badge" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{lead.instagram}</a>}
+          {lead.instagram && !ig && <a className="seek-badge" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{lead.instagram}</a>}
           {lead.maps_url && <a className="seek-badge" href={lead.maps_url} target="_blank" rel="noopener noreferrer"><MapPin size={11} />Maps<ExternalLink size={10} /></a>}
         </div>
+        {ig && lead.instagram && <a className="seek-ig" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`}
+          target="_blank" rel="noopener noreferrer" title={ig.bio ?? ""}>
+          {ig.foto
+            // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
+            ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
+            : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
+          <span className="seek-ig-handle">{lead.instagram}</span>
+          {ig.seguidores != null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
+          {ig.posts != null && <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} posts</span>}
+          {ig.curtidas != null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)}/post</span>}
+          {ig.bio && <span className="lead-ig-bio">{ig.bio}</span>}
+        </a>}
       </div>
     </header>
 

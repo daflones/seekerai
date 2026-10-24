@@ -67,6 +67,16 @@ export interface PlaceResult {
     estado: "bom" | "ok" | "desatualizado" | "fora";
     sinais: string[];
   } | null;
+  /** Lead já salvo desse lugar (match por place_id na busca). */
+  leadId?: string | null;
+  /** Lead salvo já tem site gerado. */
+  sitePronto?: boolean;
+}
+
+export function fmtCompact(n: number, lang: string): string {
+  return new Intl.NumberFormat(lang === "pt" ? "pt-BR" : lang, {
+    notation: "compact", maximumFractionDigits: 1,
+  }).format(n);
 }
 
 export interface LeadRow {

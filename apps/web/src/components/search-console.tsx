@@ -8,7 +8,7 @@ import {
   Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
   Search, SlidersHorizontal, Star, Users,
 } from "lucide-react";
-import { placeImageSrc, type PlaceResult } from "@/lib/app-client";
+import { fmtCompact, placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { formatPotential } from "@/lib/catalog";
 import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/lib/catalog-i18n";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
@@ -17,10 +17,6 @@ import { FancySelect } from "./fancy-select";
 
 const PAGE_SIZE = 9;
 const STORE_KEY = "seekerai_search_v1";
-
-function fmtCompact(n: number, lang: string): string {
-  return new Intl.NumberFormat(lang === "pt" ? "pt-BR" : lang, { notation: "compact", maximumFractionDigits: 1 }).format(n);
-}
 
 interface SearchResponse {
   resultados: PlaceResult[];
@@ -104,13 +100,20 @@ export function SearchConsole({
     if (poller.current) { clearInterval(poller.current); poller.current = null; }
   }
 
+  // Resultados que já são lead salvo vêm com leadId — pré-marca o mapa.
+  function savedFromResults(list: PlaceResult[]): Record<number, string> {
+    const init: Record<number, string> = {};
+    list.forEach((p, i) => { if (p.leadId) init[i] = p.leadId; });
+    return init;
+  }
+
   function applyDone(data: SearchResponse, jobId: string | null) {
     const list = data.resultados ?? [];
     const m = { provedor: data.provedor, replay: data.replay, creditos: data.creditosCobrados };
     setResults(list);
     setMeta(m);
     setBusy(false);
-    setSaved({});
+    setSaved(savedFromResults(list));
     setSelected(new Set());
     setPage(1);
     store({ jobId, results: list, meta: m });
@@ -193,6 +196,7 @@ export function SearchConsole({
     if (restored?.results) {
       setResults(restored.results);
       setMeta(restored.meta);
+      setSaved(savedFromResults(restored.results));
     }
     if (restored?.jobId) {
       pollJob(restored.jobId);
@@ -442,6 +446,7 @@ export function SearchConsole({
               {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.waOk}</span>}
               {p.whatsapp === false && p.telefone && <span className="seek-badge">{t.waNo}</span>}
               {p.instagram && !p.ig && <a className="seek-badge" href={`https://instagram.com/${p.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{p.instagram}</a>}
+              {p.sitePronto && <span className="seek-badge seek-badge-ok">{t.siteDone}</span>}
               {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">{t.closed}</span>}
             </div>
             {p.ig && <a className="seek-ig" href={`https://instagram.com/${p.instagram!.replace(/^@/, "")}`}

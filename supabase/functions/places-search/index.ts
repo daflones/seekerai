@@ -70,6 +70,10 @@ interface NormalizedPlace {
   /** Dados do perfil do Instagram — preenchido pelo enrichInstagram. */
   ig?: IgProfile | null;
   siteCheck?: SiteCheck | null;
+  /** Lead já salvo desse lugar (match por place_id) — vira "Ver lead". */
+  leadId?: string | null;
+  /** Lead salvo já tem site gerado — badge no card. */
+  sitePronto?: boolean;
 }
 
 interface IgProfile {
@@ -530,6 +534,30 @@ Deno.serve(async (req) => {
             : p.siteCheck?.estado === "desatualizado" ? 2 : 0);
         return score(b) - score(a);
       });
+
+      // Resultados que já são lead salvo: match por place_id → "Ver lead"
+      // e badge de site gerado, evitando salvar duplicado.
+      const placeIds = resultados.map((p) => p.id).filter((x): x is string => Boolean(x));
+      if (placeIds.length) {
+        const { data: existentes } = await db.from("leads")
+          .select("id,place_id").eq("user_id", user.id).in("place_id", placeIds);
+        const byPlace = new Map(
+          (existentes ?? []).map((l) => [l.place_id as string, l.id as string]),
+        );
+        const leadIds = [...byPlace.values()];
+        const comSite = new Set<string>();
+        if (leadIds.length) {
+          const { data: outs } = await db.from("lead_outputs")
+            .select("lead_id").in("lead_id", leadIds).eq("tipo", "generate_site");
+          for (const o of outs ?? []) {
+            if (o.lead_id) comSite.add(o.lead_id as string);
+          }
+        }
+        for (const p of resultados) {
+          const lid = p.id ? byPlace.get(p.id) : undefined;
+          if (lid) { p.leadId = lid; p.sitePronto = comSite.has(lid); }
+        }
+      }
 
       await settleAction(db, user.id, requestRef, "completed");
 

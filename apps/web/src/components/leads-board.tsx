@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight, Building2, CheckCircle2, ChevronLeft, ChevronRight,
-  Globe, Image as ImageIcon, Loader2, MapPin, MessageSquareText,
-  Phone, Sparkles, Star, Target, FileCode2,
+  Globe, Heart, Image as ImageIcon, Instagram, Loader2, MapPin,
+  MessageSquareText, Phone, Sparkles, Star, Target, Users, FileCode2,
 } from "lucide-react";
-import { callAction, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { promptFor } from "@/lib/ai-prompts";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import type { Lang } from "@/lib/i18n/shared";
@@ -195,6 +195,8 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       {pageItems.map((lead) => {
         const actions = serviceActions[lead.service_slug] ?? [];
         const serviceName = serviceNames[lead.service_slug] ?? lead.service_slug;
+        const ig = (lead.dados?.ig ?? null) as
+          { seguidores?: number | null; posts?: number | null; curtidas?: number | null; foto?: string | null; bio?: string | null } | null;
         return <article key={lead.id} className="lead-card">
           <div className="lead-card-media">
             {placeImageSrc(lead.imagem)
@@ -227,8 +229,23 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               {!lead.site && <span className="seek-badge seek-badge-gap">{t.siteNo}</span>}
               {lead.site && <span className="seek-badge seek-badge-ok"><Globe size={10} />{t.siteYes}</span>}
               {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok">WhatsApp</span>}
-              {lead.instagram && <span className="seek-badge">{lead.instagram}</span>}
+              {lead.instagram && !ig && <span className="seek-badge">{lead.instagram}</span>}
             </p>
+            {ig && <a className="seek-ig" href={`https://instagram.com/${(lead.instagram ?? "").replace(/^@/, "")}`}
+              target="_blank" rel="noopener noreferrer" title={ig.bio ?? ""}>
+              {ig.foto
+                // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
+                ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
+                : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
+              <span className="seek-ig-handle">{lead.instagram}</span>
+              {ig.seguidores !== null && ig.seguidores !== undefined &&
+                <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
+              {ig.posts !== null && ig.posts !== undefined &&
+                <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} {t.igPosts}</span>}
+              {ig.curtidas !== null && ig.curtidas !== undefined &&
+                <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)} {t.igLikes}</span>}
+            </a>}
+            {ig?.bio && <p className="lead-ig-bio">{ig.bio}</p>}
             <p className="lead-tip"><Sparkles size={12} />{suggestion(lead)}</p>
 
             <div className="lead-actions">
