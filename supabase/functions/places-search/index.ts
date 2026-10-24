@@ -512,9 +512,24 @@ Deno.serve(async (req) => {
     });
 
     try {
-      const resultados = provider === "apify"
-        ? await searchApify(query)
-        : await searchGooglePlaces(query, regionCode);
+      // Provedor primário cai → a busca segue com o outro (ex.: Apify sem
+      // crédito continua servindo resultados do Google Places).
+      let resultados: NormalizedPlace[];
+      let provedor = provider;
+      try {
+        resultados = provider === "apify"
+          ? await searchApify(query)
+          : await searchGooglePlaces(query, regionCode);
+      } catch (err) {
+        console.error(
+          `[places-search] ${provider} falhou, tentando fallback:`,
+          err instanceof Error ? err.message : err,
+        );
+        resultados = provider === "apify"
+          ? await searchGooglePlaces(query, regionCode)
+          : await searchApify(query);
+        provedor = provider === "apify" ? "google_places" : "apify";
+      }
 
       // Enriquecimento: WhatsApp em lote (grátis) + varredura dos sites
       // (que também descobre o @ do Instagram no HTML) — depois o scrape
@@ -565,14 +580,14 @@ Deno.serve(async (req) => {
       if (isAdmin && resultados.length > 0) {
         await db.from("search_runs").upsert({
           query,
-          provider,
+          provider: provedor,
           results: resultados,
           created_by: user.id,
           created_at: new Date().toISOString(),
         }, { onConflict: "query_norm" });
       }
 
-      return json({ resultados, provedor: provider, creditosCobrados: reservation.cost });
+      return json({ resultados, provedor, creditosCobrados: reservation.cost });
     } catch (err) {
       await settleAction(db, user.id, requestRef, "refunded");
       throw err;

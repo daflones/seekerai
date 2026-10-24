@@ -10,7 +10,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import {
   ArrowLeft, ArrowRight, ArrowUp, CalendarDays,
-  Instagram, MapPin, Menu, MessageCircle, Phone, Sparkles, X,
+  Instagram, MapPin, Menu, MessageCircle, Phone, Sparkles, Tag, X,
 } from "lucide-react";
 import type { SiteConfig, SiteServico } from "@/lib/sites";
 import { ImageStreamHero } from "./image-stream-hero";
@@ -27,6 +27,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  // "Visite-nos": modal próprio dos nichos de loja/mercado — CTA vira
+  // experiência (endereço, horários, rotas) em vez de pulo pro Maps.
+  const [visitOpen, setVisitOpen] = useState(false);
   const {
     bookOpen, setBookOpen, step, bk, setBk, erro, waNumber,
     pros, hasPros, dias, slots, stepsTotal, dataStep, horaStep, finalStep,
@@ -106,8 +109,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useOverlayLock(lightbox !== null || bookOpen, {
-    onEscape: () => { setLightbox(null); setBookOpen(false); },
+  useOverlayLock(lightbox !== null || bookOpen || visitOpen, {
+    onEscape: () => { setLightbox(null); setBookOpen(false); setVisitOpen(false); },
     lightbox: { index: lightbox, total: lightboxImgs.length, go: setLightbox },
   });
 
@@ -115,6 +118,36 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
   // "o estúdio" → "do estúdio"/"no estúdio" pras seções derivadas.
   const deLugar = (vocab?.prep ?? "o espaço").replace(/^o /, "do ").replace(/^a /, "da ");
   const noLugar = deLugar.replace(/^do /, "no ").replace(/^da /, "na ");
+
+  // CTA por nicho: "agendar" abre o fluxo de horário; "zap" pede pelo
+  // WhatsApp; "mapa" leva ao endereço. Sem destino, cai pro #contato.
+  const ctaKind = vocab?.cta ?? "agendar";
+  const ctaLabel = vocab?.ctaLabel ?? "Agendar";
+  const waHref = waNumber ? `https://wa.me/${waNumber}` : null;
+  const telHref = cfg.contato.telefone ? `tel:${cfg.contato.telefone.replace(/\D/g, "")}` : null;
+  const ctaHref = ctaKind === "mapa"
+    ? (cfg.contato.mapsUrl ?? waHref ?? telHref)
+    : ctaKind === "zap"
+      ? (waHref ?? cfg.contato.mapsUrl ?? telHref)
+      : null;
+  const servicosLabel = vocab?.servicosLabel ?? "Serviços";
+  const temOfertas = (cfg.ofertas?.length ?? 0) > 0 && Boolean(vocab?.ofertasTitle);
+  const ofertasNav = vocab?.ofertasTitle?.split(" ")[0] ?? "Ofertas";
+
+  const CtaButton = ({ className, onClick, children }: { className: string; onClick?: () => void; children: React.ReactNode }) =>
+    ctaHref
+      ? <a className={className} href={ctaHref} target="_blank" rel="noopener noreferrer" onClick={onClick}>{children}</a>
+      : <button type="button" className={className}
+          onClick={() => {
+            onClick?.();
+            if (ctaKind === "agendar") openBook();
+            else if (ctaKind === "mapa") setVisitOpen(true);
+            else scrollTo("#contato");
+          }}>{children}</button>;
+
+  const waServico = (nome: string) => waNumber
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(`Olá! Vim pelo site d${deLugar.slice(1)} e quero saber sobre ${nome}.`)}`
+    : null;
 
   const marqueeItems = [
     ...Object.keys(servicosPorCat),
@@ -153,11 +186,12 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         </a>
         <div className="bbeauty-nav-links">
           {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
-          <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
+          <a href="#servicos" onClick={anchor("#servicos")}>{servicosLabel}</a>
+          {temOfertas && <a href="#ofertas" onClick={anchor("#ofertas")} className="bbeauty-nav-ofertas">{ofertasNav}</a>}
           <a href="#portfolio" onClick={anchor("#portfolio")}>Portfólio</a>
           {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>Dúvidas</a>}
           <a href="#contato" onClick={anchor("#contato")}>Contato</a>
-          <button className="bbeauty-nav-cta" onClick={() => openBook()}>Agendar</button>
+          <CtaButton className="bbeauty-nav-cta">{ctaLabel}</CtaButton>
         </div>
         <button className="bbeauty-nav-burger" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -169,11 +203,12 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25, ease: EASE }}>
             {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
-            <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
+            <a href="#servicos" onClick={anchor("#servicos")}>{servicosLabel}</a>
+            {temOfertas && <a href="#ofertas" onClick={anchor("#ofertas")}>{ofertasNav}</a>}
             <a href="#portfolio" onClick={anchor("#portfolio")}>Portfólio</a>
             {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>Dúvidas</a>}
             <a href="#contato" onClick={anchor("#contato")}>Contato</a>
-            <button className="bbeauty-mobile-cta" onClick={() => { setMenuOpen(false); openBook(); }}>Agendar horário</button>
+            <CtaButton className="bbeauty-mobile-cta" onClick={() => setMenuOpen(false)}>{ctaLabel}</CtaButton>
           </motion.div>
         )}
       </AnimatePresence>
@@ -304,27 +339,38 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       <section className="bbeauty-section" id="servicos" style={{ paddingTop: 0 }}>
         <div className="bbeauty-wrap">
           <div className="bbeauty-section-head">
-            <FadeUp y={16}><span className="bbeauty-eyebrow">Serviços</span></FadeUp>
-            <h2 className="bbeauty-h2"><RevealText text="Escolha o seu" /> <em><RevealText text="momento" delay={0.25} /></em></h2>
+            <FadeUp y={16}><span className="bbeauty-eyebrow">{servicosLabel}</span></FadeUp>
+            <h2 className="bbeauty-h2"><RevealText text={vocab?.servicosTitle ?? "Escolha o seu"} /> <em><RevealText text={vocab?.servicosEm ?? "momento"} delay={0.25} /></em></h2>
           </div>
           <div className="bbeauty-services">
             {Object.entries(servicosPorCat).map(([cat, itens], ci) => (
               <FadeUp key={cat} delay={ci * 0.08}>
                 <div className="bbeauty-service-cat">
                   <h3>{cat}</h3>
-                  <small>{itens.length} {itens.length === 1 ? "serviço" : "serviços"} · toque para agendar</small>
-                  {itens.map((s) => (
-                    <button key={s.nome} className="bbeauty-service-row" onClick={() => openBook(s)}>
-                      <span className="s-nome">{s.nome}</span>
-                      <span className="s-dots" aria-hidden />
-                      <span className="s-meta">
-                        {s.duracaoMin ? `~${s.duracaoMin} min` : ""}
-                        {s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}
-                        {!s.preco && !s.duracaoMin ? <span className="ask">Sob consulta</span> : null}
-                        {!s.preco && s.duracaoMin ? <span className="ask"> · valor {noLugar}</span> : null}
+                  <small>{itens.length} {itens.length === 1 ? "item" : "itens"} · {vocab?.servicosHint ?? "toque para agendar"}</small>
+                  {itens.map((s) => {
+                    const meta = <>
+                      {s.duracaoMin ? `~${s.duracaoMin} min` : ""}
+                      {s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}
+                      {ctaKind === "agendar" && !s.preco && !s.duracaoMin ? <span className="ask">Sob consulta</span> : null}
+                      {ctaKind === "agendar" && !s.preco && s.duracaoMin ? <span className="ask"> · valor {noLugar}</span> : null}
+                      {ctaKind !== "agendar" && !s.preco ? <span className="ask">›</span> : null}
+                    </>;
+                    const wa = ctaKind !== "agendar" ? waServico(s.nome) : null;
+                    const main = (
+                      <span className="s-main">
+                        <span className="s-nome">{s.nome}</span>
+                        {s.descricao && <small className="s-desc">{s.descricao}</small>}
                       </span>
-                    </button>
-                  ))}
+                    );
+                    return wa
+                      ? <a key={s.nome} className="bbeauty-service-row" href={wa} target="_blank" rel="noopener noreferrer">
+                          {main}<span className="s-dots" aria-hidden /><span className="s-meta">{meta}</span>
+                        </a>
+                      : <button key={s.nome} type="button" className="bbeauty-service-row" onClick={() => openBook(s)}>
+                          {main}<span className="s-dots" aria-hidden /><span className="s-meta">{meta}</span>
+                        </button>;
+                  })}
                 </div>
               </FadeUp>
             ))}
@@ -332,6 +378,36 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           <FadeUp><p className="bbeauty-service-note">Valores e disponibilidade confirmados no WhatsApp — sem compromisso.</p></FadeUp>
         </div>
       </section>
+
+      {/* ---------- OFERTAS (quando o material do IG mostra promoções) ---------- */}
+      {temOfertas && (
+        <section className="bbeauty-section bbeauty-ofertas" id="ofertas" style={{ paddingTop: 0 }}>
+          <div className="bbeauty-wrap">
+            <div className="bbeauty-section-head">
+              <FadeUp y={16}><span className="bbeauty-eyebrow">Só aqui</span></FadeUp>
+              <h2 className="bbeauty-h2"><RevealText text={vocab?.ofertasTitle ?? "Ofertas"} /></h2>
+            </div>
+            <div className="bbeauty-deals">
+              {(cfg.ofertas ?? []).map((o, i) => (
+                <motion.article key={i} className="bbeauty-deal"
+                  initial={{ opacity: 0, y: 22, rotate: i % 2 ? 1.2 : -1.2 }}
+                  whileInView={{ opacity: 1, y: 0, rotate: 0 }}
+                  viewport={{ once: true, margin: "-40px" }}
+                  transition={{ duration: 0.55, delay: i * 0.08, ease: EASE }}>
+                  {o.tag && <span className="bbeauty-deal-tag"><Tag size={11} />{o.tag}</span>}
+                  <strong>{o.titulo}</strong>
+                  {o.texto && <p>{o.texto}</p>}
+                  {waNumber && (
+                    <a className="bbeauty-deal-cta" href={waServico(o.titulo) ?? `https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
+                      {ctaKind === "mapa" ? "Aproveitar" : "Quero essa"} <ArrowRight size={13} />
+                    </a>
+                  )}
+                </motion.article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ---------- CORREDOR 3D ---------- */}
       {galeria.length > 0 && (
@@ -588,7 +664,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           <div className="bbeauty-footer-body" ref={footBodyRef}>
             <h2 className="bbeauty-footer-h2">Seu momento de<br /><em>{vocab?.ctaEm ?? "se cuidar"}</em></h2>
             <div className="bbeauty-footer-pills">
-              <Magnetic><button className="bbeauty-pill primary" onClick={() => openBook()}><Sparkles size={15} /> Agendar agora</button></Magnetic>
+              <Magnetic><CtaButton className="bbeauty-pill primary"><Sparkles size={15} /> {ctaLabel}</CtaButton></Magnetic>
               {waNumber && <Magnetic><a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
               {cfg.contato.mapsUrl && <Magnetic><a className="bbeauty-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> Como chegar</a></Magnetic>}
               {cfg.contato.instagram && <Magnetic><a className="bbeauty-pill" href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
@@ -742,6 +818,55 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                   </button>
                 </div>
                 <p className="bbeauty-book-msg">A mensagem é montada com suas escolhas — é só enviar e a gente confirma na hora.</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+
+      {/* ---------- Modal "Visite-nos" (nichos de loja/mercado) ---------- */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {visitOpen && (
+            <motion.div className="bbeauty-book-modal-bg" data-palette={paleta} style={themeVars}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              onClick={() => setVisitOpen(false)}>
+              <motion.div className="bbeauty-booking-card bbeauty-book-modal bbeauty-visit-modal"
+                initial={{ opacity: 0, y: 42, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 30, scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 260, damping: 26 }}
+                onClick={(e) => e.stopPropagation()}>
+                <button className="bbeauty-modal-close" aria-label="Fechar" onClick={() => setVisitOpen(false)}><X size={17} /></button>
+                <div className="bbeauty-book-modal-head">
+                  <span className="bbeauty-eyebrow">Visite-nos</span>
+                  <h2 className="bbeauty-modal-h2">Te esperamos <em>{noLugar}</em></h2>
+                </div>
+                {cfg.contato.endereco && (
+                  <p className="bbeauty-visit-line"><MapPin size={15} />{cfg.contato.endereco}</p>
+                )}
+                {(cfg.horariosLabel?.length ?? 0) > 0 && (
+                  <div className="bbeauty-visit-hours">
+                    {(cfg.horariosLabel ?? []).map(([d, h]) => (
+                      <div key={d} className="bbeauty-hours-line"><span>{d}</span><strong>{h}</strong></div>
+                    ))}
+                  </div>
+                )}
+                <div className="bbeauty-visit-actions">
+                  {cfg.contato.mapsUrl && (
+                    <a className="bbeauty-pill primary" href={cfg.contato.mapsUrl} target="_blank" rel="noopener noreferrer">
+                      <MapPin size={15} /> Traçar rota
+                    </a>
+                  )}
+                  {waNumber && (
+                    <a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle size={15} /> WhatsApp
+                    </a>
+                  )}
+                  {telHref && <a className="bbeauty-pill" href={telHref}><Phone size={15} /> Ligar</a>}
+                </div>
               </motion.div>
             </motion.div>
           )}

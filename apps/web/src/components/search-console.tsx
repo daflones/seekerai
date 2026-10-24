@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BookmarkPlus, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
-  Search, SlidersHorizontal, Star, Users,
+  AlarmClock, Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
+  Search, SlidersHorizontal, Star, Users, XCircle,
 } from "lucide-react";
 import { fmtCompact, placeImageSrc, type PlaceResult } from "@/lib/app-client";
-import { formatPotential } from "@/lib/catalog";
+import { formatPotential, potentialEstimate } from "@/lib/catalog";
 import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/lib/catalog-i18n";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import type { Locale } from "@/lib/i18n/shared";
@@ -17,6 +17,10 @@ import { FancySelect } from "./fancy-select";
 
 const PAGE_SIZE = 9;
 const STORE_KEY = "seekerai_search_v1";
+// Proteção de espera: avisa aos 40s (busca continua), cancela aos 90s —
+// job que morre no edge ficaria "running" pra sempre sem isso.
+const SLOW_MS = 40_000;
+const DEAD_MS = 90_000;
 
 interface SearchResponse {
   resultados: PlaceResult[];
@@ -89,7 +93,10 @@ export function SearchConsole({
   const [confirming, setConfirming] = useState(false);
   const [chips, setChips] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState("oportunidade");
+  const [slow, setSlow] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Persistência: resultado e job ativo sobrevivem a troca de página/aba.
   function store(state: StoredState) {
@@ -98,6 +105,16 @@ export function SearchConsole({
 
   function stopPolling() {
     if (poller.current) { clearInterval(poller.current); poller.current = null; }
+    if (deadTimer.current) { clearTimeout(deadTimer.current); deadTimer.current = null; }
+  }
+
+  // Cancela a espera no cliente (o job segue no servidor, mas some da tela).
+  function cancelSearch(timed: boolean) {
+    stopPolling();
+    setBusy(false);
+    setSlow(false);
+    setTimedOut(timed);
+    store({ jobId: null, results: null, meta: null });
   }
 
   // Resultados que já são lead salvo vêm com leadId — pré-marca o mapa.
@@ -110,9 +127,12 @@ export function SearchConsole({
   function applyDone(data: SearchResponse, jobId: string | null) {
     const list = data.resultados ?? [];
     const m = { provedor: data.provedor, replay: data.replay, creditos: data.creditosCobrados };
+    stopPolling();
     setResults(list);
     setMeta(m);
     setBusy(false);
+    setSlow(false);
+    setTimedOut(false);
     setSaved(savedFromResults(list));
     setSelected(new Set());
     setPage(1);
@@ -123,6 +143,9 @@ export function SearchConsole({
   function pollJob(jobId: string) {
     stopPolling();
     setBusy(true);
+    setTimedOut(false);
+    // Backstop: se nenhum tick responder, corta mesmo assim.
+    deadTimer.current = setTimeout(() => cancelSearch(true), DEAD_MS);
     poller.current = setInterval(() => {
       void (async () => {
         try {
@@ -130,12 +153,16 @@ export function SearchConsole({
           const data = (await res.json().catch(() => null)) as { job?: SearchJob } | null;
           if (!res.ok || !data?.job) return;
           const job = data.job;
+          // Idade real do job — restaurado de outra aba já conta o tempo certo.
+          const elapsed = Date.now() - new Date(job.created_at).getTime();
+          if (elapsed >= SLOW_MS) setSlow(true);
+          if (elapsed >= DEAD_MS) { cancelSearch(true); return; }
           if (job.status === "done" && job.result) {
-            stopPolling();
             applyDone(job.result, jobId);
           } else if (job.status === "error") {
             stopPolling();
             setBusy(false);
+            setSlow(false);
             setError(job.erro ?? t.errSearch);
             store({ jobId: null, results: null, meta: null });
           }
@@ -152,8 +179,10 @@ export function SearchConsole({
     void doSearch();
   }
 
-  async function doSearch() {
-    const q = `${niche} ${lang === "pt" ? "em" : "in"} ${city}${refine.trim() ? `, ${refine.trim()}` : ""}`;
+  async function doSearch(cityOverride?: string) {
+    const cityName = cityOverride ?? city;
+    const q = `${niche} ${lang === "pt" ? "em" : "in"} ${cityName}${refine.trim() ? `, ${refine.trim()}` : ""}`;
+    if (cityOverride) setCity(cityOverride);
     setConfirming(false);
     setResults(null);
     setMeta(null);
@@ -161,6 +190,8 @@ export function SearchConsole({
     setSelected(new Set());
     setPage(1);
     setBusy(true);
+    setSlow(false);
+    setTimedOut(false);
     setError("");
     try {
       const res = await fetch("/api/search-jobs", {
@@ -310,6 +341,21 @@ export function SearchConsole({
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const selectableCount = results ? results.filter((_, i) => !saved[i]).length : 0;
 
+  // Sugestão pro timeout: cidade com maior potencial estimado pro
+  // nicho+serviço escolhidos, diferente da atual.
+  const suggestedCity = (() => {
+    const canon = canonicalNiche(niche);
+    let best: { label: string; e: number } | null = null;
+    for (const g of cGroups) {
+      for (const c of g.cities) {
+        if (c.label === city) continue;
+        const e = potentialEstimate(c, canon, service);
+        if (!best || e > best.e) best = { label: c.label, e };
+      }
+    }
+    return best;
+  })();
+
   return <div className="seek-console">
     <form className="seek-form" onSubmit={(e) => { e.preventDefault(); void search(); }}>
       <label className="seek-field">
@@ -374,6 +420,41 @@ export function SearchConsole({
     {busy && <p className="seek-meta seek-running" role="status">
       <Loader2 size={13} className="spin" /> {t.running}
     </p>}
+
+    {busy && slow && <div className="seek-slow" role="status">
+      <div className="seek-slow-text">
+        <strong><AlarmClock size={15} /> {t.slowT}</strong>
+        <p>{t.slowP}{suggestedCity ? ` ${t.slowCity} ${suggestedCity.label}.` : ""}</p>
+      </div>
+      <div className="seek-slow-actions">
+        {suggestedCity && (
+          <button type="button" className="button button-primary button-small"
+            onClick={() => void doSearch(suggestedCity.label)}>
+            <Search size={13} /> {t.slowTry} {suggestedCity.label}
+          </button>
+        )}
+        <button type="button" className="button button-glass button-small"
+          onClick={() => cancelSearch(false)}>
+          <XCircle size={13} /> {t.slowCancel}
+        </button>
+      </div>
+    </div>}
+
+    {timedOut && !busy && <div className="seek-slow" role="alert">
+      <div className="seek-slow-text">
+        <strong><AlarmClock size={15} /> {t.timeoutT}</strong>
+        <p>{t.timeoutP}</p>
+      </div>
+      <div className="seek-slow-actions">
+        {suggestedCity && (
+          <button type="button" className="button button-primary button-small"
+            onClick={() => void doSearch(suggestedCity.label)}>
+            <Search size={13} /> {t.slowTry} {suggestedCity.label}
+          </button>
+        )}
+      </div>
+    </div>}
+
     {error && <p role="alert" className="auth-error">{error}</p>}
 
     {meta && results !== null && !busy && <p className="seek-meta">

@@ -99,11 +99,14 @@ const serviceFit: Record<string, number> = {
   edicao_video: 0.45, motion_design: 0.35, producao_conteudo: 0.5,
 };
 
+/** Estimativa numérica de leads potenciais: cidade × nicho × serviço. */
+export function potentialEstimate(city: DemoCity, niche: string, service: string): number {
+  return city.businesses * (nicheWeight[niche] ?? 0.008) * (serviceFit[service] ?? 0.5);
+}
+
 /** Estimativa ilustrativa de leads potenciais: cidade × nicho × serviço. */
 export function formatPotential(city: DemoCity, niche: string, service: string): string {
-  const estimate = city.businesses
-    * (nicheWeight[niche] ?? 0.008)
-    * (serviceFit[service] ?? 0.5);
+  const estimate = potentialEstimate(city, niche, service);
   if (estimate >= 10_000) return `+${Math.round(estimate / 1000)} mil`;
   if (estimate >= 1_000) {
     const rounded = Math.round(estimate / 100) / 10;

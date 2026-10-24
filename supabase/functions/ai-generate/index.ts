@@ -323,15 +323,19 @@ function siteThemeFor(categoria: string | null): { tipo: "barbearia" | "beleza";
   if (/barbearia|barber|barbeiro/.test(c)) return { tipo: "barbearia", paleta: "barbearia" };
   const paleta =
     /tatuagem|tattoo|piercing/.test(c) ? "tattoo"
+    : /supermercado|mercado|mercearia|hortifruti|atacad|empório|emporio|conveniência|conveniencia/.test(c) ? "mercado"
     : /padaria|confeitaria|doceria|doce|bakery/.test(c) ? "padaria"
     : /pizzaria|restaurante|hamburgueria|lanchonete|churrascaria|sushi|cantina|comida|marmita/.test(c) ? "trattoria"
     : /cafeteria|café|coffee/.test(c) ? "cafe"
-    : /dentista|clínica|clinica|medicina|fisioterapia|psicolog|farmácia|farmacia|laborat|odonto|saúde|saude/.test(c) ? "clinica"
+    : /dentista|clínica|clinica|medicina|fisioterapia|psicolog|farmácia|farmacia|laborat|odonto|saúde|saude|nutricion/.test(c) ? "clinica"
     : /academia|crossfit|personal|pilates|yoga|luta|dança|danca|fitness|gym/.test(c) ? "studio"
     : /pet|veterinár/.test(c) ? "pet"
     : /flor|jardim|paisag/.test(c) ? "flora"
     : /estética automotiva|estetica automotiva|detalhamento|lava.*car|oficina|mecânic|mecanic/.test(c) ? "carbono"
     : /imobiliár|advocacia|advogad|contabil|escritório|escritorio|seguro/.test(c) ? "corporativo"
+    : /loja|boutique|calçado|calcado|joalheria|ótica|otica|eletrônic|eletronic|informática|informatica|móveis|moveis|decoraç|decorac|papelaria|livraria|brinquedo/.test(c) ? "varejo"
+    : /hotel|pousada|hospedagem|hospedaria/.test(c) ? "hotel"
+    : /escola|curso|idioma|autoescola|faculdade/.test(c) ? "educacao"
     : "beleza";
   return { tipo: "beleza", paleta };
 }
@@ -396,31 +400,177 @@ interface NichoVocab {
   ctaEm: string;
   /** JSON-LD @type. */
   schema: string;
+  /** Comportamento do CTA principal: agendar abre o fluxo de horário;
+      zap pede/encomenda pelo WhatsApp; mapa leva ao endereço. */
+  cta: "agendar" | "zap" | "mapa";
+  /** Texto do botão principal ("Agendar", "Pedir pelo WhatsApp"). */
+  ctaLabel: string;
+  /** Eyebrow da seção de serviços e item de nav ("Cardápio", "Setores"). */
+  servicosLabel: string;
+  /** Primeira parte do h2 da seção ("Escolha o seu", "Ofertas da"). */
+  servicosTitle: string;
+  /** Palavra em itálico do h2 ("momento", "semana", "prato"). */
+  servicosEm: string;
+  /** Dica sob cada categoria ("toque para agendar", "peça pelo WhatsApp"). */
+  servicosHint: string;
+  /** Título da seção de ofertas, quando o material do IG indicar
+      promoções ("Ofertas da semana"). null = nicho sem seção. */
+  ofertasTitle: string | null;
+  /** Guia pro prompt de copy: o que "servicos" e FAQ devem conter
+      neste nicho — evita "agendamento" em mercado, "cardápio" em clínica. */
+  guia: string;
 }
 
 /** Vocabulário por nicho — sem texto de salão de beleza em estúdio de
-    tattoo. Tudo determinístico a partir da paleta/categoria. */
+    tattoo nem "agendamento" em mercado. Determinístico por paleta. */
 function nicheVocab(paleta: string, categoria: string | null): NichoVocab {
   const V: Record<string, NichoVocab> = {
-    beleza: { rotulo: "ESPAÇO DE BELEZA", em: "se cuidar e se amar", desc: "beleza, cuidado e autoestima. Ambiente acolhedor e atendimento sem pressa.", prep: "o espaço", marquee: "Um lugar para você se cuidar", ctaEm: "se cuidar", schema: "BeautySalon" },
-    tattoo: { rotulo: "ESTÚDIO DE TATUAGEM", em: "marcar a sua história", desc: "tatuagens autorais e piercings. Ambiente criativo, atendimento sem pressa e arte de verdade.", prep: "o estúdio", marquee: "Arte que fica na pele", ctaEm: "se expressar", schema: "TattooParlor" },
-    padaria: { rotulo: "PADARIA ARTESANAL", em: "saborear o pão do dia", desc: "pães fresquinhos, cafés e doces da casa. Cheiro de fornada e aquele atendimento de bairro.", prep: "a padaria", marquee: "Saindo do forno, todo dia", ctaEm: "saborear", schema: "Bakery" },
-    trattoria: { rotulo: "RESTAURANTE", em: "viver a boa mesa", desc: "pratos da casa feitos com carinho. Ambiente acolhedor pra comer bem e ficar à vontade.", prep: "a casa", marquee: "Mesa posta, coração aberto", ctaEm: "saborear", schema: "Restaurant" },
-    cafe: { rotulo: "CAFÉ ESPECIAL", em: "viver o ritual do café", desc: "cafés especiais, métodos e lanches da casa. Um cantinho pra desacelerar.", prep: "o café", marquee: "Café passado na hora", ctaEm: "desacelerar", schema: "CafeOrCoffeeShop" },
-    clinica: { rotulo: "CLÍNICA", em: "cuidar da sua saúde", desc: "atendimento humanizado e cuidado completo. Estrutura pensada pra você se sentir bem.", prep: "a clínica", marquee: "Cuidado de verdade", ctaEm: "se cuidar", schema: "MedicalClinic" },
-    studio: { rotulo: "STUDIO FITNESS", em: "evoluir todo dia", desc: "treino, técnica e constância. Energia pra você sair melhor do que entrou.", prep: "o estúdio", marquee: "Seu melhor treino te espera", ctaEm: "evoluir", schema: "ExerciseGym" },
-    pet: { rotulo: "PETSHOP", em: "cuidar de quem te ama", desc: "banho, tosa e cuidado completo pro seu melhor amigo. Carinho em cada detalhe.", prep: "o espaço", marquee: "Pet feliz, dono tranquilo", ctaEm: "cuidar deles", schema: "PetStore" },
-    flora: { rotulo: "FLORICULTURA", em: "florescer o seu dia", desc: "arranjos autorais e flores fresquinhas. Delicadeza pra qualquer momento.", prep: "o ateliê", marquee: "Flores frescas, todo dia", ctaEm: "florescer", schema: "Florist" },
-    carbono: { rotulo: "ESTÉTICA AUTOMOTIVA", em: "brilhar de novo", desc: "detalhamento, proteção e acabamento de precisão. Seu carro tratado como merece.", prep: "o estúdio", marquee: "Detalhe que faz diferença", ctaEm: "renovar", schema: "AutoBodyShop" },
-    corporativo: { rotulo: "ESPAÇO PROFISSIONAL", em: "resolver com confiança", desc: "atendimento especializado e soluções sob medida. Seriedade com atenção de verdade.", prep: "o escritório", marquee: "Confiança em cada detalhe", ctaEm: "resolver", schema: "ProfessionalService" },
+    beleza: {
+      rotulo: "ESPAÇO DE BELEZA", em: "se cuidar e se amar",
+      desc: "beleza, cuidado e autoestima. Ambiente acolhedor e atendimento sem pressa.",
+      prep: "o espaço", marquee: "Um lugar para você se cuidar", ctaEm: "se cuidar", schema: "BeautySalon",
+      cta: "agendar", ctaLabel: "Agendar",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "momento",
+      servicosHint: "toque para agendar", ofertasTitle: null,
+      guia: "servicos = serviços de beleza/bem-estar com duracaoMin plausível (30-120). FAQ pode falar de agendamento, duração e preparo.",
+    },
+    tattoo: {
+      rotulo: "ESTÚDIO DE TATUAGEM", em: "marcar a sua história",
+      desc: "tatuagens autorais e piercings. Ambiente criativo, atendimento sem pressa e arte de verdade.",
+      prep: "o estúdio", marquee: "Arte que fica na pele", ctaEm: "se expressar", schema: "TattooParlor",
+      cta: "agendar", ctaLabel: "Agendar",
+      servicosLabel: "Estilos", servicosTitle: "Escolha o seu", servicosEm: "traço",
+      servicosHint: "toque para agendar", ofertasTitle: null,
+      guia: "servicos = estilos/trabalhos de tattoo e piercing (realismo, fine line, fechamento, piercing), duracaoMin 60-240. FAQ fala de orçamento, agendamento e cuidados.",
+    },
+    padaria: {
+      rotulo: "PADARIA ARTESANAL", em: "saborear o pão do dia",
+      desc: "pães fresquinhos, cafés e doces da casa. Cheiro de fornada e aquele atendimento de bairro.",
+      prep: "a padaria", marquee: "Saindo do forno, todo dia", ctaEm: "saborear", schema: "Bakery",
+      cta: "zap", ctaLabel: "Chamar no WhatsApp",
+      servicosLabel: "Delícias", servicosTitle: "Do forno pra", servicosEm: "mesa",
+      servicosHint: "peça pelo WhatsApp", ofertasTitle: "Ofertas da semana",
+      guia: "servicos = produtos/fornadas da padaria (pães, bolos, cafés, salgados, encomendas) — duracaoMin SEMPRE null, não é agendamento. Se as legendas/fotos mostrarem ofertas ou panfletos, crie a seção ofertas. FAQ fala de encomendas, fornadas e pagamento.",
+    },
+    mercado: {
+      rotulo: "MERCADO", em: "economizar todo dia",
+      desc: "ofertas fresquinhas, hortifruti e aquele atendimento de bairro. Preço bom de verdade.",
+      prep: "o mercado", marquee: "Ofertas novas toda semana", ctaEm: "economizar", schema: "GroceryStore",
+      cta: "mapa", ctaLabel: "Como chegar",
+      servicosLabel: "Setores", servicosTitle: "Todos os", servicosEm: "corredores",
+      servicosHint: "ofertas no balcão", ofertasTitle: "Ofertas da semana",
+      guia: "servicos = setores/departamentos e conveniências do mercado (hortifruti, padaria, açougue, ofertas da semana, entrega) — duracaoMin SEMPRE null. Se o material do Instagram mostrar panfletos/promoções, crie a seção ofertas com as campanhas vistas. NUNCA fale de agendamento. FAQ fala de entrega, pagamento e promoções.",
+    },
+    trattoria: {
+      rotulo: "RESTAURANTE", em: "viver a boa mesa",
+      desc: "pratos da casa feitos com carinho. Ambiente acolhedor pra comer bem e ficar à vontade.",
+      prep: "a casa", marquee: "Mesa posta, coração aberto", ctaEm: "saborear", schema: "Restaurant",
+      cta: "zap", ctaLabel: "Pedir pelo WhatsApp",
+      servicosLabel: "Cardápio", servicosTitle: "Escolha o seu", servicosEm: "prato",
+      servicosHint: "peça pelo WhatsApp", ofertasTitle: "Combos e promoções",
+      guia: "servicos = pratos/categorias do cardápio (entradas, pratos da casa, sobremesas, delivery) — duracaoMin SEMPRE null. Se as legendas/fotos mostrarem promoções, combos ou happy hour, crie a seção ofertas. FAQ fala de delivery, reservas e formas de pagamento.",
+    },
+    cafe: {
+      rotulo: "CAFÉ ESPECIAL", em: "viver o ritual do café",
+      desc: "cafés especiais, métodos e lanches da casa. Um cantinho pra desacelerar.",
+      prep: "o café", marquee: "Café passado na hora", ctaEm: "desacelerar", schema: "CafeOrCoffeeShop",
+      cta: "zap", ctaLabel: "Chamar no WhatsApp",
+      servicosLabel: "Cardápio", servicosTitle: "Escolha o seu", servicosEm: "ritual",
+      servicosHint: "peça pelo WhatsApp", ofertasTitle: "Combos da casa",
+      guia: "servicos = itens do cardápio (métodos, espressos, lanches, doces) — duracaoMin SEMPRE null. Combos/promoções nas legendas viram ofertas. FAQ fala de métodos, encomendas e pagamento.",
+    },
+    clinica: {
+      rotulo: "CLÍNICA", em: "cuidar da sua saúde",
+      desc: "atendimento humanizado e cuidado completo. Estrutura pensada pra você se sentir bem.",
+      prep: "a clínica", marquee: "Cuidado de verdade", ctaEm: "se cuidar", schema: "MedicalClinic",
+      cta: "agendar", ctaLabel: "Agendar consulta",
+      servicosLabel: "Tratamentos", servicosTitle: "Escolha o seu", servicosEm: "tratamento",
+      servicosHint: "toque para agendar", ofertasTitle: null,
+      guia: "servicos = consultas/tratamentos/exames com duracaoMin plausível (30-60). FAQ fala de agendamento, convênios e preparo.",
+    },
+    studio: {
+      rotulo: "STUDIO FITNESS", em: "evoluir todo dia",
+      desc: "treino, técnica e constância. Energia pra você sair melhor do que entrou.",
+      prep: "o estúdio", marquee: "Seu melhor treino te espera", ctaEm: "evoluir", schema: "ExerciseGym",
+      cta: "zap", ctaLabel: "Começar pelo WhatsApp",
+      servicosLabel: "Modalidades", servicosTitle: "Escolha o seu", servicosEm: "treino",
+      servicosHint: "monte seu plano", ofertasTitle: "Planos em destaque",
+      guia: "servicos = modalidades/planos (musculação, funcional, aulas, personal) — duracaoMin 45-60 só pra aulas; planos duracaoMin null. Planos promocionais/matrícula viram ofertas. FAQ fala de planos, aula experimental e horários.",
+    },
+    pet: {
+      rotulo: "PETSHOP", em: "cuidar de quem te ama",
+      desc: "banho, tosa e cuidado completo pro seu melhor amigo. Carinho em cada detalhe.",
+      prep: "o espaço", marquee: "Pet feliz, dono tranquilo", ctaEm: "cuidar deles", schema: "PetStore",
+      cta: "agendar", ctaLabel: "Agendar banho",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o melhor", servicosEm: "cuidado",
+      servicosHint: "toque para agendar", ofertasTitle: "Combos e pacotes",
+      guia: "servicos = banho, tosa, hidratação, táxi dog, vacinas se citado — duracaoMin 45-120. Combos/pacotes promocionais viram ofertas. FAQ fala de agendamento, porte e preparo.",
+    },
+    flora: {
+      rotulo: "FLORICULTURA", em: "florescer o seu dia",
+      desc: "arranjos autorais e flores fresquinhas. Delicadeza pra qualquer momento.",
+      prep: "o ateliê", marquee: "Flores frescas, todo dia", ctaEm: "florescer", schema: "Florist",
+      cta: "zap", ctaLabel: "Encomendar",
+      servicosLabel: "Arranjos", servicosTitle: "Escolha o seu", servicosEm: "arranjo",
+      servicosHint: "encomende pelo WhatsApp", ofertasTitle: "Edições especiais",
+      guia: "servicos = arranjos, buquês, encomendas pra ocasiões, assinatura de flores — duracaoMin SEMPRE null. Coleções/edições especiais viram ofertas. FAQ fala de encomenda, entrega e prazo.",
+    },
+    carbono: {
+      rotulo: "ESTÉTICA AUTOMOTIVA", em: "brilhar de novo",
+      desc: "detalhamento, proteção e acabamento de precisão. Seu carro tratado como merece.",
+      prep: "o estúdio", marquee: "Detalhe que faz diferença", ctaEm: "renovar", schema: "AutoBodyShop",
+      cta: "zap", ctaLabel: "Pedir orçamento",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o", servicosEm: "detalhe",
+      servicosHint: "orçamento pelo WhatsApp", ofertasTitle: null,
+      guia: "servicos = serviços automotivos (polimento, vitrificação, higienização, PPF) — duracaoMin 60-480. FAQ fala de orçamento, prazo e cuidados.",
+    },
+    corporativo: {
+      rotulo: "ESPAÇO PROFISSIONAL", em: "resolver com confiança",
+      desc: "atendimento especializado e soluções sob medida. Seriedade com atenção de verdade.",
+      prep: "o escritório", marquee: "Confiança em cada detalhe", ctaEm: "resolver", schema: "ProfessionalService",
+      cta: "zap", ctaLabel: "Falar com especialista",
+      servicosLabel: "Especialidades", servicosTitle: "Escolha a sua", servicosEm: "frente",
+      servicosHint: "consulte pelo WhatsApp", ofertasTitle: null,
+      guia: "servicos = áreas de atuação/especialidades do negócio — duracaoMin SEMPRE null. FAQ fala de primeira consulta, prazos e honorários de forma genérica.",
+    },
+    varejo: {
+      rotulo: "LOJA", em: "encontrar o seu estilo",
+      desc: "curadoria de produtos e aquele atendimento que faz diferença. Novidades toda semana.",
+      prep: "a loja", marquee: "Novidades chegando sempre", ctaEm: "garimpar", schema: "Store",
+      cta: "mapa", ctaLabel: "Como chegar",
+      servicosLabel: "Produtos", servicosTitle: "Garimpe o seu", servicosEm: "achado",
+      servicosHint: "novidades na loja", ofertasTitle: "Ofertas da loja",
+      guia: "servicos = categorias de produtos/coleções da loja — duracaoMin SEMPRE null. Liquidações, coleções e campanhas das legendas viram ofertas. FAQ fala de trocas, pagamento e entrega.",
+    },
+    hotel: {
+      rotulo: "HOSPEDAGEM", em: "descansar de verdade",
+      desc: "conforto, localização e aquele cuidado em cada detalhe da estadia.",
+      prep: "a hospedagem", marquee: "Sua estadia começa aqui", ctaEm: "descansar", schema: "LodgingBusiness",
+      cta: "zap", ctaLabel: "Reservar pelo WhatsApp",
+      servicosLabel: "Acomodações", servicosTitle: "Escolha a sua", servicosEm: "estadia",
+      servicosHint: "reserve pelo WhatsApp", ofertasTitle: "Pacotes e temporadas",
+      guia: "servicos = tipos de quarto/acomodações e comodidades — duracaoMin SEMPRE null. Pacotes promocionais viram ofertas. FAQ fala de check-in, reserva e estacionamento.",
+    },
+    educacao: {
+      rotulo: "ESCOLA & CURSOS", em: "aprender pra valer",
+      desc: "ensino de verdade, turmas acolhedoras e atenção em cada etapa.",
+      prep: "a escola", marquee: "Sua próxima etapa começa aqui", ctaEm: "aprender", schema: "EducationalOrganization",
+      cta: "zap", ctaLabel: "Falar com a secretaria",
+      servicosLabel: "Cursos", servicosTitle: "Escolha o seu", servicosEm: "caminho",
+      servicosHint: "matricule-se pelo WhatsApp", ofertasTitle: "Turmas abertas",
+      guia: "servicos = cursos/modalidades/turmas oferecidas — duracaoMin SEMPRE null. Turmas abertas e bolsas viram ofertas. FAQ fala de matrícula, materiais e horários.",
+    },
   };
-  const base = V[paleta] ?? {
+  return V[paleta] ?? {
     rotulo: (categoria ?? "ESTABELECIMENTO LOCAL").toUpperCase(),
     em: "se sentir em casa",
     desc: `${(categoria ?? "atendimento").toLowerCase()} e atendimento de verdade. Ambiente acolhedor, sem pressa.`,
     prep: "o espaço", marquee: "Um lugar pra você", ctaEm: "se cuidar", schema: "LocalBusiness",
+    cta: "zap", ctaLabel: "Chamar no WhatsApp",
+    servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "momento",
+    servicosHint: "chame pelo WhatsApp", ofertasTitle: "Ofertas",
+    guia: "servicos = o que o estabelecimento oferece, inferido da categoria e das legendas — duracaoMin só se for serviço com hora marcada, senão null. Adapte o FAQ ao tipo de negócio.",
   };
-  return base;
 }
 
 /** Resolve referências de imagem do lead/contexto em URLs baixáveis. */
@@ -900,6 +1050,14 @@ function sanitizeConfigPatch(raw: unknown): Record<string, unknown> {
       .filter((x) => x.q && x.a);
     if (f.length) patch.faq = f;
   }
+  if (Array.isArray(raw.ofertas)) {
+    const o = raw.ofertas.filter(isRecord).slice(0, 6).map((x) => ({
+      titulo: str(x.titulo, 80) ?? "",
+      texto: str(x.texto, 200),
+      tag: str(x.tag, 40),
+    })).filter((x) => x.titulo);
+    if (o.length) patch.ofertas = o;
+  }
   if (isRecord(raw.seo)) {
     const desc = str(raw.seo.description, 160);
     if (desc) patch.seo = { description: desc };
@@ -913,13 +1071,16 @@ const CONFIG_PATCH_SYSTEM = [
   "Responda APENAS com JSON válido (sem markdown, sem comentários) neste formato exato:",
   '{ "tagline": "frase curta de marca", "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null}],',
   '  "historia": {"titulo":"…","paragrafos":["…","…"]}, "diferenciais":["…"],',
+  '  "ofertas": [{"titulo":"…","texto":"…","tag":"OFERTA"}],',
   '  "faq":[{"q":"…","a":"…"}], "seo":{"description":"…"} }',
   "REGRAS:",
-  "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados). Não invente preços, profissionais, prêmios ou números.",
-  "- Se os serviços reais não estiverem claros, proponha os 4-8 serviços mais típicos da categoria, com duracaoMin plausível (30-120) e preco SEMPRE null.",
+  "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados, legendas do Instagram). Não invente preços, profissionais, prêmios ou números.",
+  "- Siga o GUIA DO NICHO enviado junto com os fatos — ele define o que 'servicos' representa nesse negócio (cardápio, setores, tratamentos…) e se duracaoMin deve ser null.",
+  "- Se os serviços reais não estiverem claros, proponha 4-8 itens típicos da categoria, respeitando o guia do nicho, e preco SEMPRE null.",
+  "- ofertas: SÓ preencha quando o material real (legendas/fotos do Instagram) mostrar promoções, panfletos, combos, pacotes ou campanhas — ex.: panfleto de mercado, happy hour, combo de banho+tosa. tag é um selo curto ('OFERTA DA SEMANA', 'COMBO'). Sem material promocional, omita o campo. Nunca invente preço ou validade; pode mencionar valores apenas se estiverem escritos nas legendas.",
   "- tagline: elegante, max 8 palavras, no tom do negócio.",
-  "- historia: 2 parágrafos acolhedores sobre a proposta do espaço — sem inventar datas/fatos; pode falar de proposta e experiência, não de biografia.",
-  "- faq: 4-6 perguntas práticas (agendamento, formas de pagamento, duração, preparo) com respostas honestas e genéricas.",
+  "- historia: 2 parágrafos acolhedores sobre a proposta do lugar — sem inventar datas/fatos; pode falar de proposta e experiência, não de biografia.",
+  "- faq: 4-6 perguntas práticas ADAPTADAS ao nicho (o guia diz quais temas fazem sentido — entrega, estacionamento, matrícula, orçamento… nunca agendamento quando o negócio não agenda).",
   "- seo.description: 1 frase com nome + categoria + cidade.",
   "- Todo o texto em português brasileiro, sem emojis.",
 ].join("\n");
@@ -1070,9 +1231,12 @@ async function publishPremiumSite(
     const facts: string[] = [];
     if (igMeta?.bio) facts.push(`Bio do Instagram: ${asString(igMeta.bio, 400)}`);
     if (igMeta?.seguidores) facts.push(`Seguidores no Instagram: ${igMeta.seguidores} (${igMeta.posts ?? 0} posts)`);
+    const vocab = nicheVocab(paleta, asString(lead.categoria, 150));
     const extra = [
+      `GUIA DO NICHO (${vocab.rotulo}): ${vocab.guia}`,
       facts.length ? `Dados reais do Instagram:\n${facts.join("\n")}` : "",
-      captions ? `Legendas reais do Instagram do estabelecimento (use pra inferir serviços, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}` : "",
+      captions ? `Legendas reais do Instagram do estabelecimento (use pra inferir serviços, ofertas, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}` : "",
+      ig?.videos?.length ? `O perfil tem ${ig.videos.length} reels/vídeos recentes — se as legendas indicarem bastidores/produção, a seção de história pode mencionar esse processo.` : "",
     ].filter(Boolean).join("\n\n");
     return configPatchFromAi(apiKey, lead, extra ? `\n${extra}` : "");
   })();

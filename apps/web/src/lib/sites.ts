@@ -39,7 +39,20 @@ export interface SiteConfig {
     marquee: string;
     ctaEm: string;
     schema: string;
+    /** agendar = fluxo de horário; zap = WhatsApp; mapa = como chegar. */
+    cta?: "agendar" | "zap" | "mapa";
+    ctaLabel?: string;
+    servicosLabel?: string;
+    servicosTitle?: string;
+    servicosEm?: string;
+    servicosHint?: string;
+    /** Título da seção de ofertas; quando definido e `ofertas` vier
+        da IA (material promocional no IG), a seção aparece. */
+    ofertasTitle?: string | null;
   };
+  /** Promoções/campanhas detectadas no material do Instagram (mercado,
+      restaurante, petshop…) — renderizadas como seção própria. */
+  ofertas?: { titulo: string; texto?: string; tag?: string }[];
   contato: {
     telefone?: string;
     whatsapp?: string;

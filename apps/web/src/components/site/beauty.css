@@ -87,6 +87,30 @@
   --bb-line: #ffffff14; --bb-line-2: #ffffff26; --bb-text: #e9ecef; --bb-muted: #98a1ab;
   --bb-accent: #e09b2d; --bb-accent-2: #f0c56d; --bb-accent-ink: #e09b2d; --bb-espresso: #0b0c0e;
 }
+/* Mercado: verde hortifruti + amarelo de encarte de ofertas. */
+.bbeauty[data-palette="mercado"], .bbeauty-book-modal-bg[data-palette="mercado"], .bbeauty-lightbox[data-palette="mercado"] {
+  --bb-bg: #f4f7ee; --bb-bg-2: #ecf1df; --bb-panel: #fdfef8; --bb-panel-2: #f0f4e3;
+  --bb-line: #1c301d17; --bb-line-2: #1c301d2e; --bb-text: #1c301d; --bb-muted: #6c7d62;
+  --bb-accent: #2f8f4e; --bb-accent-2: #e0a81e; --bb-accent-ink: #f4fbef; --bb-espresso: #152a1c;
+}
+/* Varejo: couro/taupe de boutique, acolhedor sem ser doce. */
+.bbeauty[data-palette="varejo"], .bbeauty-book-modal-bg[data-palette="varejo"], .bbeauty-lightbox[data-palette="varejo"] {
+  --bb-bg: #f7f4f1; --bb-bg-2: #efe9e4; --bb-panel: #fffdfb; --bb-panel-2: #f3ede7;
+  --bb-line: #2a1d1617; --bb-line-2: #2a1d162e; --bb-text: #2a1d16; --bb-muted: #86736a;
+  --bb-accent: #8f5a3c; --bb-accent-2: #c9a183; --bb-accent-ink: #fdf6f0; --bb-espresso: #221812;
+}
+/* Hotel: navy profundo + dourado de recepção. */
+.bbeauty[data-palette="hotel"], .bbeauty-book-modal-bg[data-palette="hotel"], .bbeauty-lightbox[data-palette="hotel"] {
+  --bb-bg: #f5f5f1; --bb-bg-2: #ecebe4; --bb-panel: #fefefc; --bb-panel-2: #f0efe8;
+  --bb-line: #1a243317; --bb-line-2: #1a24332e; --bb-text: #1a2433; --bb-muted: #6f7886;
+  --bb-accent: #9a7b3f; --bb-accent-2: #c9ab6a; --bb-accent-ink: #fdf8ec; --bb-espresso: #14202e;
+}
+/* Educação: azul escolar confiante + amarelo de marca-texto. */
+.bbeauty[data-palette="educacao"], .bbeauty-book-modal-bg[data-palette="educacao"], .bbeauty-lightbox[data-palette="educacao"] {
+  --bb-bg: #f3f6fa; --bb-bg-2: #eaf0f7; --bb-panel: #ffffff; --bb-panel-2: #eef3f9;
+  --bb-line: #17283d17; --bb-line-2: #17283d2e; --bb-text: #17283d; --bb-muted: #6d7a8c;
+  --bb-accent: #2f6fb2; --bb-accent-2: #f2b53d; --bb-accent-ink: #f0f6fd; --bb-espresso: #132236;
+}
 
 /* ---------- Variantes de composição (o mesmo nicho não sai clone) ---------- */
 /* b: fotos à esquerda, frame retangular, polaroid pro outro lado. */
@@ -416,13 +440,59 @@
   margin-top: 22px; font-size: 12.5px; color: var(--bb-muted); font-style: italic;
   font-family: var(--bb-font-display); font-size: 16px;
 }
+a.bbeauty-service-row { text-decoration: none; width: 100%; }
+.bbeauty-service-row .s-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bbeauty-service-row .s-desc { font-size: 12px; font-weight: 400; color: var(--bb-muted); line-height: 1.4; }
+
+/* ---------- Modal "Visite-nos" (varejo/mercado) ---------- */
+.bbeauty-visit-modal { max-width: 480px; }
+.bbeauty-visit-line {
+  display: flex; align-items: flex-start; gap: 9px; margin: 0;
+  font-size: 14.5px; line-height: 1.5; color: var(--bb-text);
+}
+.bbeauty-visit-line svg { flex-shrink: 0; margin-top: 3px; color: var(--bb-accent); }
+.bbeauty-visit-hours { display: flex; flex-direction: column; gap: 7px; margin-top: 18px; }
+.bbeauty-visit-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+/* ---------- Ofertas (promoções detectadas no material do IG) ---------- */
+.bbeauty-deals {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;
+}
+.bbeauty-deal {
+  position: relative; border-radius: 20px; overflow: hidden;
+  padding: 26px 22px 22px; border: 1px dashed var(--bb-line-2);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bb-panel) 88%, transparent), color-mix(in srgb, var(--bb-panel-2) 80%, transparent));
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+}
+.bbeauty-deal::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 4px;
+  background: linear-gradient(90deg, var(--bb-accent), var(--bb-accent-2));
+}
+.bbeauty-deal-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--bb-accent); color: var(--bb-accent-ink);
+  font-size: 10.5px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+}
+.bbeauty-deal strong {
+  font-family: var(--bb-font-display); font-size: 24px; font-weight: 600; line-height: 1.15;
+}
+.bbeauty-deal p { margin: 0; font-size: 13.5px; color: var(--bb-muted); line-height: 1.55; }
+.bbeauty-deal-cta {
+  margin-top: auto; display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--bb-accent); text-decoration: none;
+}
+.bbeauty-deal-cta:hover { text-decoration: underline; }
+.bbeauty-nav-ofertas { color: var(--bb-accent); font-weight: 800; }
+a.bbeauty-nav-cta, a.bbeauty-mobile-cta { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 
 /* ---------- Corredor 3D ---------- */
 .bbeauty-corridor { position: relative; }
 .bbeauty-corridor-stream {
   height: clamp(420px, 62vh, 620px);
   background:
-    radial-gradient(60% 70% at 50% 55%, #f4ecda66, transparent 75%),
+    radial-gradient(60% 70% at 50% 55%, color-mix(in srgb, var(--bb-accent-2) 20%, transparent), transparent 75%),
     linear-gradient(180deg, var(--bb-bg), var(--bb-bg-2) 55%, var(--bb-bg));
 }
 .bbeauty-corridor-overlay {
