@@ -183,14 +183,14 @@ export function useBooking(cfg: SiteConfig) {
     const now = new Date();
     for (let i = 0; i < (cfg.booking.diasFuturos || 14); i++) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-      out.push({ d, aberto: Boolean(cfg.horarios[String(d.getDay())]?.length) });
+      out.push({ d, aberto: Boolean(cfg.horarios?.[String(d.getDay())]?.length) });
     }
     return out;
   }, [cfg]);
 
   const slots = useMemo(() => {
     if (!bk.data) return [];
-    const janelas = cfg.horarios[String(bk.data.getDay())] ?? [];
+    const janelas = cfg.horarios?.[String(bk.data.getDay())] ?? [];
     const dur = bk.servico?.duracaoMin ?? cfg.booking.slotMin;
     const stepMin = cfg.booking.slotMin || 30;
     const now = new Date();

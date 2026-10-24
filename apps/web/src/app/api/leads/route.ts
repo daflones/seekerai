@@ -34,6 +34,7 @@ const leadItem = z.object({
     estado: z.enum(["bom", "ok", "desatualizado", "fora"]),
     sinais: z.array(z.string().max(120)).max(8),
   }).nullish(),
+  horariosLabel: z.array(z.tuple([z.string().max(60), z.string().max(120)])).max(7).nullish(),
 });
 
 const leadSchema = z.object({
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
         ...(item.siteCheck ? { siteCheck: item.siteCheck } : {}),
         ...(item.ig ? { ig: item.ig } : {}),
         ...(item.pais ? { pais: item.pais } : {}),
+        ...(item.horariosLabel?.length ? { horariosLabel: item.horariosLabel } : {}),
       },
     }));
     // place_id nulo nunca colide; unique (user_id, place_id) ignora duplicados.

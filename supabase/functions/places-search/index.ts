@@ -34,6 +34,7 @@ const FIELD_MASK = [
   "places.businessStatus",
   "places.primaryTypeDisplayName",
   "places.regularOpeningHours.openNow",
+  "places.regularOpeningHours.weekdayDescriptions",
   "places.addressComponents",
   "places.photos",
 ].join(",");
@@ -67,6 +68,8 @@ interface NormalizedPlace {
   lng: number | null;
   whatsapp: boolean | null;
   instagram: string | null;
+  /** Horários reais do Maps — "Segunda: 09:00–19:00" pares [dia, faixa]. */
+  horariosLabel?: [string, string][] | null;
   /** Dados do perfil do Instagram — preenchido pelo enrichInstagram. */
   ig?: IgProfile | null;
   siteCheck?: SiteCheck | null;
@@ -151,9 +154,30 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
       lng: null,
       whatsapp: null,
       instagram: null,
+      horariosLabel: parseWeekdayDescriptions(
+        isRecord(place.regularOpeningHours)
+          ? place.regularOpeningHours.weekdayDescriptions
+          : null,
+      ),
     };
   });
 }
+
+/** "segunda-feira: 09:00–19:00" (já localizado) → ["Segunda-feira","09:00–19:00"]. */
+function parseWeekdayDescriptions(list: unknown): [string, string][] | null {
+  const out = (Array.isArray(list) ? list : [])
+    .flatMap((d): [string, string][] => {
+      const m = asString(d, 200)?.match(/^(.+?):\s*(.+)$/);
+      if (!m) return [];
+      return [[m[1][0].toUpperCase() + m[1].slice(1), m[2].trim()]];
+    });
+  return out.length ? out : null;
+}
+
+const DAY_PT_SEARCH: Record<string, string> = {
+  monday: "Segunda", tuesday: "Terça", wednesday: "Quarta", thursday: "Quinta",
+  friday: "Sexta", saturday: "Sábado", sunday: "Domingo",
+};
 
 async function searchApify(query: string): Promise<NormalizedPlace[]> {
   const token = await requireSecret("APIFY_API_TOKEN");
@@ -203,6 +227,18 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
       pais: asString(p.countryCode, 2)?.toUpperCase() ?? null,
       whatsapp: null,
       instagram: asString(p.instagramUrl ?? p.instagram, 300) ?? null,
+      // openingHours: [{day:"Monday", hours:"9:00 AM to 7:00 PM"}] — os
+      // horários reais do Maps chegam ao site via dados.horariosLabel.
+      horariosLabel: (() => {
+        const out = (Array.isArray(p.openingHours) ? p.openingHours : [])
+          .flatMap((d): [string, string][] => {
+            if (!isRecord(d)) return [];
+            const day = DAY_PT_SEARCH[(asString(d.day, 30) ?? "").toLowerCase()];
+            const hours = asString(d.hours, 120);
+            return day && hours ? [[day, hours]] : [];
+          });
+        return out.length ? out : null;
+      })(),
     };
   });
 }

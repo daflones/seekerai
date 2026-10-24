@@ -573,6 +573,126 @@ function nicheVocab(paleta: string, categoria: string | null): NichoVocab {
   };
 }
 
+/**
+ * Fallback determinístico quando a IA não devolve servicos (timeout,
+ * modelo fora do ar) — a seção nunca renderiza vazia.
+ */
+function defaultServicos(paleta: string): Record<string, unknown>[] {
+  const S: Record<string, [string, string, string | null][]> = {
+    beleza: [
+      ["Cabelo", "Corte, escova, coloração e tratamentos capilares", "60-120"],
+      ["Estética facial", "Limpeza de pele e tratamentos faciais", "45-90"],
+      ["Mãos e pés", "Manicure, pedicure e esmaltação", "45-60"],
+    ],
+    barbearia: [
+      ["Corte", "Corte clássico ou atual com finalização", "40-60"],
+      ["Barba", "Barba completa com navalha e toalha quente", "30-45"],
+      ["Sobrancelha", "Alinhamento e design", "15-20"],
+    ],
+    tattoo: [
+      ["Tattoo autoral", "Projeto exclusivo criado junto com o artista", "120-240"],
+      ["Realismo", "Preto e cinza ou colorido", "180-360"],
+      ["Fechamento", "Braço, perna ou costas por sessões", "240-480"],
+      ["Piercing", "Aplicação com material descartável", "30-60"],
+    ],
+    trattoria: [
+      ["Pratos da casa", "Especialidades feitas com carinho", null],
+      ["Sobremesas", "Doces artesanais pra fechar a refeição", null],
+      ["Delivery", "Peça em casa pelo WhatsApp", null],
+    ],
+    padaria: [
+      ["Pães artesanais", "Fermentação natural e fornadas diárias", null],
+      ["Confeitaria", "Bolos, doces e tortas da casa", null],
+      ["Café da manhã", "Cafés, lanches e salgados fresquinhos", null],
+    ],
+    cafe: [
+      ["Cafés especiais", "Espresso, filtrados e métodos especiais", null],
+      ["Lanches", "Tostas, sanduíches e lanches da casa", null],
+      ["Doces", "Sobremesas pra acompanhar o café", null],
+    ],
+    clinica: [
+      ["Consultas", "Atendimento humanizado e completo", "30-60"],
+      ["Exames", "Check-ups e exames de rotina", "30-60"],
+      ["Acompanhamento", "Retornos e tratamento contínuo", "30-45"],
+    ],
+    studio: [
+      ["Musculação", "Treino com acompanhamento", null],
+      ["Aulas coletivas", "Turmas com horários variados", "45-60"],
+      ["Avaliação", "Avaliação física inicial", "30-45"],
+    ],
+    pet: [
+      ["Banho", "Banho completo com produtos específicos", "60-90"],
+      ["Tosa", "Higiênica e estética por porte", "60-120"],
+      ["Cuidado", "Hidratação, escovação e cuidado extra", "45-90"],
+    ],
+    flora: [
+      ["Buquês", "Arranjos autorais pra qualquer ocasião", null],
+      ["Plantas", "Vasos e plantas pra casa ou escritório", null],
+      ["Encomendas", "Presentes e decoração sob encomenda", null],
+    ],
+    carbono: [
+      ["Detalhamento", "Lavagem técnica e acabamento completo", "120-240"],
+      ["Polimento", "Correção de pintura e brilho", "240-480"],
+      ["Proteção", "Vitrificação, cera e películas", "240-480"],
+    ],
+    corporativo: [
+      ["Consultoria", "Atendimento especializado sob medida", null],
+      ["Atendimento", "Primeira conversa pra entender seu caso", null],
+    ],
+    mercado: [
+      ["Hortifruti", "Frutas e verduras fresquinhas todo dia", null],
+      ["Açougue", "Cortes frescos e especiais", null],
+      ["Padaria", "Pães e frios direto do balcão", null],
+      ["Ofertas da semana", "Promoções novas toda semana", null],
+    ],
+    varejo: [
+      ["Coleções", "Curadoria e novidades toda semana", null],
+      ["Acessórios", "Peças pra completar o seu estilo", null],
+      ["Novidades", "Chegadas exclusivas na loja", null],
+    ],
+    hotel: [
+      ["Acomodações", "Quartos confortáveis e bem cuidados", null],
+      ["Café da manhã", "Pra começar bem o dia", null],
+      ["Estadia", "Conforto e localização privilegiada", null],
+    ],
+    educacao: [
+      ["Cursos", "Turmas e modalidades disponíveis", null],
+      ["Reforço", "Acompanhamento individualizado", null],
+      ["Matrículas", "Turmas abertas — fale com a secretaria", null],
+    ],
+  };
+  const min = (r: string | null) => {
+    if (!r) return { duracaoMin: null };
+    const [a, b] = r.split("-").map(Number);
+    return { duracaoMin: a ? Math.round((a + (b ?? a)) / 2) : null };
+  };
+  return (S[paleta] ?? S.corporativo).map(([nome, descricao, d]) => ({
+    nome, descricao, ...min(d),
+  }));
+}
+
+const DOW_NAME: Record<string, string> = {
+  domingo: "0", segunda: "1", "segunda-feira": "1", "terça": "2", "terça-feira": "2",
+  quarta: "3", "quarta-feira": "3", quinta: "4", "quinta-feira": "4",
+  sexta: "5", "sexta-feira": "5", "sábado": "6",
+  sunday: "0", monday: "1", tuesday: "2", wednesday: "3", thursday: "4",
+  friday: "5", saturday: "6",
+};
+
+/** Labels reais ("Segunda", "09:00 – 19:00") → mapa de janelas pro booking. */
+function horariosFromLabels(
+  labels: [string, string][] | undefined,
+): Record<string, [string, string][] | null> | undefined {
+  if (!labels?.length) return undefined;
+  const out: Record<string, [string, string][] | null> = {};
+  for (const [day, range] of labels) {
+    const key = DOW_NAME[day.toLowerCase()];
+    if (!key || key in out) continue;
+    out[key] = parseOpeningHours(range);
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Resolve referências de imagem do lead/contexto em URLs baixáveis. */
 async function resolveLeadImageSources(
   lead: Record<string, unknown>,
@@ -767,6 +887,125 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
     ...(horariosLabel.length ? { horarios, horariosLabel } : {}),
     avaliacao: typeof place.totalScore === "number" ? place.totalScore : undefined,
     totalAvaliacoes: typeof place.reviewsCount === "number" ? place.reviewsCount : undefined,
+  };
+}
+
+/** Extrai @ do HTML de um site (barato — uma requisição, sem Apify). */
+async function instagramFromWebsite(url: string): Promise<string | undefined> {
+  if (!/^https?:\/\//i.test(url)) return undefined;
+  if (url.match(/instagram\.com\//i)) {
+    const h = url.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]+)/i)?.[1];
+    return h ? `@${h}` : undefined;
+  }
+  const res = await fetch(url, {
+    headers: { "user-agent": "Mozilla/5.0 (compatible; SeekerAI/1.0)" },
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => null);
+  if (!res?.ok) return undefined;
+  const html = (await res.text().catch(() => "")).slice(0, 250_000);
+  const m = html.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]{1,40})/i);
+  const h = m?.[1];
+  if (!h || /^(p|tv|reel|reels|explore|accounts|embed|share|oauth)$/i.test(h)) return undefined;
+  return `@${h}`;
+}
+
+/**
+ * Fallback quando a Apify está fora do ar (ex.: sem crédito): Google
+ * Places (New) devolve reviews, horários, fotos e rating pelo place_id
+ * que o lead já guarda da busca.
+ */
+async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>): Promise<PlaceDetails> {
+  const empty: PlaceDetails = { reviews: [], imageUrls: [] };
+  const key = await getSecret("GOOGLE_PLACES_API_KEY");
+  if (!key) return empty;
+  const MASK = "id,displayName,rating,userRatingCount,reviews,regularOpeningHours,photos,websiteUri";
+  const placeId = asString(lead.place_id, 300);
+  let place: Record<string, unknown> | null = null;
+  if (placeId) {
+    const res = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=pt-BR`,
+      { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": MASK }, signal: AbortSignal.timeout(20_000) },
+    ).catch(() => null);
+    if (res?.ok) place = await res.json().catch(() => null) as Record<string, unknown>;
+    else console.error("[site] google places get falhou:", res?.status ?? "network");
+  }
+  if (!place) {
+    const nome = asString(lead.nome, 150) ?? "";
+    const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": MASK },
+      body: JSON.stringify({ textQuery: `${nome} ${cidade}`.trim(), languageCode: "pt-BR", maxResultCount: 1 }),
+      signal: AbortSignal.timeout(20_000),
+    }).catch(() => null);
+    const data = res?.ok ? await res.json().catch(() => null) : null;
+    if (!res?.ok) console.error("[site] google places search falhou:", res?.status ?? "network");
+    place = isRecord(data?.places?.[0]) ? data.places[0] : null;
+  }
+  if (!place) return empty;
+
+  const reviews = (Array.isArray(place.reviews) ? place.reviews : [])
+    .slice(0, 5).flatMap((r): PlaceReview[] => {
+      if (!isRecord(r)) return [];
+      const texto = isRecord(r.text) ? asString(r.text.text, 500) : undefined;
+      if (!texto || texto.length < 12) return [];
+      const autor = isRecord(r.authorAttribution)
+        ? asString(r.authorAttribution.displayName, 80)
+        : undefined;
+      return [{
+        autor: autor ?? "Cliente",
+        nota: typeof r.rating === "number" ? r.rating : 5,
+        texto,
+        quando: asString(r.relativePublishTimeDescription, 40),
+      }];
+    });
+
+  const hoursObj = isRecord(place.regularOpeningHours) ? place.regularOpeningHours : null;
+  // weekdayDescriptions já vem localizado ("segunda-feira: 09:00–19:00").
+  const horariosLabel: [string, string][] = (Array.isArray(hoursObj?.weekdayDescriptions)
+    ? hoursObj.weekdayDescriptions : [])
+    .flatMap((d): [string, string][] => {
+      const m = asString(d, 200)?.match(/^(.+?):\s*(.+)$/);
+      return m ? [[m[1][0].toUpperCase() + m[1].slice(1), m[2].trim()]] : [];
+    });
+  // Sem descriptions, monta dos períodos (day 0 = domingo).
+  if (!horariosLabel.length) {
+    const horarios: Record<string, [string, string][] | null> = {};
+    const byDay = new Map<string, [string, string]>();
+    for (const p of Array.isArray(hoursObj?.periods) ? hoursObj.periods : []) {
+      if (!isRecord(p) || !isRecord(p.open) || typeof p.open.day !== "number") continue;
+      const fmt = (t: Record<string, unknown>) =>
+        `${String(typeof t.hour === "number" ? t.hour : 0).padStart(2, "0")}:${String(typeof t.minute === "number" ? t.minute : 0).padStart(2, "0")}`;
+      const key2 = String(p.open.day);
+      const win = isRecord(p.close) ? `${fmt(p.open)} – ${fmt(p.close)}` : "Aberto 24h";
+      if (!byDay.has(key2)) {
+        horarios[key2] = [isRecord(p.close) ? [fmt(p.open), fmt(p.close)] : ["00:00", "23:59"]];
+        byDay.set(key2, [DAY_PT[key2] ?? key2, win]);
+      }
+    }
+    horariosLabel.push(...["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []));
+  }
+
+  // Fotos do Maps: photos[].name → endpoint de mídia retorna photoUri.
+  const imageUrls = (await Promise.all(
+    (Array.isArray(place.photos) ? place.photos : []).slice(0, 4).map(async (ph) => {
+      if (!isRecord(ph) || typeof ph.name !== "string") return null;
+      const res = await fetch(
+        `https://places.googleapis.com/v1/${ph.name}/media?maxWidthPx=1600&skipHttpRedirect=true&key=${encodeURIComponent(key)}`,
+        { signal: AbortSignal.timeout(15_000) },
+      ).catch(() => null);
+      const data = res?.ok ? await res.json().catch(() => null) : null;
+      return isRecord(data) ? asString(data.photoUri, 800) : null;
+    }),
+  )).filter((u): u is string => Boolean(u));
+
+  const site = asString(place.websiteUri, 500);
+  const instagram = site ? await instagramFromWebsite(site) : undefined;
+  return {
+    reviews, imageUrls, instagram,
+    ...(horariosLabel.length ? { horariosLabel } : {}),
+    avaliacao: typeof place.rating === "number" ? place.rating : undefined,
+    totalAvaliacoes: typeof place.userRatingCount === "number" ? place.userRatingCount : undefined,
   };
 }
 
@@ -1005,8 +1244,14 @@ function baseSiteConfig(lead: Record<string, unknown>, tipo: string): Record<str
       endereco: asString(lead.endereco, 300) ?? undefined,
       mapsUrl: asString(lead.maps_url, 800) ?? asString(dados.mapsUrl, 800) ?? undefined,
     },
-    horarios: { "0": null, "1": [["09:00", "19:00"]], "2": [["09:00", "19:00"]], "3": [["09:00", "19:00"]], "4": [["09:00", "19:00"]], "5": [["09:00", "19:00"]], "6": [["09:00", "14:00"]] },
-    horariosLabel: [["Segunda a sexta", "09:00 – 19:00"], ["Sábado", "09:00 – 14:00"], ["Domingo", "Fechado"]],
+    // Horários: só reais — salvos na busca (dados.horariosLabel) ou
+    // rebuscados do Maps na geração. Nunca fabricados.
+    horariosLabel: (Array.isArray(dados.horariosLabel) ? dados.horariosLabel : [])
+      .flatMap((p): [string, string][] => {
+        if (!Array.isArray(p) || p.length !== 2) return [];
+        const d = asString(p[0], 60); const h = asString(p[1], 120);
+        return d && h ? [[d, h]] : [];
+      }),
     servicos: [],
     avaliacoes: typeof lead.avaliacao === "number"
       ? { nota: lead.avaliacao, total: typeof lead.total_avaliacoes === "number" ? lead.total_avaliacoes : 0, fonte: "Google" }
@@ -1205,14 +1450,32 @@ async function publishPremiumSite(
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // Scrapes secundários em paralelo — Apify demora e o gateway corta em
   // ~150s, então cada consumidor faz race com um cap próprio.
-  const placePromise = fetchPlaceDetails(lead);
+  // Apify primeiro; sem reviews/horários (ex.: sem crédito) o Google
+  // Places cobre com os dados que o place_id do lead já referencia.
+  const placePromise = (async () => {
+    const ap = await fetchPlaceDetails(lead);
+    if (ap.reviews.length || ap.horariosLabel?.length) return ap;
+    console.log("[site] apify vazio — fallback Google Places");
+    const g = await fetchPlaceDetailsGoogle(lead);
+    return {
+      reviews: ap.reviews.length ? ap.reviews : g.reviews,
+      imageUrls: ap.imageUrls.length ? ap.imageUrls : g.imageUrls,
+      instagram: ap.instagram ?? g.instagram,
+      horarios: ap.horarios ?? g.horarios,
+      horariosLabel: ap.horariosLabel ?? g.horariosLabel,
+      avaliacao: ap.avaliacao ?? g.avaliacao,
+      totalAvaliacoes: ap.totalAvaliacoes ?? g.totalAvaliacoes,
+    };
+  })();
   // Instagram: o @ do lead (vem do Maps) dispara o scrape já; sem @, tenta
   // o website do place e, por último, a descoberta social (crawl pesado).
   const igPromise = (async () => {
     let handle = asString(lead.instagram, 300) ?? null;
     if (!handle) {
       const place = await placePromise;
-      handle = place.instagram ?? (await fetchPlaceInstagram(lead));
+      handle = place.instagram ?? (await fetchPlaceInstagram(lead))
+        ?? (asString(lead.site, 500) ? await instagramFromWebsite(asString(lead.site, 500)!) : null)
+        ?? null;
       if (handle) {
         await db.from("leads").update({ instagram: handle }).eq("id", leadId).is("instagram", null);
       }
@@ -1345,6 +1608,10 @@ async function publishPremiumSite(
   const { patch, modelo } = await patchPromise;
   Object.assign(config, patch);
   if (patch.seo) config.seo = { ...(isRecord(config.seo) ? config.seo : {}), ...patch.seo };
+  // IA fora do ar/timeout → serviços padrão do nicho, a seção nunca fica vazia.
+  if (!Array.isArray(config.servicos) || !config.servicos.length) {
+    config.servicos = defaultServicos(paleta);
+  }
   const realPhotos = publicUrls.filter((x) => x.real).map((x) => x.url);
   const genPhotos = publicUrls.filter((x) => !x.real).map((x) => x.url);
   config.fotos = {
@@ -1363,8 +1630,19 @@ async function publishPremiumSite(
   if (place.instagram && isRecord(config.contato) && !config.contato.instagram) {
     config.contato.instagram = `https://instagram.com/${place.instagram.replace(/^@/, "")}`;
   }
-  if (place.horarios) config.horarios = place.horarios;
-  if (place.horariosLabel) config.horariosLabel = place.horariosLabel;
+  if (place.horariosLabel?.length) config.horariosLabel = place.horariosLabel;
+  // Mapa de janelas pro modal de agendamento: Maps direto ou derivado
+  // dos labels reais (busca/fallback Google só devolvem o label).
+  const horariosMap = place.horarios
+    ?? horariosFromLabels(config.horariosLabel as [string, string][] | undefined);
+  if (horariosMap) config.horarios = horariosMap;
+  // Nicho agendável sem horário real → o CTA vira WhatsApp (sem inventar
+  // disponibilidade falsa no calendário).
+  const vocabCfg = config.vocab as NichoVocab | undefined;
+  if (vocabCfg?.cta === "agendar" && !config.horarios) {
+    vocabCfg.cta = "zap";
+    vocabCfg.ctaLabel = "Agendar pelo WhatsApp";
+  }
   if (videos.length) config.videos = videos;
   // Nota/reviews do Maps também preenchem o que o lead não tinha (ex.:
   // lead criado a mão sem avaliação — o chip e as avaliações somem sem isso).

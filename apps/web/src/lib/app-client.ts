@@ -63,6 +63,8 @@ export interface PlaceResult {
     bio: string | null;
     verificado: boolean;
   } | null;
+  /** Horários reais do Maps — salvos no lead, usados na geração do site. */
+  horariosLabel?: [string, string][] | null;
   siteCheck?: {
     estado: "bom" | "ok" | "desatualizado" | "fora";
     sinais: string[];

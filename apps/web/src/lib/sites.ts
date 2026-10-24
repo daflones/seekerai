@@ -61,7 +61,7 @@ export interface SiteConfig {
     mapsUrl?: string;
   };
   /** Horários por dia da semana (0=dom): lista de janelas [abre, fecha]. null = fechado. */
-  horarios: Record<string, [string, string][] | null>;
+  horarios?: Record<string, [string, string][] | null>;
   horariosLabel?: [string, string][];
   servicos: SiteServico[];
   profissionais?: { nome: string; especialidade?: string; foto?: string }[];
