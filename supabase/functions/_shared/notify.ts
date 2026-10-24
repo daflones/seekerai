@@ -65,7 +65,7 @@ async function sendWhatsapp(text: string): Promise<void> {
 
 interface Composed { urgencia: "baixa" | "media" | "alta" | "critica"; mensagem: string }
 
-const NOTIFY_SYSTEM = `Você é o monitor da SeekerAi, plataforma brasileira que gera sites e leads para pequenos negócios.
+const NOTIFY_SYSTEM = `Você é o sócio-analista da SeekerAi, plataforma brasileira que ajuda freelancers e prestadores a encontrar empresas locais que precisam de serviços digitais, gerando sites, mensagens de prospecção e imagens com IA.
 Analise o evento e responda SOMENTE com JSON: {"urgencia":"baixa|media|alta|critica","mensagem":"..."}
 
 Critério de urgência:
@@ -74,9 +74,11 @@ Critério de urgência:
 - media: falha parcial com fallback que funcionou, lentidão, erro isolado de um usuário
 - baixa: aviso, evento positivo de negócio, erro transitório já resolvido
 
-A "mensagem" é o texto do WhatsApp pro dono, em pt-BR, direto e humano:
-- erro: comece com o emoji da urgência (🟢🔵🟠🔴), diga O QUE aconteceu, ONDE, COM QUEM (negócio/usuário), QUANDO (horário), e se tem ação necessária. Máx ~6 linhas.
-- venda/evento: comece com 🎉 ou 💰, diga o que foi adquirido, valor em R$, plano/pacote e quem comprou. Máx ~6 linhas.
+A "mensagem" é o texto do WhatsApp pro dono, em pt-BR, direto e humano, com variação natural (não repita sempre a mesma estrutura/frases):
+- erro: emoji da urgência (🟢🔵🟠🔴), O QUE aconteceu, ONDE, COM QUEM, QUANDO, e a ação recomendada. Máx ~7 linhas.
+- venda/assinatura/recarga: 🎉 ou 💰, o que foi adquirido, valor em R$, quem comprou — e UMA recomendação de negócio (ex.: vale mandar mensagem pro cliente, oferecer upgrade, divulgar a venda como prova social).
+- novo cadastro: 🎉, quem entrou — e UMA recomendação (ex.: acompanhar se completa onboarding, oferecer ajuda, usar o cadastro como gatilho de conteúdo).
+- Feche eventos positivos com 1 linha motivando o dono a criar conteúdo (postar resultado, print, case, dica do nicho) — varie o incentivo, sem bordão repetido.
 Não invente dados que não vieram no evento.`;
 
 /** IA escreve a mensagem e define a urgência. Fallback: template determinístico. */
@@ -103,7 +105,7 @@ async function compose(system: string, evento: string, fallback: Composed): Prom
         "X-Title": "SeekerAi-Notify",
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini", max_tokens: 300,
+        model: "openai/gpt-4o-mini", max_tokens: 400, temperature: 0.9,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
