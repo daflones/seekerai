@@ -24,6 +24,7 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { getSecret, requireSecret } from "../_shared/secrets.ts";
+import { igCachePut, igMediaCached } from "../_shared/instagram.ts";
 
 const ACTIONS = new Set([
   "deep_strategy",
@@ -1067,11 +1068,19 @@ interface IgMedia {
  * a mídia real re-hospedada popula galeria e reels do site.
  */
 async function fetchInstagramMedia(handleOrUrl: string | null | undefined): Promise<IgMedia | null> {
-  const token = await getSecret("APIFY_API_TOKEN");
   const raw = handleOrUrl;
-  if (!token || !raw) return null;
+  if (!raw) return null;
   const handle = raw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1] ?? raw.replace(/^@/, "").replace(/\/+$/, "");
   if (!/^[A-Za-z0-9._]{1,60}$/.test(handle)) return null;
+
+  // Fonte barata primeiro — cache (7d) + ScrapeCreators.
+  try {
+    const sc = await igMediaCached(handle);
+    if (sc && (sc.images.length || sc.videos.length || sc.captions.length)) return sc;
+  } catch { /* cai pro Apify */ }
+
+  const token = await getSecret("APIFY_API_TOKEN");
+  if (!token) return null;
   const res = await fetch(
     `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=80`,
     {
@@ -1116,6 +1125,8 @@ async function fetchInstagramMedia(handleOrUrl: string | null | undefined): Prom
   media.videos = media.videos.slice(0, 2);
   media.captions = media.captions.slice(0, 10);
   if (!media.images.length && !media.videos.length && !media.erro) media.erro = "sem-midia";
+  // Apify também alimenta o cache — mesmo dado, fonte mais cara.
+  if (!media.erro) await igCachePut(handle, "media", media);
   return media;
 }
 

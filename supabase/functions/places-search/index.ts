@@ -18,6 +18,7 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { getSetting, requireSecret } from "../_shared/secrets.ts";
+import { igProfileCached, igCachePut } from "../_shared/instagram.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -290,17 +291,48 @@ async function igApifyCall(token: string, body: Record<string, unknown>, timeout
 async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
   const comIg = places.filter((p) => p.instagram).slice(0, 8);
   if (!comIg.length) return;
+
+  const applyProfile = (p: NormalizedPlace, prof: {
+    seguidores: number | null; posts: number | null; curtidas: number | null;
+    foto: string | null; bio: string | null; verificado: boolean; whatsapp?: string | null;
+  }) => {
+    p.ig = {
+      seguidores: prof.seguidores, posts: prof.posts, curtidas: prof.curtidas,
+      foto: prof.foto, bio: prof.bio, verificado: prof.verificado,
+    };
+    // wa.me na bio = telefone real — preenche quando o Maps não trouxe.
+    if (prof.whatsapp && !p.telefone) {
+      p.telefone = `+${prof.whatsapp}`;
+      p.whatsapp = true;
+    }
+  };
+
+  // Fonte 1: cache (7d) + ScrapeCreators — barato, por handle.
+  const misses: NormalizedPlace[] = [];
+  await Promise.all(comIg.map(async (p) => {
+    const handle = p.instagram!.replace(/^@/, "");
+    try {
+      const prof = await igProfileCached(handle);
+      if (prof) applyProfile(p, prof);
+      else misses.push(p);
+    } catch {
+      misses.push(p);
+    }
+  }));
+  if (!misses.length) return;
+
+  // Fonte 2: Apify batelado — só pros que o ScrapeCreators não achou.
   let token: string;
   try {
     token = await requireSecret("APIFY_API_TOKEN");
   } catch {
     return;
   }
-  const urls = comIg.map((p) => `https://www.instagram.com/${p.instagram!.replace(/^@/, "")}/`);
+  const urls = misses.map((p) => `https://www.instagram.com/${p.instagram!.replace(/^@/, "")}/`);
   // Uma chamada só: "details" volta rápido (~10s) e já traz latestPosts
   // com curtidas — o resultsType "posts" estoura o tempo e nunca retorna.
   const details = await Promise.race([
-    igApifyCall(token, { directUrls: urls, resultsType: "details", resultsLimit: comIg.length }, 55_000),
+    igApifyCall(token, { directUrls: urls, resultsType: "details", resultsLimit: misses.length }, 55_000),
     sleep(48_000).then(() => [] as unknown[]),
   ]);
 
@@ -310,7 +342,7 @@ async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
     const uname = asString(d.username, 80)?.toLowerCase();
     if (uname) profiles.set(uname, d);
   }
-  for (const p of comIg) {
+  for (const p of misses) {
     const uname = p.instagram!.replace(/^@/, "").toLowerCase();
     const prof = profiles.get(uname);
     if (!prof) continue;
@@ -319,7 +351,7 @@ async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
     const likes = recent
       .map((post) => (typeof post.likesCount === "number" ? post.likesCount : null))
       .filter((n): n is number => n !== null);
-    p.ig = {
+    const normalized = {
       seguidores: typeof prof.followersCount === "number" ? prof.followersCount : null,
       posts: typeof prof.postsCount === "number" ? prof.postsCount
         : recent.length || null,
@@ -328,6 +360,8 @@ async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
       bio: asString(prof.biography, 600),
       verificado: prof.verified === true,
     };
+    applyProfile(p, normalized);
+    await igCachePut(uname, "perfil", normalized);
   }
 }
 
