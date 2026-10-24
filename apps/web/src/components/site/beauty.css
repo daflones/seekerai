@@ -29,6 +29,52 @@
   color: var(--bb-text);
   font-family: var(--bb-font-body);
 }
+
+/* ============================================================
+   Paletas por nicho — mesmo layout editorial, identidade do
+   estabelecimento. --bb-espresso em paletas escuras vira o
+   accent (botões continuam contrastando com o fundo).
+   ============================================================ */
+.bbeauty[data-palette="padaria"], .bbeauty-book-modal-bg[data-palette="padaria"], .bbeauty-lightbox[data-palette="padaria"] {
+  --bb-bg: #faf3e6; --bb-bg-2: #f3ead8; --bb-panel: #fffaf0; --bb-panel-2: #f6edda;
+  --bb-line: #3a2c1e17; --bb-line-2: #3a2c1e2e; --bb-text: #3a2c1e; --bb-muted: #8d7a63;
+  --bb-accent: #b4531f; --bb-accent-2: #d99a4e; --bb-accent-ink: #fff8ec; --bb-espresso: #241305;
+}
+.bbeauty[data-palette="trattoria"], .bbeauty-book-modal-bg[data-palette="trattoria"], .bbeauty-lightbox[data-palette="trattoria"] {
+  --bb-bg: #faf5ef; --bb-bg-2: #f3ebe0; --bb-panel: #fffaf4; --bb-panel-2: #f5ecdf;
+  --bb-line: #2b1d1617; --bb-line-2: #2b1d162e; --bb-text: #2b1d16; --bb-muted: #8a7268;
+  --bb-accent: #a92f26; --bb-accent-2: #c86a3f; --bb-accent-ink: #fff5ec; --bb-espresso: #1d0f0a;
+}
+.bbeauty[data-palette="cafe"], .bbeauty-book-modal-bg[data-palette="cafe"], .bbeauty-lightbox[data-palette="cafe"] {
+  --bb-bg: #f5efe7; --bb-bg-2: #ede4d8; --bb-panel: #fbf7f0; --bb-panel-2: #f0e8dc;
+  --bb-line: #2e241c17; --bb-line-2: #2e241c2e; --bb-text: #2e241c; --bb-muted: #86735f;
+  --bb-accent: #6f4e37; --bb-accent-2: #a9805e; --bb-accent-ink: #fdf6ec; --bb-espresso: #1e140c;
+}
+.bbeauty[data-palette="clinica"], .bbeauty-book-modal-bg[data-palette="clinica"], .bbeauty-lightbox[data-palette="clinica"] {
+  --bb-bg: #f3f9fb; --bb-bg-2: #e9f3f6; --bb-panel: #ffffff; --bb-panel-2: #eef6f8;
+  --bb-line: #1d2b3317; --bb-line-2: #1d2b332e; --bb-text: #1d2b33; --bb-muted: #6d828c;
+  --bb-accent: #25808f; --bb-accent-2: #67b7c9; --bb-accent-ink: #f2fbfd; --bb-espresso: #0e2126;
+}
+.bbeauty[data-palette="studio"], .bbeauty-book-modal-bg[data-palette="studio"], .bbeauty-lightbox[data-palette="studio"] {
+  --bb-bg: #141518; --bb-bg-2: #191b1f; --bb-panel: #1e2126; --bb-panel-2: #23262c;
+  --bb-line: #ffffff14; --bb-line-2: #ffffff26; --bb-text: #eef1f3; --bb-muted: #9aa3ad;
+  --bb-accent: #8fd14f; --bb-accent-2: #b9e58a; --bb-accent-ink: #8fd14f; --bb-espresso: #0b0c0e;
+}
+.bbeauty[data-palette="pet"], .bbeauty-book-modal-bg[data-palette="pet"], .bbeauty-lightbox[data-palette="pet"] {
+  --bb-bg: #f6f8f0; --bb-bg-2: #eef2e4; --bb-panel: #fcfdf7; --bb-panel-2: #f1f5e6;
+  --bb-line: #24301f17; --bb-line-2: #24301f2e; --bb-text: #24301f; --bb-muted: #75836a;
+  --bb-accent: #4f8f46; --bb-accent-2: #86b96f; --bb-accent-ink: #f4faee; --bb-espresso: #17210f;
+}
+.bbeauty[data-palette="flora"], .bbeauty-book-modal-bg[data-palette="flora"], .bbeauty-lightbox[data-palette="flora"] {
+  --bb-bg: #faf5f4; --bb-bg-2: #f4eae8; --bb-panel: #fffafa; --bb-panel-2: #f6ecea;
+  --bb-line: #32222417; --bb-line-2: #3222242e; --bb-text: #322224; --bb-muted: #8d7778;
+  --bb-accent: #b25f77; --bb-accent-2: #d19cae; --bb-accent-ink: #fff5f7; --bb-espresso: #211114;
+}
+.bbeauty[data-palette="corporativo"], .bbeauty-book-modal-bg[data-palette="corporativo"], .bbeauty-lightbox[data-palette="corporativo"] {
+  --bb-bg: #f4f6f9; --bb-bg-2: #ebf0f5; --bb-panel: #ffffff; --bb-panel-2: #eff3f8;
+  --bb-line: #1e273617; --bb-line-2: #1e27362e; --bb-text: #1e2736; --bb-muted: #6d7688;
+  --bb-accent: #2f4d8f; --bb-accent-2: #6d8cc4; --bb-accent-ink: #f0f5fd; --bb-espresso: #101a30;
+}
 .bbeauty {
   background: var(--bb-bg);
   min-height: 100dvh;

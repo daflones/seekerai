@@ -20,7 +20,9 @@ export interface SiteConfig {
   logo?: string;
   tagline?: string;
   cidade?: string;
-  tema?: { accent?: string };
+  /** Paleta de cores do tema editorial — definida pela categoria do negócio
+      (padaria, trattoria, clinica, studio, pet, flora, corporativo…). */
+  tema?: { accent?: string; paleta?: string };
   contato: {
     telefone?: string;
     whatsapp?: string;

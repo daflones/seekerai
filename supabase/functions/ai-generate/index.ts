@@ -313,10 +313,23 @@ async function describeReferenceImage(
 const slugify = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "")
   .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "site";
 
-/** Tema visual por categoria do negócio. */
-function siteTipoFor(categoria: string | null): "barbearia" | "beleza" {
+/** Tema + paleta visual por categoria do negócio.
+    O tipo escolhe o layout (barbearia dark / beleza editorial);
+    a paleta troca as cores do tema editorial pra combinar com o nicho. */
+function siteThemeFor(categoria: string | null): { tipo: "barbearia" | "beleza"; paleta: string } {
   const c = (categoria ?? "").toLowerCase();
-  return /barbearia|barber|barbeiro/.test(c) ? "barbearia" : "beleza";
+  if (/barbearia|barber|barbeiro/.test(c)) return { tipo: "barbearia", paleta: "barbearia" };
+  const paleta =
+    /padaria|confeitaria|doceria|doce|bakery/.test(c) ? "padaria"
+    : /pizzaria|restaurante|hamburgueria|lanchonete|churrascaria|sushi|cantina|comida|marmita/.test(c) ? "trattoria"
+    : /cafeteria|café|coffee/.test(c) ? "cafe"
+    : /dentista|clínica|clinica|medicina|fisioterapia|psicolog|farmácia|farmacia|laborat|odonto|saúde|saude/.test(c) ? "clinica"
+    : /academia|crossfit|personal|pilates|yoga|luta|dança|danca|fitness|gym/.test(c) ? "studio"
+    : /pet|veterinár/.test(c) ? "pet"
+    : /flor|jardim|paisag/.test(c) ? "flora"
+    : /imobiliár|advocacia|advogad|contabil|escritório|escritorio|seguro/.test(c) ? "corporativo"
+    : "beleza";
+  return { tipo: "beleza", paleta };
 }
 
 /** Resolve referências de imagem do lead/contexto em URLs baixáveis. */
@@ -396,6 +409,7 @@ interface PlaceReview { autor: string; nota: number; texto: string; quando?: str
 interface PlaceDetails {
   reviews: PlaceReview[];
   imageUrls: string[];
+  instagram?: string;
   horarios?: Record<string, [string, string][] | null>;
   horariosLabel?: [string, string][];
 }
@@ -437,13 +451,17 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
   if (!token) return empty;
   const nome = asString(lead.nome, 150) ?? "";
   const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
-  // reviewsSort é o que efetivamente liga o scrape de reviews no actor;
-  // busca por nome+cidade (o maps_url é URL de search, não de place).
+  // reviewsSort liga o scrape de reviews; placeIds é match exato quando o
+  // lead guardou o placeId real do Google (ChIJ...). Social/contatos ficam
+  // fora daqui — é crawl pesado que derruba a chamada inteira.
+  const placeId = asString(lead.place_id, 300);
   const body = {
-    searchStringsArray: [`${nome} ${cidade}`.trim()],
+    ...(placeId?.startsWith("ChIJ") ? { placeIds: [placeId] }
+      : { searchStringsArray: [`${nome} ${cidade}`.trim()] }),
     maxCrawledPlacesPerSearch: 1,
     maxReviews: 6,
     reviewsSort: "newest",
+    maxImages: 10,
     language: "pt-BR",
   };
   const res = await fetch(
@@ -459,6 +477,22 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
   // Fotos reais do Maps além da capa — galeria enriquecida com mídia do local.
   const imageUrls = (Array.isArray(place.imageUrls) ? place.imageUrls : [])
     .map((u) => asString(u, 800)).filter((u): u is string => Boolean(u)).slice(0, 6);
+
+  // Instagram do lugar via scrapeSocialMediaProfiles — chamada à parte e
+  // só quando o lead não tem @, porque esse crawl visita o site do lugar
+  // (lento) e não pode derrubar a chamada de reviews.
+  const instagramFromPlace = (p: Record<string, unknown>): string | undefined => {
+    const bags = [
+      ...(Array.isArray(p.instagrams) ? p.instagrams : []),
+      p.instagram, p.instagramUrl, p.website,
+    ];
+    for (const raw of bags) {
+      const match = asString(raw, 500)?.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]+)/i);
+      if (match) return `@${match[1]}`;
+    }
+    return undefined;
+  };
+  const instagram = instagramFromPlace(place);
   const reviews = (Array.isArray(place.reviews) ? place.reviews : [])
     .slice(0, 6).flatMap((r): PlaceReview[] => {
       if (!isRecord(r)) return [];
@@ -485,7 +519,44 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
     byDay.set(key, [DAY_PT[key], windows ? windows.map((w) => `${w[0]} – ${w[1]}`).join(", ") : "Fechado"]);
   }
   const horariosLabel = ["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []);
-  return { reviews, imageUrls, ...(horariosLabel.length ? { horarios, horariosLabel } : {}) };
+  return { reviews, imageUrls, instagram, ...(horariosLabel.length ? { horarios, horariosLabel } : {}) };
+}
+
+/**
+ * Descoberta pesada de Instagram: scrapeSocialMediaProfiles visita o site
+ * do estabelecimento. Roda à parte — se demorar, não sacrifica reviews.
+ */
+async function fetchPlaceInstagram(lead: Record<string, unknown>): Promise<string | null> {
+  const token = await getSecret("APIFY_API_TOKEN");
+  if (!token) return null;
+  const nome = asString(lead.nome, 150) ?? "";
+  const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
+  const placeId = asString(lead.place_id, 300);
+  const res = await fetch(
+    `https://api.apify.com/v2/actors/${APIFY_PLACES_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=85`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(placeId?.startsWith("ChIJ") ? { placeIds: [placeId] }
+          : { searchStringsArray: [`${nome} ${cidade}`.trim()] }),
+        maxCrawledPlacesPerSearch: 1,
+        scrapeSocialMediaProfiles: true,
+        maxReviews: 0,
+        language: "pt-BR",
+      }),
+      signal: AbortSignal.timeout(100_000),
+    },
+  ).catch(() => null);
+  if (!res?.ok) return null;
+  const items = (await res.json().catch(() => [])) as unknown[];
+  const p = isRecord(items[0]) ? items[0] : {};
+  const bags = [...(Array.isArray(p.instagrams) ? p.instagrams : []), p.instagram, p.instagramUrl, p.website];
+  for (const raw of bags) {
+    const match = asString(raw, 500)?.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]+)/i);
+    if (match) return `@${match[1]}`;
+  }
+  return null;
 }
 
 interface IgMedia {
@@ -503,9 +574,9 @@ interface IgMedia {
  * As legendas viram contexto pra IA (serviços/diferenciais reais) e
  * a mídia real re-hospedada popula galeria e reels do site.
  */
-async function fetchInstagramMedia(lead: Record<string, unknown>): Promise<IgMedia | null> {
+async function fetchInstagramMedia(handleOrUrl: string | null | undefined): Promise<IgMedia | null> {
   const token = await getSecret("APIFY_API_TOKEN");
-  const raw = asString(lead.instagram, 300);
+  const raw = handleOrUrl;
   if (!token || !raw) return null;
   const handle = raw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1] ?? raw.replace(/^@/, "").replace(/\/+$/, "");
   if (!/^[A-Za-z0-9._]{1,60}$/.test(handle)) return null;
@@ -623,9 +694,19 @@ function siteAssetPrompts(
   // Nem nome nem cidade no texto do prompt: qualquer substantivo próprio
   // vira letreiro/marca d'água na imagem gerada.
   const biz = `a Brazilian ${catEn}`;
-  const direction = tipo === "barbearia"
-    ? "dark moody cinematic look, charcoal and amber tones, brass and leather textures, shallow depth of field"
-    : "bright editorial look, ivory and champagne tones, soft window light, delicate gold accents, shallow depth of field";
+  const DIRECTIONS: Record<string, string> = {
+    barbearia: "dark moody cinematic look, charcoal and amber tones, brass and leather textures, shallow depth of field",
+    beleza: "bright editorial look, ivory and champagne tones, soft window light, delicate gold accents, shallow depth of field",
+    padaria: "warm rustic bakery look, cream and terracotta tones, morning light through the window, wood and linen textures, dust of flour",
+    trattoria: "rich appetizing restaurant look, warm low light, deep red and dark wood tones, rustic table settings",
+    cafe: "cozy artisanal coffee shop look, warm brown and cream tones, soft morning light, ceramic and wood textures",
+    clinica: "clean clinical look, airy white and soft teal tones, bright diffuse light, minimal hygienic surfaces",
+    studio: "moody athletic look, dark graphite tones with energetic accents, dramatic rim lighting, dynamic feel",
+    pet: "friendly warm look, soft green and cream tones, natural daylight, cozy caring atmosphere",
+    flora: "romantic botanical look, blush pink and sage tones, soft daylight, delicate floral textures",
+    corporativo: "sophisticated professional look, navy and warm grey tones, clean office light, polished surfaces",
+  };
+  const direction = DIRECTIONS[tipo] ?? DIRECTIONS.beleza;
   const scenes = [
     `wide establishing shot of the interior of ${biz}, hero image, clear focal point`,
     `interior detail of ${biz} — the client chair or service station and ambient decor`,
@@ -838,7 +919,7 @@ async function publishPremiumSite(
 
   const dados = isRecord(lead.dados) ? lead.dados : {};
   const nome = asString(lead.nome, 150) ?? "estabelecimento";
-  const tipo = siteTipoFor(asString(lead.categoria, 150));
+  const { tipo, paleta } = siteThemeFor(asString(lead.categoria, 150));
 
   // Slug: o do lead se já existir; senão nome+bairro/cidade sem colidir.
   let slug = asString(dados.siteSlug, 80) ??
@@ -858,8 +939,20 @@ async function publishPremiumSite(
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // Scrapes secundários em paralelo — Apify demora e o gateway corta em
   // ~150s, então cada consumidor faz race com um cap próprio.
-  const igPromise = lead.instagram ? fetchInstagramMedia(lead) : Promise.resolve(null);
   const placePromise = fetchPlaceDetails(lead);
+  // Instagram: o @ do lead (vem do Maps) dispara o scrape já; sem @, tenta
+  // o website do place e, por último, a descoberta social (crawl pesado).
+  const igPromise = (async () => {
+    let handle = asString(lead.instagram, 300) ?? null;
+    if (!handle) {
+      const place = await placePromise;
+      handle = place.instagram ?? (await fetchPlaceInstagram(lead));
+      if (handle) {
+        await db.from("leads").update({ instagram: handle }).eq("id", leadId).is("instagram", null);
+      }
+    }
+    return handle ? fetchInstagramMedia(handle) : null;
+  })();
 
   // Patch de config roda EM PARALELO com as imagens — são independentes.
   // Espera o Instagram até 35s só pra capturar as legendas como contexto.
@@ -873,8 +966,10 @@ async function publishPremiumSite(
 
   // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
   const sources = await resolveLeadImageSources(lead, context);
-  // Instagram é bonus — não pode segurar o pipeline se o actor demorar.
-  const ig = await Promise.race([igPromise, sleep(60_000).then(() => null)]);
+  // Instagram é bonus — não pode segurar o pipeline. Com @ no lead o
+  // scrape é direto; sem @ a descoberta social pode demorar mais.
+  const igCap = lead.instagram ? 60_000 : 125_000;
+  const ig = await Promise.race([igPromise, sleep(igCap).then(() => null)]);
   if (ig) {
     for (const u of ig.images) {
       if (sources.length < MAX_SITE_IMAGES && !sources.includes(u)) sources.push(u);
@@ -906,7 +1001,8 @@ async function publishPremiumSite(
     if (desc) visualRef = desc;
 
     const prompts = siteAssetPrompts(
-      { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) }, tipo, visualRef,
+      { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
+      tipo === "barbearia" ? "barbearia" : paleta, visualRef,
     ).slice(0, faltando);
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.
@@ -970,7 +1066,12 @@ async function publishPremiumSite(
     hero: realPhotos[0] ?? genPhotos[0],
     galeria: [...realPhotos.slice(1), ...placeImgs, ...genPhotos],
   };
-  // Fatos reais vencem o patch — horários e avaliações vêm do Maps.
+  config.tema = { paleta };
+  // Fatos reais vencem o patch — horários e avaliações vêm do Maps,
+  // e o Instagram descoberto completa o contato.
+  if (place.instagram && isRecord(config.contato) && !config.contato.instagram) {
+    config.contato.instagram = `https://instagram.com/${place.instagram.replace(/^@/, "")}`;
+  }
   if (place.horarios) config.horarios = place.horarios;
   if (place.horariosLabel) config.horariosLabel = place.horariosLabel;
   if (videos.length) config.videos = videos;
@@ -998,7 +1099,7 @@ async function publishPremiumSite(
     debug: {
       ig: ig ? { imgs: ig.images.length, vids: ig.videos.length, erro: ig.erro ?? null } : "sem-instagram/timeout",
       videosRehosted: videos.length,
-      place: { reviews: place.reviews.length, imgs: placeImgs.length, horarios: place.horariosLabel?.length ?? 0 },
+      place: { reviews: place.reviews.length, imgs: placeImgs.length, horarios: place.horariosLabel?.length ?? 0, instagram: place.instagram ?? null },
       sources: sources.length,
     },
   };

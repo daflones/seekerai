@@ -92,7 +92,7 @@ console.log(JSON.stringify({
 
 if (data.siteSlug) {
   const { data: site } = await db.from("sites").select("tipo,config").eq("slug", data.siteSlug).single();
-  console.log("tipo:", site?.tipo);
+  console.log("tipo:", site?.tipo, "| paleta:", site?.config?.tema?.paleta);
   console.log("hero:", site?.config?.fotos?.hero?.split("/").pop());
   console.log("galeria:", site?.config?.fotos?.galeria?.length, "fotos");
   console.log("servicos:", site?.config?.servicos?.map((s) => s.nome).join(", "));

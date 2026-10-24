@@ -10,12 +10,16 @@ import { formatMoney, INTL_PRICES } from "@/lib/i18n/shared";
 import { getLocale, getTheme } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { verifiedSession } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 
 export default async function Home() {
+  // Logado não vê landing — vai direto pro painel.
+  if (await verifiedSession()) redirect("/app");
   const [loc, theme] = await Promise.all([getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
   const h = t.home;

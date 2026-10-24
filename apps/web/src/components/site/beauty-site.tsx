@@ -118,8 +118,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
   const anchor = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); setMenuOpen(false); scrollTo(href); };
 
+  const paleta = cfg.tema?.paleta;
   return (
-    <div className="bbeauty" ref={rootRef}>
+    <div className="bbeauty" ref={rootRef} data-palette={paleta}>
       <div className="bbeauty-ambient" aria-hidden><i className="orb-a" /><i className="orb-b" /><i className="orb-c" /></div>
       <div className="bbeauty-grain" aria-hidden />
       <motion.div className="bbeauty-progress" style={{ scaleX: scrollYProgress }} aria-hidden />
@@ -613,7 +614,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {bookOpen && (
-            <motion.div className="bbeauty-book-modal-bg"
+            <motion.div className="bbeauty-book-modal-bg" data-palette={paleta}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setBookOpen(false)}>
@@ -744,7 +745,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {lightbox !== null && lightboxImgs[lightbox] && (
-            <motion.div className="bbeauty-lightbox"
+            <motion.div className="bbeauty-lightbox" data-palette={paleta}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setLightbox(null)}>
