@@ -111,6 +111,66 @@
   --bb-line: #17283d17; --bb-line-2: #17283d2e; --bb-text: #17283d; --bb-muted: #6d7a8c;
   --bb-accent: #2f6fb2; --bb-accent-2: #f2b53d; --bb-accent-ink: #f0f6fd; --bb-espresso: #132236;
 }
+/* Eventos: champagne dourado de festa + rosé de celebração. */
+.bbeauty[data-palette="eventos"], .bbeauty-book-modal-bg[data-palette="eventos"], .bbeauty-lightbox[data-palette="eventos"] {
+  --bb-bg: #faf4ec; --bb-bg-2: #f3e9d9; --bb-panel: #fffdf8; --bb-panel-2: #f6eddd;
+  --bb-line: #3a2a1217; --bb-line-2: #3a2a122e; --bb-text: #33230f; --bb-muted: #8a7458;
+  --bb-accent: #b8862e; --bb-accent-2: #c96a5a; --bb-accent-ink: #fdf8ee; --bb-espresso: #2a1c0d;
+}
+/* Açougue: vermelho carne + madeira de tábua. */
+.bbeauty[data-palette="acougue"], .bbeauty-book-modal-bg[data-palette="acougue"], .bbeauty-lightbox[data-palette="acougue"] {
+  --bb-bg: #f9f1ec; --bb-bg-2: #f1e4dc; --bb-panel: #fefbf8; --bb-panel-2: #f5e9e1;
+  --bb-line: #3a161217; --bb-line-2: #3a16122e; --bb-text: #381410; --bb-muted: #8c6f68;
+  --bb-accent: #a8322f; --bb-accent-2: #c98a5a; --bb-accent-ink: #fdf3ee; --bb-espresso: #2c100e;
+}
+/* Farmácia: verde farmacêutico limpo + branco clínico. */
+.bbeauty[data-palette="farmacia"], .bbeauty-book-modal-bg[data-palette="farmacia"], .bbeauty-lightbox[data-palette="farmacia"] {
+  --bb-bg: #f0f7f4; --bb-bg-2: #e3f0ea; --bb-panel: #fbfefd; --bb-panel-2: #eaf4ef;
+  --bb-line: #122a2017; --bb-line-2: #122a202e; --bb-text: #122a20; --bb-muted: #5f7a6e;
+  --bb-accent: #1f8f6a; --bb-accent-2: #6ec4a8; --bb-accent-ink: #eefaf5; --bb-espresso: #0e241b;
+}
+/* Ótica: azul aço de vitrine + grafite de armação. */
+.bbeauty[data-palette="otica"], .bbeauty-book-modal-bg[data-palette="otica"], .bbeauty-lightbox[data-palette="otica"] {
+  --bb-bg: #f2f5f8; --bb-bg-2: #e8edf3; --bb-panel: #fdfefe; --bb-panel-2: #edf2f7;
+  --bb-line: #15223017; --bb-line-2: #1522302e; --bb-text: #152230; --bb-muted: #64727f;
+  --bb-accent: #3d6b9e; --bb-accent-2: #8fb4d9; --bb-accent-ink: #eef4fb; --bb-espresso: #101b29;
+}
+/* Assistência técnica: azul tech + cinza de bancada. */
+.bbeauty[data-palette="assistencia"], .bbeauty-book-modal-bg[data-palette="assistencia"], .bbeauty-lightbox[data-palette="assistencia"] {
+  --bb-bg: #f1f4f8; --bb-bg-2: #e6ebf2; --bb-panel: #fbfcfe; --bb-panel-2: #ebf0f6;
+  --bb-line: #131f2e17; --bb-line-2: #131f2e2e; --bb-text: #131f2e; --bb-muted: #5d6c7e;
+  --bb-accent: #2d6fd0; --bb-accent-2: #7fb0ec; --bb-accent-ink: #edf3fc; --bb-espresso: #0f1a28;
+}
+/* Oficina/auto: grafite de garagem + laranja de segurança. */
+.bbeauty[data-palette="auto"], .bbeauty-book-modal-bg[data-palette="auto"], .bbeauty-lightbox[data-palette="auto"] {
+  --bb-bg: #f4f3f0; --bb-bg-2: #eae8e2; --bb-panel: #fdfcfa; --bb-panel-2: #f0eee8;
+  --bb-line: #221d1617; --bb-line-2: #221d162e; --bb-text: #221d16; --bb-muted: #746a5d;
+  --bb-accent: #d9762b; --bb-accent-2: #8a8f98; --bb-accent-ink: #fdf4ea; --bb-espresso: #1c1712;
+}
+/* Construção: terracota de obra + areia de cimento. */
+.bbeauty[data-palette="construcao"], .bbeauty-book-modal-bg[data-palette="construcao"], .bbeauty-lightbox[data-palette="construcao"] {
+  --bb-bg: #f7f1e9; --bb-bg-2: #efe5d6; --bb-panel: #fdfaf4; --bb-panel-2: #f3ebdc;
+  --bb-line: #30200f17; --bb-line-2: #30200f2e; --bb-text: #30200f; --bb-muted: #82725c;
+  --bb-accent: #b35a2e; --bb-accent-2: #d9a45c; --bb-accent-ink: #fdf4e9; --bb-espresso: #281a0c;
+}
+/* Viagem: azul céu de destino + areia de praia. */
+.bbeauty[data-palette="viagem"], .bbeauty-book-modal-bg[data-palette="viagem"], .bbeauty-lightbox[data-palette="viagem"] {
+  --bb-bg: #f0f6f9; --bb-bg-2: #e2eef4; --bb-panel: #fbfdfe; --bb-panel-2: #e9f2f7;
+  --bb-line: #0f253317; --bb-line-2: #0f25332e; --bb-text: #0f2533; --bb-muted: #5f7684;
+  --bb-accent: #2e8fb8; --bb-accent-2: #e5b96b; --bb-accent-ink: #edf7fc; --bb-espresso: #0d1f2b;
+}
+/* Imobiliária: navy de escritório + latão de maçaneta. */
+.bbeauty[data-palette="imobiliaria"], .bbeauty-book-modal-bg[data-palette="imobiliaria"], .bbeauty-lightbox[data-palette="imobiliaria"] {
+  --bb-bg: #f4f5f3; --bb-bg-2: #ebecf1; --bb-panel: #fdfdfe; --bb-panel-2: #eff0f0;
+  --bb-line: #141d2e17; --bb-line-2: #141d2e2e; --bb-text: #141d2e; --bb-muted: #67707f;
+  --bb-accent: #8a6d3b; --bb-accent-2: #2f4a7a; --bb-accent-ink: #faf6ec; --bb-espresso: #10182a;
+}
+/* Arquitetura: grafite de prancheta + cobre de material. */
+.bbeauty[data-palette="arquitetura"], .bbeauty-book-modal-bg[data-palette="arquitetura"], .bbeauty-lightbox[data-palette="arquitetura"] {
+  --bb-bg: #f4f3f1; --bb-bg-2: #eae8e4; --bb-panel: #fdfcfb; --bb-panel-2: #f0eeea;
+  --bb-line: #1d1a1717; --bb-line-2: #1d1a172e; --bb-text: #1d1a17; --bb-muted: #73706a;
+  --bb-accent: #9c5b3e; --bb-accent-2: #b98d6f; --bb-accent-ink: #faf3ee; --bb-espresso: #181512;
+}
 
 /* ---------- Variantes de composição (o mesmo nicho não sai clone) ---------- */
 /* b: fotos à esquerda, frame retangular, polaroid pro outro lado. */

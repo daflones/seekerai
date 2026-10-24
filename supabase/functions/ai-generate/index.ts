@@ -324,20 +324,36 @@ function siteThemeFor(categoria: string | null): { tipo: "barbearia" | "beleza";
   if (/barbearia|barber|barbeiro/.test(c)) return { tipo: "barbearia", paleta: "barbearia" };
   const paleta =
     /tatuagem|tattoo|piercing/.test(c) ? "tattoo"
+    // Ordem importa: "salão de festas" tem "salão" (beleza), "estética
+    // automotiva" tem "estética" (beleza), "clínica veterinária" tem
+    // "clínica" — os específicos sempre antes dos amplos.
+    : /buffet|festa|evento|cerimonial|catering|banquete|recepc|sonoriz/.test(c) ? "eventos"
+    : /estética automotiva|estetica automotiva|detalhamento|funilaria/.test(c) ? "carbono"
+    : /oficina|mecânic|mecanic|lava.?jato|lava.*car|borracharia|pneu|autocenter|alinhamento|suspensã|suspensao/.test(c) ? "auto"
+    : /construç|construc|reforma|elétric|eletric|hidrául|hidraul|pintura|gesso|drywall|marcenaria|serralheria|pedreiro|ar condicionado/.test(c) ? "construcao"
     : /supermercado|mercado|mercearia|hortifruti|atacad|empório|emporio|conveniência|conveniencia/.test(c) ? "mercado"
+    : /açougue|acougue|peixaria|frios/.test(c) ? "acougue"
     : /padaria|confeitaria|doceria|doce|bakery/.test(c) ? "padaria"
     : /pizzaria|restaurante|hamburgueria|lanchonete|churrascaria|sushi|cantina|comida|marmita/.test(c) ? "trattoria"
     : /cafeteria|café|coffee/.test(c) ? "cafe"
-    : /dentista|clínica|clinica|medicina|fisioterapia|psicolog|farmácia|farmacia|laborat|odonto|saúde|saude|nutricion/.test(c) ? "clinica"
-    : /academia|crossfit|personal|pilates|yoga|luta|dança|danca|fitness|gym/.test(c) ? "studio"
+    : /imobiliár|imobiliari|corretor|imóveis|imoveis/.test(c) ? "imobiliaria"
+    : /arquitet|interiores|design de interiores/.test(c) ? "arquitetura"
+    : /viagem|viagens|turismo|passeio/.test(c) ? "viagem"
+    : /assistência|assistencia|conserto|reparo|celular|informática|informatica|eletrônic|eletronic/.test(c) ? "assistencia"
+    : /beleza|salão|salao|estética|estetica|manicure|nail|sobrancelha|cabelo|cabeleireiro|depilaç|maquiag|lash|brow|cosmet|massag|\bspa\b/.test(c) ? "beleza"
     : /pet|veterinár/.test(c) ? "pet"
+    : /farmácia|farmacia|drogaria/.test(c) ? "farmacia"
+    : /ótica|otica|optica/.test(c) ? "otica"
+    : /dentista|clínica|clinica|medicina|fisioterapia|psicolog|laborat|odonto|saúde|saude|nutricion/.test(c) ? "clinica"
+    : /academia|crossfit|personal|pilates|yoga|luta|dança|danca|fitness|gym/.test(c) ? "studio"
     : /flor|jardim|paisag/.test(c) ? "flora"
-    : /estética automotiva|estetica automotiva|detalhamento|lava.*car|oficina|mecânic|mecanic/.test(c) ? "carbono"
-    : /imobiliár|advocacia|advogad|contabil|escritório|escritorio|seguro/.test(c) ? "corporativo"
-    : /loja|boutique|calçado|calcado|joalheria|ótica|otica|eletrônic|eletronic|informática|informatica|móveis|moveis|decoraç|decorac|papelaria|livraria|brinquedo/.test(c) ? "varejo"
+    : /advocacia|advogad|contabil|escritório|escritorio|seguro/.test(c) ? "corporativo"
+    : /loja|boutique|calçado|calcado|joalheria|móveis|moveis|decoraç|decorac|papelaria|livraria|brinquedo/.test(c) ? "varejo"
     : /hotel|pousada|hospedagem|hospedaria/.test(c) ? "hotel"
-    : /escola|curso|idioma|autoescola|faculdade/.test(c) ? "educacao"
-    : "beleza";
+    : /escola|curso|idioma|autoescola|auto.escola|habilitaç|condutor|faculdade/.test(c) ? "educacao"
+    // Nicho não mapeado → "generico" dispara a classificação por IA
+    // (fotos + bio + legendas) em vez de assumir beleza.
+    : "generico";
   return { tipo: "beleza", paleta };
 }
 
@@ -452,6 +468,96 @@ function nicheVocab(paleta: string, categoria: string | null): NichoVocab {
       servicosLabel: "Delícias", servicosTitle: "Do forno pra", servicosEm: "mesa",
       servicosHint: "peça pelo WhatsApp", ofertasTitle: "Ofertas da semana",
       guia: "servicos = produtos/fornadas da padaria (pães, bolos, cafés, salgados, encomendas) — duracaoMin SEMPRE null, não é agendamento. Se as legendas/fotos mostrarem ofertas ou panfletos, crie a seção ofertas. FAQ fala de encomendas, fornadas e pagamento.",
+    },
+    eventos: {
+      rotulo: "BUFFET & EVENTOS", em: "celebrar em grande estilo",
+      desc: "buffet completo e estrutura pra festas e eventos. Do casamento ao corporativo, cada detalhe pensado.",
+      prep: "o espaço", marquee: "Festas que ficam na memória", ctaEm: "celebrar", schema: "EventVenue",
+      cta: "zap", ctaLabel: "Pedir orçamento",
+      servicosLabel: "Formatos", servicosTitle: "Escolha o seu", servicosEm: "evento",
+      servicosHint: "orçamento pelo WhatsApp", ofertasTitle: "Pacotes e promoções",
+      guia: "servicos = formatos de evento e cardápios oferecidos (casamento, aniversário, corporativo, churrasco, buffet em domicílio, cardápios por faixa de preço) — duracaoMin SEMPRE null, é orçamento. Se as legendas/fotos mostrarem pacotes ou promoções, crie a seção ofertas. FAQ fala de capacidade, cardápio, orçamento e antecedência de reserva.",
+    },
+    acougue: {
+      rotulo: "AÇOUGUE", em: "o melhor corte da região",
+      desc: "carnes frescas e cortes especiais todo dia. Qualidade de açougueiro de verdade.",
+      prep: "o açougue", marquee: "Cortes frescos, todo dia", ctaEm: "saborear", schema: "Butcher",
+      cta: "zap", ctaLabel: "Pedir pelo WhatsApp",
+      servicosLabel: "Cortes", servicosTitle: "Escolha o seu", servicosEm: "corte",
+      servicosHint: "peça pelo WhatsApp", ofertasTitle: "Ofertas da semana",
+      guia: "servicos = cortes e produtos do açougue (cortes bovinos, picanha, linguiças artesanais, kits churrasco, embutidos, frango) — duracaoMin SEMPRE null. Promoções das legendas viram ofertas. FAQ fala de encomenda, corte sob medida e entrega.",
+    },
+    farmacia: {
+      rotulo: "FARMÁCIA", em: "cuidar da sua saúde",
+      desc: "medicamentos, dermocosméticos e aquele atendimento de farmácia de bairro. Entrega rápida na sua região.",
+      prep: "a farmácia", marquee: "Sua saúde em primeiro lugar", ctaEm: "se cuidar", schema: "Pharmacy",
+      cta: "zap", ctaLabel: "Pedir pelo WhatsApp",
+      servicosLabel: "Produtos", servicosTitle: "Tudo pra sua", servicosEm: "saúde",
+      servicosHint: "peça pelo WhatsApp", ofertasTitle: "Ofertas da farmácia",
+      guia: "servicos = categorias e serviços da farmácia (medicamentos e genéricos, dermocosméticos, vitaminas, manipulação, aferição de pressão, perfumaria) — duracaoMin SEMPRE null. Promoções e descontos viram ofertas. FAQ fala de entrega, receita e formas de pagamento.",
+    },
+    otica: {
+      rotulo: "ÓTICA", em: "enxergar melhor",
+      desc: "armações, lentes e exame de vista completo. Seu olhar merece o melhor ajuste.",
+      prep: "a ótica", marquee: "Armações novas toda semana", ctaEm: "enxergar", schema: "Optician",
+      cta: "zap", ctaLabel: "Falar no WhatsApp",
+      servicosLabel: "Produtos", servicosTitle: "Escolha o seu", servicosEm: "estilo",
+      servicosHint: "visite a loja", ofertasTitle: "Promoções da ótica",
+      guia: "servicos = categorias da ótica (armações, óculos de sol, lentes multifocais, exame de vista, ajustes) — duracaoMin null, exceto exame de vista se citado (20-40). Promoções viram ofertas. FAQ fala de exame, prazo e garantia.",
+    },
+    assistencia: {
+      rotulo: "ASSISTÊNCIA TÉCNICA", em: "resolver sem dor de cabeça",
+      desc: "conserto rápido e diagnóstico honesto pro seu aparelho. Peças de qualidade, prazo cumprido.",
+      prep: "a assistência", marquee: "Seu aparelho como novo", ctaEm: "resolver", schema: "ProfessionalService",
+      cta: "zap", ctaLabel: "Pedir orçamento",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "conserto",
+      servicosHint: "orçamento pelo WhatsApp", ofertasTitle: null,
+      guia: "servicos = reparos e serviços técnicos (troca de tela, bateria, formatação, manutenção, destrava, chip) — duracaoMin 30-120 plausível por reparo. FAQ fala de orçamento, garantia e prazo.",
+    },
+    auto: {
+      rotulo: "OFICINA MECÂNICA", em: "seu carro em boas mãos",
+      desc: "manutenção, reparo e revisão com honestidade. Diagnóstico certo, preço justo.",
+      prep: "a oficina", marquee: "Seu carro rodando liso", ctaEm: "confiar", schema: "AutoRepair",
+      cta: "zap", ctaLabel: "Pedir orçamento",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "serviço",
+      servicosHint: "orçamento pelo WhatsApp", ofertasTitle: "Combos de revisão",
+      guia: "servicos = serviços de oficina/lava jato/borracharia (revisão, troca de óleo, freios, suspensão, pneus, lavagem completa, alinhamento) — duracaoMin 30-240. Combos e pacotes viram ofertas. FAQ fala de orçamento, garantia e agendamento.",
+    },
+    construcao: {
+      rotulo: "CONSTRUÇÃO & REFORMAS", em: "transformar seu espaço",
+      desc: "obras, reformas e acabamentos com prazo e qualidade. Seu projeto executado direito.",
+      prep: "a equipe", marquee: "Obra limpa, no prazo", ctaEm: "transformar", schema: "HomeAndConstructionBusiness",
+      cta: "zap", ctaLabel: "Pedir orçamento",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "projeto",
+      servicosHint: "orçamento pelo WhatsApp", ofertasTitle: null,
+      guia: "servicos = serviços de obra (reforma, elétrica, hidráulica, pintura, gesso, acabamento, pequenos reparos) — duracaoMin SEMPRE null, é orçamento por projeto. FAQ fala de orçamento, prazo, visita técnica e garantia.",
+    },
+    viagem: {
+      rotulo: "AGÊNCIA DE VIAGENS", em: "conhecer o mundo",
+      desc: "roteiros, pacotes e passagens com cuidado em cada detalhe. Sua próxima viagem começa aqui.",
+      prep: "a agência", marquee: "Sua próxima aventura", ctaEm: "viajar", schema: "TravelAgency",
+      cta: "zap", ctaLabel: "Montar minha viagem",
+      servicosLabel: "Pacotes", servicosTitle: "Escolha o seu", servicosEm: "destino",
+      servicosHint: "roteiro pelo WhatsApp", ofertasTitle: "Promoções de viagem",
+      guia: "servicos = pacotes e serviços de viagem (pacotes nacionais/internacionais, passagens, hospedagem, seguro viagem, intercâmbio) — duracaoMin SEMPRE null. Pacotes promocionais viram ofertas. FAQ fala de pagamento, documentação e personalização de roteiro.",
+    },
+    imobiliaria: {
+      rotulo: "IMOBILIÁRIA", em: "o seu novo endereço",
+      desc: "imóveis selecionados e atendimento que entende o que você procura. Compra, venda e locação.",
+      prep: "a imobiliária", marquee: "Seu lar te espera", ctaEm: "encontrar", schema: "RealEstateAgent",
+      cta: "zap", ctaLabel: "Falar com corretor",
+      servicosLabel: "Imóveis", servicosTitle: "Encontre o seu", servicosEm: "lar",
+      servicosHint: "fale com um corretor", ofertasTitle: null,
+      guia: "servicos = tipos de imóvel e serviços da imobiliária (venda, locação, avaliação, captação, administração, lançamentos) — duracaoMin SEMPRE null. FAQ fala de documentação, visita e financiamento.",
+    },
+    arquitetura: {
+      rotulo: "ARQUITETURA & INTERIORES", em: "projetar seu espaço",
+      desc: "projetos sob medida que unem beleza e função. Do conceito à entrega, em cada detalhe.",
+      prep: "o escritório", marquee: "Projetos que inspiram", ctaEm: "projetar", schema: "ProfessionalService",
+      cta: "zap", ctaLabel: "Falar do projeto",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "projeto",
+      servicosHint: "orçamento pelo WhatsApp", ofertasTitle: null,
+      guia: "servicos = serviços de projeto (arquitetônico, interiores, consultoria, acompanhamento de obra, consultoria de ambientação) — duracaoMin SEMPRE null. FAQ fala de processo, prazo e como começar.",
     },
     mercado: {
       rotulo: "MERCADO", em: "economizar todo dia",
@@ -640,6 +746,57 @@ function defaultServicos(paleta: string): Record<string, unknown>[] {
       ["Consultoria", "Atendimento especializado sob medida", null],
       ["Atendimento", "Primeira conversa pra entender seu caso", null],
     ],
+    eventos: [
+      ["Casamentos", "Buffet completo, equipe e estrutura no seu grande dia", null],
+      ["Aniversários", "Festas adulto e infantil com cardápio sob medida", null],
+      ["Corporativo", "Coffee breaks, confraternizações e eventos de empresa", null],
+      ["Buffet em domicílio", "Levamos a festa completa até você", null],
+    ],
+    acougue: [
+      ["Cortes especiais", "Picanha, ancho e cortes nobres do dia", null],
+      ["Kit churrasco", "Seleção completa pro fim de semana", null],
+      ["Embutidos artesanais", "Linguiças e embutidos feitos na casa", null],
+    ],
+    farmacia: [
+      ["Medicamentos", "Referência e genéricos com melhor preço", null],
+      ["Dermocosméticos", "Skincare e cuidados pessoais", null],
+      ["Entrega rápida", "Peça pelo WhatsApp e receba em casa", null],
+    ],
+    otica: [
+      ["Armações", "Modelos pra todos os estilos e rostos", null],
+      ["Lentes", "Multifocais, antirreflexo e fotossensíveis", null],
+      ["Exame de vista", "Avaliação completa na loja", "20-40"],
+    ],
+    assistencia: [
+      ["Tela e bateria", "Troca rápida com peças de qualidade", "30-60"],
+      ["Manutenção", "Limpeza, formatação e otimização", "60-120"],
+      ["Diagnóstico", "Avaliação honesta antes do orçamento", null],
+    ],
+    auto: [
+      ["Revisão completa", "Checklist de segurança e manutenção", "120-240"],
+      ["Troca de óleo", "Óleo, filtros e itens de rotina", "30-60"],
+      ["Freios e suspensão", "Diagnóstico e reparo", "60-180"],
+    ],
+    construcao: [
+      ["Reformas", "Do banheiro à obra completa, no prazo", null],
+      ["Elétrica e hidráulica", "Instalações e reparos certificados", null],
+      ["Pintura e acabamento", "Acabamento fino pro seu espaço", null],
+    ],
+    viagem: [
+      ["Pacotes nacionais", "Praias, serras e cidades do Brasil", null],
+      ["Internacional", "Roteiros completos pro exterior", null],
+      ["Passagens e hospedagem", "Tudo num só lugar, com suporte", null],
+    ],
+    imobiliaria: [
+      ["Imóveis à venda", "Casas e apartamentos selecionados", null],
+      ["Locação", "Aluguel com contrato tranquilo", null],
+      ["Avaliação", "Quanto vale o seu imóvel?", null],
+    ],
+    arquitetura: [
+      ["Projeto arquitetônico", "Da planta ao executivo completo", null],
+      ["Interiores", "Ambientação sob medida pro seu estilo", null],
+      ["Consultoria", "Orientação técnica pra sua obra", null],
+    ],
     mercado: [
       ["Hortifruti", "Frutas e verduras fresquinhas todo dia", null],
       ["Açougue", "Cortes frescos e especiais", null],
@@ -670,6 +827,124 @@ function defaultServicos(paleta: string): Record<string, unknown>[] {
   return (S[paleta] ?? S.corporativo).map(([nome, descricao, d]) => ({
     nome, descricao, ...min(d),
   }));
+}
+
+const NICHO_CLASSIFY_SYSTEM = `Você classifica o nicho de um estabelecimento brasileiro para personalizar o site dele.
+Analise categoria do Maps, nome, descrições das fotos reais, bio e legendas do Instagram.
+
+Responda SOMENTE com JSON nesta forma exata:
+{"paleta":"...", "vocab":{...} | null}
+
+- "paleta": se o negócio encaixar CLARAMENTE num destes, retorne a chave e vocab:null —
+  beleza, barbearia, tattoo, mercado, padaria, trattoria, cafe, clinica, studio, pet, flora,
+  carbono, corporativo, varejo, hotel, educacao, eventos, acougue, farmacia, otica,
+  assistencia, auto, construcao, viagem, imobiliaria, arquitetura.
+- Se NÃO encaixar em nenhum, invente uma chave curta em português minúsculo sem acento
+  (ex.: "sorveteria", "chacara", "igreja", "lavanderia") e preencha o vocab em pt-BR:
+  {"rotulo":"RÓTULO DO NICHO EM CAIXA ALTA","em":"frase em itálico do hero",
+   "desc":"linha de apresentação do negócio, uma frase","prep":"o/a + substantivo do lugar",
+   "marquee":"frase curta de destaque","ctaEm":"verbo em itálico do CTA final",
+   "schema":"schema.org @type apropriado","cta":"zap|agendar|mapa","ctaLabel":"texto do botão",
+   "servicosLabel":"rótulo da seção de serviços/ofertas","servicosTitle":"início do h2 da seção",
+   "servicosEm":"palavra em itálico do h2","servicosHint":"dica sob cada item",
+   "ofertasTitle":"título da seção de ofertas ou null","guia":"instruções pro redator: o que
+   servicos contém neste nicho, se duracaoMin faz sentido (só serviços com hora marcada),
+   e o que o FAQ deve cobrir"}
+- "agendar" só pra negócio com hora marcada; "zap" pra orçamento/pedido; "mapa" pra visita sem aviso.
+- NUNCA use linguagem de salão de beleza pra nichos que não são beleza.`;
+
+interface NichoResult { paleta: string; vocab: NichoVocab | null }
+
+/**
+ * Nicho fora do mapa determinístico → a IA classifica usando fotos
+ * (descrições da visão), bio e legendas do Instagram. Retorna paleta
+ * conhecida (vocab determinístico cuida) ou paleta nova + vocab custom.
+ */
+async function classifyNichoAI(
+  apiKey: string | null,
+  lead: Record<string, unknown>,
+  ctx: { descs: string[]; captions: string[]; bio?: string | null },
+): Promise<NichoResult | null> {
+  const userContent = [
+    `Estabelecimento: ${asString(lead.nome, 150) ?? "?"} — categoria: ${asString(lead.categoria, 150) ?? "?"}, ${asString(lead.cidade, 80) ?? ""}`,
+    ctx.bio ? `Bio do Instagram: ${asString(ctx.bio, 300)}` : "",
+    ctx.descs.length ? `Descrições das fotos reais do lugar:\n${ctx.descs.join("\n")}` : "",
+    ctx.captions.length ? `Legendas do Instagram:\n${ctx.captions.slice(0, 6).join("\n---\n")}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  let content: unknown = null;
+  if (apiKey) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
+        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi",
+      },
+      body: JSON.stringify({
+        model: TEXT_MODEL, max_tokens: 900,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: NICHO_CLASSIFY_SYSTEM },
+          { role: "user", content: userContent },
+        ],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    }).catch(() => null);
+    if (res?.ok) {
+      const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+      const choices = data && Array.isArray(data.choices) ? data.choices : [];
+      content = isRecord(choices[0]) && isRecord(choices[0].message)
+        ? choices[0].message.content : null;
+    }
+  }
+  if (typeof content !== "string" || !content.trim()) {
+    const nv = await nvidiaChat(NICHO_CLASSIFY_SYSTEM, userContent, 900, 30_000);
+    const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
+    content = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
+      ? nvChoices[0].message.content : null;
+  }
+  if (typeof content !== "string") return null;
+
+  const KNOWN = new Set([
+    "beleza", "barbearia", "tattoo", "mercado", "padaria", "trattoria", "cafe", "clinica",
+    "studio", "pet", "flora", "carbono", "corporativo", "varejo", "hotel", "educacao",
+    "eventos", "acougue", "farmacia", "otica", "assistencia", "auto", "construcao",
+    "viagem", "imobiliaria", "arquitetura",
+  ]);
+  try {
+    const raw = JSON.parse(content) as Record<string, unknown>;
+    let paleta = (asString(raw.paleta, 40) ?? "").toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "");
+    if (!paleta) return null;
+    if (KNOWN.has(paleta)) return { paleta, vocab: null };
+    // Paleta nova → exige vocab completo e sanitizado pra ter coerência.
+    const v = isRecord(raw.vocab) ? raw.vocab : null;
+    if (!v) return null;
+    const cta = ["agendar", "zap", "mapa"].includes(asString(v.cta, 10) ?? "")
+      ? asString(v.cta, 10)! as NichoVocab["cta"]
+      : "zap";
+    const vocab: NichoVocab = {
+      rotulo: asString(v.rotulo, 60) ?? "ESTABELECIMENTO LOCAL",
+      em: asString(v.em, 60) ?? "se sentir em casa",
+      desc: asString(v.desc, 220) ?? "atendimento de verdade, do jeito que você merece.",
+      prep: asString(v.prep, 30) ?? "o espaço",
+      marquee: asString(v.marquee, 80) ?? "Um lugar pra você",
+      ctaEm: asString(v.ctaEm, 40) ?? "conhecer",
+      schema: asString(v.schema, 60) ?? "LocalBusiness",
+      cta,
+      ctaLabel: asString(v.ctaLabel, 40) ?? "Chamar no WhatsApp",
+      servicosLabel: asString(v.servicosLabel, 30) ?? "Serviços",
+      servicosTitle: asString(v.servicosTitle, 40) ?? "Escolha o seu",
+      servicosEm: asString(v.servicosEm, 30) ?? "momento",
+      servicosHint: asString(v.servicosHint, 60) ?? "chame pelo WhatsApp",
+      ofertasTitle: asString(v.ofertasTitle, 60),
+      guia: asString(v.guia, 600)
+        ?? "servicos = o que o estabelecimento oferece — duracaoMin só pra serviço com hora marcada.",
+    };
+    return { paleta, vocab };
+  } catch {
+    return null;
+  }
 }
 
 const DOW_NAME: Record<string, string> = {
@@ -1262,7 +1537,7 @@ async function ensureSiteBucket(db: ReturnType<typeof serviceClient>): Promise<v
  */
 function siteAssetPrompts(
   lead: { nome: string; categoria: string | null; cidade: string | null },
-  tipo: "barbearia" | "beleza",
+  tipo: string,
   visualRef?: string | null,
 ): string[] {
   // Sem o nome literal do negócio e com categoria em inglês: modelos de
@@ -1279,6 +1554,14 @@ function siteAssetPrompts(
     "consultório odontológico": "dental clinic", hamburgueria: "burger restaurant",
     "açaí": "açaí bowl shop", sushi: "sushi restaurant", churrascaria: "brazilian steakhouse",
     "estética automotiva": "car detailing studio", lavanderia: "laundromat",
+    buffet: "catering and events venue", "salão de festas": "event venue",
+    "salao de festas": "event venue", eventos: "event venue", sorveteria: "ice cream shop",
+    igreja: "church", funerária: "funeral home",
+    açougue: "butcher shop", acougue: "butcher shop",
+    ótica: "eyewear store", otica: "eyewear store",
+    "assistência técnica": "electronics repair shop", "assistencia tecnica": "electronics repair shop",
+    borracharia: "tire shop", imobiliária: "real estate office", imobiliaria: "real estate office",
+    "agência de viagens": "travel agency", "agencia de viagens": "travel agency",
   };
   const catKey = (lead.categoria ?? "").toLowerCase().trim();
   const catEn = CAT_EN[catKey] ?? CAT_EN[catKey.replace(/\s*-\s*.*/, "")] ?? lead.categoria ?? "local business";
@@ -1298,6 +1581,16 @@ function siteAssetPrompts(
     corporativo: "sophisticated professional look, navy and warm grey tones, clean office light, polished surfaces",
     tattoo: "moody tattoo studio look, near-black tones with crimson accents, ink and skin textures, dramatic spotlighting",
     carbono: "sleek automotive detailing look, graphite and amber tones, glossy reflections, dramatic garage lighting",
+    eventos: "elegant event venue look, warm golden evening light, decorated tables with floral centerpieces, festive celebratory atmosphere",
+    acougue: "artisanal butcher shop look, deep burgundy and warm wood tones, fresh meat display, rustic market lighting",
+    farmacia: "clean pharmacy look, fresh white and soft green tones, organized shelves, bright sanitary lighting",
+    otica: "sleek eyewear boutique look, steel blue and warm grey tones, glasses display on clean shelves, modern retail lighting",
+    assistencia: "electronics repair lab look, cool blue and graphite tones, tools and circuit boards, focused workbench lighting",
+    auto: "professional auto repair look, graphite and safety orange tones, clean workshop with tools, industrial lighting",
+    construcao: "construction and renovation look, warm terracotta and sand tones, skilled workers finishing interiors, work site light",
+    viagem: "bright travel agency look, sky blue and sandy tones, destination posters and world map accents, optimistic daylight",
+    imobiliaria: "upscale real estate look, deep navy and brass tones, modern property interiors, confident professional lighting",
+    arquitetura: "minimal architecture studio look, graphite and copper tones, drafting tables and material samples, directional light",
   };
   const direction = DIRECTIONS[tipo] ?? DIRECTIONS.beleza;
   const scenes = [
@@ -1529,7 +1822,14 @@ async function publishPremiumSite(
 
   const dados = isRecord(lead.dados) ? lead.dados : {};
   const nome = asString(lead.nome, 150) ?? "estabelecimento";
-  const { tipo, paleta } = siteThemeFor(asString(lead.categoria, 150));
+  const { tipo, paleta: paleta0 } = siteThemeFor(asString(lead.categoria, 150));
+  let paleta = paleta0;
+  // Nicho fora do mapa (paleta "generico") → a IA classifica a partir de
+  // fotos+bio+legendas e pode devolver um vocabulário custom inteiro.
+  // O patch espera a resolução via promise pra usar o vocab certo no guia.
+  let nichoResolve: (v: NichoResult | null) => void = () => {};
+  const nichoPromise = new Promise<NichoResult | null>((r) => { nichoResolve = r; });
+  let resolvedVocab: NichoVocab | null = null;
 
   // Slug: o do lead se já existir; senão nome+bairro/cidade sem colidir.
   let slug = asString(dados.siteSlug, 80) ??
@@ -1607,7 +1907,11 @@ async function publishPremiumSite(
     const facts: string[] = [];
     if (igMeta?.bio) facts.push(`Bio do Instagram: ${asString(igMeta.bio, 400)}`);
     if (igMeta?.seguidores) facts.push(`Seguidores no Instagram: ${igMeta.seguidores} (${igMeta.posts ?? 0} posts)`);
-    const vocab = nicheVocab(paleta, asString(lead.categoria, 150));
+    // Nicho resolvido (determinístico ou IA) — espera até 50s pela
+    // classificação do nicho genérico; sem resposta usa o vocabulário neutro.
+    const nicho = await Promise.race([nichoPromise, sleep(50_000).then(() => null)]);
+    const vocab = nicho?.vocab
+      ?? nicheVocab(nicho?.paleta ?? paleta, asString(lead.categoria, 150));
     const extra = [
       `GUIA DO NICHO (${vocab.rotulo}): ${vocab.guia}`,
       facts.length ? `Dados reais do Instagram:\n${facts.join("\n")}` : "",
@@ -1655,6 +1959,27 @@ async function publishPremiumSite(
   const descs = refs.filter((d): d is string => Boolean(d));
   const cores = accentFromDescriptions(descs);
 
+  // Nicho não mapeado (paleta "generico") → IA decide a partir das fotos,
+  // bio e legendas — pode votar numa paleta conhecida ou criar vocab novo.
+  if (paleta === "generico") {
+    const igBio = ((lead.dados as Record<string, unknown> | null)?.ig as
+      { bio?: string | null } | undefined)?.bio;
+    try {
+      const nicho = await classifyNichoAI(apiKey, lead, {
+        descs, captions: ig?.captions ?? [], bio: igBio,
+      });
+      if (nicho) {
+        paleta = nicho.paleta;
+        resolvedVocab = nicho.vocab;
+      }
+      nichoResolve(nicho);
+    } catch {
+      nichoResolve(null);
+    }
+  } else {
+    nichoResolve(null);
+  }
+
   // 2) Gap-fill com IA — prompt específico por slot, direção de arte do tema.
   const imgErrors: string[] = [];
   const faltando = Math.min(SITE_IMAGE_TARGET - publicUrls.length, MAX_GENERATED_IMAGES);
@@ -1663,7 +1988,7 @@ async function publishPremiumSite(
 
     const prompts = siteAssetPrompts(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
-      tipo === "barbearia" ? "barbearia" : (paleta as "beleza"), visualRef,
+      tipo === "barbearia" ? "barbearia" : paleta, visualRef,
     ).slice(0, faltando);
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.
@@ -1737,7 +2062,7 @@ async function publishPremiumSite(
   let h = 0;
   for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   config.tema = { paleta, variant: variants[h % 3], ...(cores ? { cores } : {}) };
-  config.vocab = nicheVocab(paleta, asString(lead.categoria, 150));
+  config.vocab = resolvedVocab ?? nicheVocab(paleta, asString(lead.categoria, 150));
   // Fatos reais vencem o patch — horários e avaliações vêm do Maps,
   // e o Instagram descoberto completa o contato.
   if (place.instagram && isRecord(config.contato) && !config.contato.instagram) {
