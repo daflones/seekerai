@@ -19,6 +19,7 @@ import {
 } from "../_shared/common.ts";
 import { getSetting, requireSecret } from "../_shared/secrets.ts";
 import { igProfileCached, igCachePut } from "../_shared/instagram.ts";
+import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -602,9 +603,11 @@ async function checkWhatsapps(places: NormalizedPlace[], regionCode: string): Pr
 }
 
 Deno.serve(async (req) => {
+  const notifyCtx: NotifyErrorInput = { onde: "places-search", erro: "" };
   try {
     requirePost(req);
     const user = await requireUser(req);
+    notifyCtx.usuario = { id: user.id, email: asString((user as Record<string, unknown>).email) };
     const body = await readJson<SearchBody>(req);
 
     const query = asString(body.query, 300)?.trim();
@@ -614,6 +617,7 @@ Deno.serve(async (req) => {
     if (!query || !service || !requestRef) {
       throw httpError(400, "Informe query, serviceSlug e requestRef");
     }
+    notifyCtx.contexto = `busca "${query}" · serviço ${service} · região ${regionCode}`;
 
     const db = serviceClient();
     const [{ data: profile }, replay, provider] = await Promise.all([
@@ -754,6 +758,10 @@ Deno.serve(async (req) => {
       throw err;
     }
   } catch (err) {
+    await notifyError({
+      ...notifyCtx,
+      erro: err instanceof Error ? err.message : String(err),
+    });
     return fail(err);
   }
 });

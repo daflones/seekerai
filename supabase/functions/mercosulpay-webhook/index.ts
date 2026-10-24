@@ -20,6 +20,7 @@ import {
   timingSafeEqual,
 } from "../_shared/common.ts";
 import { requireSecret } from "../_shared/secrets.ts";
+import { notifyError, notifySale, notifyUserOf } from "../_shared/notify.ts";
 
 const TOLERANCE_SECONDS = 300;
 const UUID_RE = /^[-0-9a-f]{36}$/i;
@@ -40,10 +41,12 @@ async function verifySignature(req: Request, rawBody: string) {
 }
 
 Deno.serve(async (req) => {
+  let notifyCtx = { onde: "mercosulpay-webhook", contexto: "" as string };
   try {
     requirePost(req);
     const rawBody = await req.text();
     const { eventType, deliveryId } = await verifySignature(req, rawBody);
+    notifyCtx.contexto = `evento ${eventType} · entrega ${deliveryId}`;
     if (!deliveryId) throw httpError(400, "Entrega sem id");
 
     const payload = JSON.parse(rawBody) as Record<string, unknown>;
@@ -70,7 +73,7 @@ Deno.serve(async (req) => {
         }
         const { data: payment } = await db
           .from("payments")
-          .select("id, amount_cents, status, provider, metadata")
+          .select("id, user_id, plan_id, amount_cents, status, provider, metadata")
           .eq("provider", "mercosulpay")
           .eq("provider_ref", reference)
           .maybeSingle();
@@ -87,6 +90,14 @@ Deno.serve(async (req) => {
             p_provider_ref: reference,
           });
           if (error) throw httpError(500, `confirm_credit_pack_payment: ${error.message}`);
+          const meta = isRecord(payment.metadata) ? payment.metadata : {};
+          const credits = Number(meta.credits ?? meta.creditos ?? 0) || null;
+          await notifySale({
+            tipo: "recarga",
+            valorReais: payment.amount_cents / 100,
+            descricao: `Recarga de créditos via Pix${credits ? ` — ${credits} créditos` : ""}`,
+            usuario: await notifyUserOf(payment.user_id),
+          });
           await finish(db, deliveryId, null);
           return json({ received: true, result });
         }
@@ -102,6 +113,12 @@ Deno.serve(async (req) => {
         if (paidCents !== null && paidCents !== payment.amount_cents) {
           // Valor divergente → revisão manual, sem conceder créditos.
           await db.from("payments").update({ status: "review" }).eq("id", payment.id);
+          await notifySale({
+            tipo: "revisao",
+            valorReais: paidCents !== null ? paidCents / 100 : payment.amount_cents / 100,
+            descricao: `Pagamento Pix com valor divergente (esperado R$ ${(payment.amount_cents / 100).toFixed(2)}) — marcado pra revisão manual`,
+            usuario: await notifyUserOf(payment.user_id),
+          });
           await finish(db, deliveryId, "amount_mismatch_review");
           return json({ received: true, result: { status: "review" } });
         }
@@ -115,16 +132,35 @@ Deno.serve(async (req) => {
           p_cycle_ref: `mercosul:${reference}`,
         });
         if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
+        const { data: plan } = await db.from("plans").select("*").eq("id", payment.plan_id).maybeSingle();
+        const planNome = isRecord(plan)
+          ? String(plan.nome ?? plan.name ?? "plano")
+          : "plano";
+        await notifySale({
+          tipo: "assinatura",
+          valorReais: payment.amount_cents / 100,
+          descricao: `Nova assinatura via Pix — plano ${planNome}`,
+          usuario: await notifyUserOf(payment.user_id),
+        });
         await finish(db, deliveryId, null);
         return json({ received: true, result });
       }
 
       if (eventType === "pix.refunded" && reference && UUID_RE.test(reference)) {
-        await db.from("payments")
+        const { data: refunded } = await db.from("payments")
           .update({ status: "review" })
           .eq("provider", "mercosulpay")
           .eq("provider_ref", reference)
-          .eq("status", "paid");
+          .eq("status", "paid")
+          .select("user_id, amount_cents").maybeSingle();
+        if (refunded) {
+          await notifySale({
+            tipo: "reembolso",
+            valorReais: refunded.amount_cents / 100,
+            descricao: "Pagamento Pix reembolsado — marcado pra revisão",
+            usuario: await notifyUserOf(refunded.user_id),
+          });
+        }
         await finish(db, deliveryId, null);
         return json({ received: true, result: { status: "review" } });
       }
@@ -137,6 +173,10 @@ Deno.serve(async (req) => {
       throw err;
     }
   } catch (err) {
+    await notifyError({
+      ...notifyCtx,
+      erro: err instanceof Error ? err.message : String(err),
+    });
     return fail(err);
   }
 });

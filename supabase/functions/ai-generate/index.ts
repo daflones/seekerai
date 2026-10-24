@@ -25,6 +25,7 @@ import {
 } from "../_shared/common.ts";
 import { getSecret, requireSecret } from "../_shared/secrets.ts";
 import { igCachePut, igMediaCached } from "../_shared/instagram.ts";
+import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 
 const ACTIONS = new Set([
   "deep_strategy",
@@ -2118,20 +2119,25 @@ async function publishPremiumSite(
 }
 
 Deno.serve(async (req) => {
+  const notifyCtx: NotifyErrorInput = { onde: "ai-generate", erro: "" };
+  let refForNotify: string | null = null;
   try {
     requirePost(req);
     const user = await requireUser(req);
+    notifyCtx.usuario = { id: user.id, email: asString((user as Record<string, unknown>).email) };
     const body = await readJson<GenerateBody>(req, 300_000);
 
     const action = asString(body.action, 40);
     const service = asString(body.serviceSlug, 60);
     const businessRef = asString(body.businessRef, 300);
+    refForNotify = businessRef;
     const requestRef = asString(body.requestRef, 150);
     const prompt = asString(body.prompt, 20_000);
     const lang = asString(body.lang, 10) || "pt";
     if (!action || !ACTIONS.has(action) || !service || !businessRef || !requestRef || !prompt) {
       throw httpError(400, "Informe action, serviceSlug, businessRef, requestRef e prompt");
     }
+    notifyCtx.contexto = `ação ${action} · serviço ${service} · ref ${businessRef}`;
 
     const inputHash = await sha256Hex(
       JSON.stringify({ action, businessRef, service, prompt, context: body.context ?? null }),
@@ -2301,6 +2307,22 @@ Deno.serve(async (req) => {
       throw httpError(502, "Provedor de IA indisponível no momento");
     }
   } catch (err) {
+    if (refForNotify) {
+      const { data: leadRow } = await serviceClient().from("leads")
+        .select("nome,categoria,cidade,uf").eq("id", refForNotify).maybeSingle();
+      if (leadRow) {
+        notifyCtx.negocio = {
+          nome: asString(leadRow.nome, 150),
+          categoria: asString(leadRow.categoria, 150),
+          cidade: [asString(leadRow.cidade, 80), asString(leadRow.uf, 4)]
+            .filter(Boolean).join("/") || null,
+        };
+      }
+    }
+    await notifyError({
+      ...notifyCtx,
+      erro: err instanceof Error ? err.message : String(err),
+    });
     return fail(err);
   }
 });
