@@ -4,6 +4,7 @@ import { authReady } from "@/lib/auth/config";
 import { allowedOrigin, callbackOrigin, loginSchema, onboardingSchema, passwordSchema, recoverySchema, safeNext, signupSchema } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { verifyAuthenticatedCaptcha } from "@/lib/auth/turnstile";
+import { sendWelcomeWhatsapp } from "@/lib/auth/welcome";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
         if (consentError) {
           return reply({ message: "Confira seu e-mail para continuar. Após entrar, você poderá concluir os dados e o aceite da conta." });
         }
+        sendWelcomeWhatsapp(data.user.id, { nome: input.name, telefone: input.phone, email: input.email });
       }
       return reply({ message: "Se o cadastro puder ser concluído, você receberá um e-mail de confirmação. Confira também a pasta de spam." });
     }
@@ -124,6 +126,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       p_name: input.name, p_phone: input.phone, p_accept_terms: input.terms, p_marketing: input.marketing,
     });
     if (profileError) return reply({ error: "Não foi possível concluir o perfil. Tente novamente." }, 503);
+    sendWelcomeWhatsapp(user.id, { nome: input.name, telefone: input.phone, email: user.email });
     return reply({ redirect: safeNext(input.next) });
   } catch (error) {
     if (error instanceof ZodError) return reply({ error: error.issues[0]?.message || "Confira os dados informados." }, 400);
