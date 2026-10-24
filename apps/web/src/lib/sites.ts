@@ -21,8 +21,25 @@ export interface SiteConfig {
   tagline?: string;
   cidade?: string;
   /** Paleta de cores do tema editorial — definida pela categoria do negócio
-      (padaria, trattoria, clinica, studio, pet, flora, corporativo…). */
-  tema?: { accent?: string; paleta?: string };
+      (padaria, trattoria, clinica, studio, pet, flora, corporativo…).
+      `variant` alterna a composição dos blocos; `cores` sobrepõe o accent
+      com as cores dominantes das fotos reais do estabelecimento. */
+  tema?: {
+    accent?: string;
+    paleta?: string;
+    variant?: "a" | "b" | "c" | string;
+    cores?: { accent: string; accent2: string };
+  };
+  /** Vocabulário por nicho — rótulos e textos do tema ("O estúdio", hero em…). */
+  vocab?: {
+    rotulo: string;
+    em: string;
+    desc: string;
+    prep: string;
+    marquee: string;
+    ctaEm: string;
+    schema: string;
+  };
   contato: {
     telefone?: string;
     whatsapp?: string;

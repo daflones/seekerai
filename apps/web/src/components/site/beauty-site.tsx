@@ -111,23 +111,32 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
     lightbox: { index: lightbox, total: lightboxImgs.length, go: setLightbox },
   });
 
+  const vocab = cfg.vocab;
+  // "o estúdio" → "do estúdio"/"no estúdio" pras seções derivadas.
+  const deLugar = (vocab?.prep ?? "o espaço").replace(/^o /, "do ").replace(/^a /, "da ");
+  const noLugar = deLugar.replace(/^do /, "no ").replace(/^da /, "na ");
+
   const marqueeItems = [
     ...Object.keys(servicosPorCat),
-    cfg.tagline ?? "", "Um lugar para você se cuidar", marca,
+    cfg.tagline ?? "", vocab?.marquee ?? "Um lugar para você se cuidar", marca,
   ].filter(Boolean);
 
   const anchor = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); setMenuOpen(false); scrollTo(href); };
 
   const paleta = cfg.tema?.paleta;
+  // Cores das fotos reais do lugar viram o accent do site.
+  const themeVars = cfg.tema?.cores
+    ? { "--bb-accent": cfg.tema.cores.accent, "--bb-accent-2": cfg.tema.cores.accent2 } as React.CSSProperties
+    : undefined;
   return (
-    <div className="bbeauty" ref={rootRef} data-palette={paleta}>
+    <div className="bbeauty" ref={rootRef} data-palette={paleta} data-variant={cfg.tema?.variant} style={themeVars}>
       <div className="bbeauty-ambient" aria-hidden><i className="orb-a" /><i className="orb-b" /><i className="orb-c" /></div>
       <div className="bbeauty-grain" aria-hidden />
       <motion.div className="bbeauty-progress" style={{ scaleX: scrollYProgress }} aria-hidden />
       {cfg.seo && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{
           __html: JSON.stringify({
-            "@context": "https://schema.org", "@type": "BeautySalon",
+            "@context": "https://schema.org", "@type": vocab?.schema ?? "LocalBusiness",
             name: cfg.nome, address: cfg.contato.endereco, telephone: cfg.contato.telefone,
             url: `https://seekerai.digital/site/${slug}`,
             ...(cfg.avaliacoes ? { aggregateRating: { "@type": "AggregateRating", ratingValue: cfg.avaliacoes.nota, reviewCount: cfg.avaliacoes.total } } : {}),
@@ -140,10 +149,10 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <a className="bbeauty-logo" href="#top" onClick={anchor("#top")} aria-label={cfg.nome}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {cfg.logo && <img src={cfg.logo} alt={`Monograma ${cfg.nome}`} />}
-          <span className="bbeauty-logo-name">{marca}<small>{cfg.tagline ?? "Espaço de beleza"}</small></span>
+          <span className="bbeauty-logo-name">{marca}<small>{cfg.tagline ?? vocab?.rotulo ?? "Estabelecimento"}</small></span>
         </a>
         <div className="bbeauty-nav-links">
-          {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>O espaço</a>}
+          {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
           <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
           <a href="#portfolio" onClick={anchor("#portfolio")}>Portfólio</a>
           {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>Dúvidas</a>}
@@ -159,7 +168,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           <motion.div className="bbeauty-mobile-menu"
             initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25, ease: EASE }}>
-            {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>O espaço</a>}
+            {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
             <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
             <a href="#portfolio" onClick={anchor("#portfolio")}>Portfólio</a>
             {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>Dúvidas</a>}
@@ -176,11 +185,11 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             <motion.span className="bbeauty-eyebrow"
               initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.7, delay: 0.15, ease: EASE }}>
-              {cfg.cidade ?? "Espaço de beleza"}
+              {cfg.cidade ?? vocab?.rotulo ?? "Estabelecimento"}
             </motion.span>
             <h1>
               <RevealText text="Um lugar para você" delay={0.2} />
-              <span className="h1-em"><RevealText text="se cuidar e se amar" delay={0.55} /></span>
+              <span className="h1-em"><RevealText text={vocab?.em ?? "se cuidar e se amar"} delay={0.55} /></span>
             </h1>
             <div className="bbeauty-hero-bottom">
               <motion.div
@@ -193,15 +202,14 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                   </span>
                 )}
                 <p className="bbeauty-hero-desc">
-                  {cfg.tagline ? `${cfg.tagline} em ` : ""}{cfg.cidade?.replace(" · ", ", ") ?? "Teresópolis"} — sobrancelhas, cílios, unhas e cursos.
-                  Ambiente acolhedor, atendimento sem pressa e aquele cappuccino esperando por você.
+                  {cfg.tagline ? `${cfg.tagline} em ` : ""}{cfg.cidade?.replace(" · ", ", ") ?? ""} — {vocab?.desc ?? "atendimento de verdade, sem pressa."}
                 </p>
               </motion.div>
               <motion.div className="bbeauty-hero-actions"
                 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.9, ease: EASE }}>
                 <a className="bbeauty-scroll-hint" href="#espaco" onClick={anchor("#espaco")}>
-                  <span className="bbeauty-shader-text">Role para conhecer o espaço</span>
+                  <span className="bbeauty-shader-text">Role para conhecer {vocab?.prep ?? "o espaço"}</span>
                   <span className="bbeauty-scroll-hint-line" aria-hidden />
                 </a>
               </motion.div>
@@ -259,7 +267,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             <div className="bbeauty-space">
               <div className="bbeauty-space-text">
                 <div className="bbeauty-section-head">
-                  <FadeUp y={16}><span className="bbeauty-eyebrow">O espaço</span></FadeUp>
+                  <FadeUp y={16}><span className="bbeauty-eyebrow">{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</span></FadeUp>
                   <h2 className="bbeauty-h2"><RevealText text={cfg.historia?.titulo ?? "Feito para você" } /></h2>
                 </div>
                 {(cfg.historia?.paragrafos ?? []).map((p, i) => (
@@ -313,7 +321,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                         {s.duracaoMin ? `~${s.duracaoMin} min` : ""}
                         {s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}
                         {!s.preco && !s.duracaoMin ? <span className="ask">Sob consulta</span> : null}
-                        {!s.preco && s.duracaoMin ? <span className="ask"> · valor no espaço</span> : null}
+                        {!s.preco && s.duracaoMin ? <span className="ask"> · valor {noLugar}</span> : null}
                       </span>
                     </button>
                   ))}
@@ -327,7 +335,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
       {/* ---------- CORREDOR 3D ---------- */}
       {galeria.length > 0 && (
-        <section className="bbeauty-corridor" aria-label="Trabalhos do espaço em movimento">
+        <section className="bbeauty-corridor" aria-label={`Trabalhos ${deLugar} em movimento`}>
           <ImageStreamHero
             images={galeria.map((src, i) => ({ src, alt: `${cfg.nome} — trabalho ${i + 1}` }))}
             cards={9}
@@ -349,7 +357,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
               <FadeUp y={16}><span className="bbeauty-eyebrow">Portfólio</span></FadeUp>
-              <h2 className="bbeauty-h2"><RevealText text="Trabalhos do" /> <em><RevealText text="espaço" delay={0.25} /></em></h2>
+              <h2 className="bbeauty-h2"><RevealText text={`Trabalhos ${deLugar}`} /> <em><RevealText text="em destaque" delay={0.25} /></em></h2>
             </div>
             <div className="bbeauty-gallery">
               {galeria.map((src, i) => (
@@ -578,7 +586,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           </div>
 
           <div className="bbeauty-footer-body" ref={footBodyRef}>
-            <h2 className="bbeauty-footer-h2">Seu momento de<br /><em>se cuidar</em></h2>
+            <h2 className="bbeauty-footer-h2">Seu momento de<br /><em>{vocab?.ctaEm ?? "se cuidar"}</em></h2>
             <div className="bbeauty-footer-pills">
               <Magnetic><button className="bbeauty-pill primary" onClick={() => openBook()}><Sparkles size={15} /> Agendar agora</button></Magnetic>
               {waNumber && <Magnetic><a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
@@ -614,7 +622,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {bookOpen && (
-            <motion.div className="bbeauty-book-modal-bg" data-palette={paleta}
+            <motion.div className="bbeauty-book-modal-bg" data-palette={paleta} style={themeVars}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setBookOpen(false)}>
@@ -745,7 +753,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {lightbox !== null && lightboxImgs[lightbox] && (
-            <motion.div className="bbeauty-lightbox" data-palette={paleta}
+            <motion.div className="bbeauty-lightbox" data-palette={paleta} style={themeVars}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setLightbox(null)}>

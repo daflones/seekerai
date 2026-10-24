@@ -34,11 +34,25 @@ const { error: credErr } = await db.rpc("apply_credit_delta", {
 if (credErr) { console.error("creditos:", credErr.message); process.exit(1); }
 console.log("créditos: 50");
 
-// 3. lead com imagem real (padaria do banco, lh3)
-const { data: src } = await db.from("leads")
-  .select("nome,endereco,bairro,cidade,uf,telefone,avaliacao,total_avaliacoes,imagem,categoria,maps_url,instagram")
-  .eq("categoria", "Padaria").not("maps_url", "is", null).not("instagram", "is", null)
-  .order("avaliacao", { ascending: false, nullsFirst: false }).limit(1).single();
+// 3. lead com imagem real — override por argv: node test-site-gen.mjs "Nome" "Categoria" "@ig"
+const ovNome = process.argv[2];
+const ovCat = process.argv[3];
+const ovIg = process.argv[4];
+let src;
+if (ovNome) {
+  src = {
+    nome: ovNome, categoria: ovCat ?? "Local", endereco: "Rua Teste, 100",
+    bairro: "Centro", cidade: "São Paulo", uf: "SP", telefone: "+55 11 99999-0000",
+    avaliacao: 4.8, total_avaliacoes: 42, imagem: null,
+    maps_url: null, instagram: ovIg ?? null,
+  };
+} else {
+  const { data: s } = await db.from("leads")
+    .select("nome,endereco,bairro,cidade,uf,telefone,avaliacao,total_avaliacoes,imagem,categoria,maps_url,instagram")
+    .eq("categoria", "Padaria").not("maps_url", "is", null).not("instagram", "is", null)
+    .order("avaliacao", { ascending: false, nullsFirst: false }).limit(1).single();
+  src = s;
+}
 const { data: lead, error: lErr } = await db.from("leads").insert({
   user_id: userId, service_slug: "sites", place_id: `test-${Date.now()}`,
   nome: src.nome, categoria: src.categoria, endereco: src.endereco,
@@ -92,7 +106,8 @@ console.log(JSON.stringify({
 
 if (data.siteSlug) {
   const { data: site } = await db.from("sites").select("tipo,config").eq("slug", data.siteSlug).single();
-  console.log("tipo:", site?.tipo, "| paleta:", site?.config?.tema?.paleta);
+  console.log("tipo:", site?.tipo, "| paleta:", site?.config?.tema?.paleta, "| variant:", site?.config?.tema?.variant, "| cores:", JSON.stringify(site?.config?.tema?.cores ?? null));
+  console.log("vocab:", JSON.stringify(site?.config?.vocab));
   console.log("hero:", site?.config?.fotos?.hero?.split("/").pop());
   console.log("galeria:", site?.config?.fotos?.galeria?.length, "fotos");
   console.log("servicos:", site?.config?.servicos?.map((s) => s.nome).join(", "));

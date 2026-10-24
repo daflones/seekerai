@@ -260,7 +260,9 @@ const REF_DESCRIBE_PROMPT =
   "Describe this photo of a local business in 2-3 short sentences for an image-generation art director: " +
   "what kind of place it is, what's visible (interior, facade, products, people at work), " +
   "materials and color palette, lighting mood and overall style. " +
-  "Do NOT mention business names or any visible text. Be concrete and visual.";
+  "Do NOT mention business names or any visible text. Be concrete and visual. " +
+  "End your reply with a line exactly like: COLORS: #rrggbb, #rrggbb, #rrggbb " +
+  "(the 3 most dominant and representative colors of the photo, accent hues first).";
 
 /**
  * Descreve uma foto real do estabelecimento (visão) pra servir de
@@ -320,16 +322,105 @@ function siteThemeFor(categoria: string | null): { tipo: "barbearia" | "beleza";
   const c = (categoria ?? "").toLowerCase();
   if (/barbearia|barber|barbeiro/.test(c)) return { tipo: "barbearia", paleta: "barbearia" };
   const paleta =
-    /padaria|confeitaria|doceria|doce|bakery/.test(c) ? "padaria"
+    /tatuagem|tattoo|piercing/.test(c) ? "tattoo"
+    : /padaria|confeitaria|doceria|doce|bakery/.test(c) ? "padaria"
     : /pizzaria|restaurante|hamburgueria|lanchonete|churrascaria|sushi|cantina|comida|marmita/.test(c) ? "trattoria"
     : /cafeteria|café|coffee/.test(c) ? "cafe"
     : /dentista|clínica|clinica|medicina|fisioterapia|psicolog|farmácia|farmacia|laborat|odonto|saúde|saude/.test(c) ? "clinica"
     : /academia|crossfit|personal|pilates|yoga|luta|dança|danca|fitness|gym/.test(c) ? "studio"
     : /pet|veterinár/.test(c) ? "pet"
     : /flor|jardim|paisag/.test(c) ? "flora"
+    : /estética automotiva|estetica automotiva|detalhamento|lava.*car|oficina|mecânic|mecanic/.test(c) ? "carbono"
     : /imobiliár|advocacia|advogad|contabil|escritório|escritorio|seguro/.test(c) ? "corporativo"
     : "beleza";
   return { tipo: "beleza", paleta };
+}
+
+/** hex "#rrggbb" → { h, s, l } pra escolher acentos a partir das fotos reais. */
+function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
+  const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return null;
+  const [r, g, b] = [1, 2, 3].map((i) => parseInt(m[i], 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = 60 * (((g - b) / d) % 6);
+    else if (max === g) h = 60 * ((b - r) / d + 2);
+    else h = 60 * ((r - g) / d + 4);
+  }
+  return { h: (h + 360) % 360, s, l };
+}
+
+/**
+ * Extrai cores dominantes das descrições de visão das fotos reais e
+ * escolhe a mais saturada como accent do site — o site sai com a cara
+ * das imagens do Instagram/Maps do lugar, não da paleta genérica.
+ */
+function accentFromDescriptions(descriptions: string[]): { accent: string; accent2: string } | null {
+  const hexes = [...descriptions.join(" ").matchAll(/#([0-9a-f]{6})\b/gi)]
+    .map((m) => `#${m[1].toLowerCase()}`);
+  const candidates = hexes
+    .map((hex) => ({ hex, hsl: hexToHsl(hex) }))
+    .filter((x): x is { hex: string; hsl: { h: number; s: number; l: number } } => Boolean(x.hsl))
+    // Acento precisa ter cor (não cinza/preto/branco) e contraste ok.
+    .filter((x) => x.hsl.s > 0.18 && x.hsl.l > 0.16 && x.hsl.l < 0.82)
+    .sort((a, b) => b.hsl.s - a.hsl.s || Math.abs(a.hsl.l - 0.45) - Math.abs(b.hsl.l - 0.45));
+  if (!candidates.length) return null;
+  const accent = candidates[0].hex;
+  const second = candidates.find((x) => Math.abs(x.hsl.h - candidates[0].hsl.h) > 24);
+  return {
+    accent,
+    accent2: second?.hex ?? (() => {
+      const { h, s, l } = candidates[0].hsl;
+      const l2 = l < 0.5 ? Math.min(0.82, l + 0.24) : Math.max(0.2, l - 0.22);
+      return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l2 * 100)}%)`;
+    })(),
+  };
+}
+
+interface NichoVocab {
+  /** Rótulo do nicho — eyebrow da nav/logo. */
+  rotulo: string;
+  /** Frase em itálico do hero ("se cuidar e se amar"). */
+  em: string;
+  /** Linha de apresentação do negócio no hero. */
+  desc: string;
+  /** "o estúdio" | "a padaria" — "Role para conhecer …". */
+  prep: string;
+  /** Item extra do marquee. */
+  marquee: string;
+  /** Em itálico do CTA do footer ("se cuidar"). */
+  ctaEm: string;
+  /** JSON-LD @type. */
+  schema: string;
+}
+
+/** Vocabulário por nicho — sem texto de salão de beleza em estúdio de
+    tattoo. Tudo determinístico a partir da paleta/categoria. */
+function nicheVocab(paleta: string, categoria: string | null): NichoVocab {
+  const V: Record<string, NichoVocab> = {
+    beleza: { rotulo: "ESPAÇO DE BELEZA", em: "se cuidar e se amar", desc: "beleza, cuidado e autoestima. Ambiente acolhedor e atendimento sem pressa.", prep: "o espaço", marquee: "Um lugar para você se cuidar", ctaEm: "se cuidar", schema: "BeautySalon" },
+    tattoo: { rotulo: "ESTÚDIO DE TATUAGEM", em: "marcar a sua história", desc: "tatuagens autorais e piercings. Ambiente criativo, atendimento sem pressa e arte de verdade.", prep: "o estúdio", marquee: "Arte que fica na pele", ctaEm: "se expressar", schema: "TattooParlor" },
+    padaria: { rotulo: "PADARIA ARTESANAL", em: "saborear o pão do dia", desc: "pães fresquinhos, cafés e doces da casa. Cheiro de fornada e aquele atendimento de bairro.", prep: "a padaria", marquee: "Saindo do forno, todo dia", ctaEm: "saborear", schema: "Bakery" },
+    trattoria: { rotulo: "RESTAURANTE", em: "viver a boa mesa", desc: "pratos da casa feitos com carinho. Ambiente acolhedor pra comer bem e ficar à vontade.", prep: "a casa", marquee: "Mesa posta, coração aberto", ctaEm: "saborear", schema: "Restaurant" },
+    cafe: { rotulo: "CAFÉ ESPECIAL", em: "viver o ritual do café", desc: "cafés especiais, métodos e lanches da casa. Um cantinho pra desacelerar.", prep: "o café", marquee: "Café passado na hora", ctaEm: "desacelerar", schema: "CafeOrCoffeeShop" },
+    clinica: { rotulo: "CLÍNICA", em: "cuidar da sua saúde", desc: "atendimento humanizado e cuidado completo. Estrutura pensada pra você se sentir bem.", prep: "a clínica", marquee: "Cuidado de verdade", ctaEm: "se cuidar", schema: "MedicalClinic" },
+    studio: { rotulo: "STUDIO FITNESS", em: "evoluir todo dia", desc: "treino, técnica e constância. Energia pra você sair melhor do que entrou.", prep: "o estúdio", marquee: "Seu melhor treino te espera", ctaEm: "evoluir", schema: "ExerciseGym" },
+    pet: { rotulo: "PETSHOP", em: "cuidar de quem te ama", desc: "banho, tosa e cuidado completo pro seu melhor amigo. Carinho em cada detalhe.", prep: "o espaço", marquee: "Pet feliz, dono tranquilo", ctaEm: "cuidar deles", schema: "PetStore" },
+    flora: { rotulo: "FLORICULTURA", em: "florescer o seu dia", desc: "arranjos autorais e flores fresquinhas. Delicadeza pra qualquer momento.", prep: "o ateliê", marquee: "Flores frescas, todo dia", ctaEm: "florescer", schema: "Florist" },
+    carbono: { rotulo: "ESTÉTICA AUTOMOTIVA", em: "brilhar de novo", desc: "detalhamento, proteção e acabamento de precisão. Seu carro tratado como merece.", prep: "o estúdio", marquee: "Detalhe que faz diferença", ctaEm: "renovar", schema: "AutoBodyShop" },
+    corporativo: { rotulo: "ESPAÇO PROFISSIONAL", em: "resolver com confiança", desc: "atendimento especializado e soluções sob medida. Seriedade com atenção de verdade.", prep: "o escritório", marquee: "Confiança em cada detalhe", ctaEm: "resolver", schema: "ProfessionalService" },
+  };
+  const base = V[paleta] ?? {
+    rotulo: (categoria ?? "ESTABELECIMENTO LOCAL").toUpperCase(),
+    em: "se sentir em casa",
+    desc: `${(categoria ?? "atendimento").toLowerCase()} e atendimento de verdade. Ambiente acolhedor, sem pressa.`,
+    prep: "o espaço", marquee: "Um lugar pra você", ctaEm: "se cuidar", schema: "LocalBusiness",
+  };
+  return base;
 }
 
 /** Resolve referências de imagem do lead/contexto em URLs baixáveis. */
@@ -412,6 +503,8 @@ interface PlaceDetails {
   instagram?: string;
   horarios?: Record<string, [string, string][] | null>;
   horariosLabel?: [string, string][];
+  avaliacao?: number;
+  totalAvaliacoes?: number;
 }
 
 const DAY_KEY: Record<string, string> = {
@@ -519,7 +612,12 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
     byDay.set(key, [DAY_PT[key], windows ? windows.map((w) => `${w[0]} – ${w[1]}`).join(", ") : "Fechado"]);
   }
   const horariosLabel = ["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []);
-  return { reviews, imageUrls, instagram, ...(horariosLabel.length ? { horarios, horariosLabel } : {}) };
+  return {
+    reviews, imageUrls, instagram,
+    ...(horariosLabel.length ? { horarios, horariosLabel } : {}),
+    avaliacao: typeof place.totalScore === "number" ? place.totalScore : undefined,
+    totalAvaliacoes: typeof place.reviewsCount === "number" ? place.reviewsCount : undefined,
+  };
 }
 
 /**
@@ -710,6 +808,8 @@ function siteAssetPrompts(
     pet: "friendly warm look, soft green and cream tones, natural daylight, cozy caring atmosphere",
     flora: "romantic botanical look, blush pink and sage tones, soft daylight, delicate floral textures",
     corporativo: "sophisticated professional look, navy and warm grey tones, clean office light, polished surfaces",
+    tattoo: "moody tattoo studio look, near-black tones with crimson accents, ink and skin textures, dramatic spotlighting",
+    carbono: "sleek automotive detailing look, graphite and amber tones, glossy reflections, dramatic garage lighting",
   };
   const direction = DIRECTIONS[tipo] ?? DIRECTIONS.beleza;
   const scenes = [
@@ -1006,18 +1106,20 @@ async function publishPremiumSite(
     }
   }
 
+  // Descreve até 2 fotos reais (Maps/Instagram) — serve pra (a) dar
+  // referência visual ao gap-fill e (b) extrair as cores dominantes do
+  // lugar de verdade, que viram o accent do site.
+  const refs = await Promise.all(
+    publicUrls.slice(0, 2).map((x) => describeReferenceImage(apiKey, x.url)),
+  );
+  const descs = refs.filter((d): d is string => Boolean(d));
+  const cores = accentFromDescriptions(descs);
+
   // 2) Gap-fill com IA — prompt específico por slot, direção de arte do tema.
   const imgErrors: string[] = [];
   const faltando = Math.min(SITE_IMAGE_TARGET - publicUrls.length, MAX_GENERATED_IMAGES);
   if (faltando > 0) {
-    // Descreve até 2 fotos reais (Maps/Instagram) pra dar referência visual
-    // do que gerar e como — ambiente, produtos, paleta do lugar de verdade.
-    let visualRef: string | null = null;
-    const refs = await Promise.all(
-      publicUrls.slice(0, 2).map((x) => describeReferenceImage(apiKey, x.url)),
-    );
-    const desc = refs.filter((d): d is string => Boolean(d)).join(" ").slice(0, 700).trim();
-    if (desc) visualRef = desc;
+    const visualRef = descs.join(" ").slice(0, 700).trim() || null;
 
     const prompts = siteAssetPrompts(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
@@ -1085,7 +1187,13 @@ async function publishPremiumSite(
     hero: realPhotos[0] ?? genPhotos[0],
     galeria: [...realPhotos.slice(1), ...placeImgs, ...genPhotos],
   };
-  config.tema = { paleta };
+  // Tema: paleta do nicho + variante de layout (3 composições — sites
+  // não ficam clones) + cores extraídas das fotos reais do lugar.
+  const variants = ["a", "b", "c"] as const;
+  let h = 0;
+  for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  config.tema = { paleta, variant: variants[h % 3], ...(cores ? { cores } : {}) };
+  config.vocab = nicheVocab(paleta, asString(lead.categoria, 150));
   // Fatos reais vencem o patch — horários e avaliações vêm do Maps,
   // e o Instagram descoberto completa o contato.
   if (place.instagram && isRecord(config.contato) && !config.contato.instagram) {
@@ -1094,6 +1202,11 @@ async function publishPremiumSite(
   if (place.horarios) config.horarios = place.horarios;
   if (place.horariosLabel) config.horariosLabel = place.horariosLabel;
   if (videos.length) config.videos = videos;
+  // Nota/reviews do Maps também preenchem o que o lead não tinha (ex.:
+  // lead criado a mão sem avaliação — o chip e as avaliações somem sem isso).
+  if (!isRecord(config.avaliacoes) && place.avaliacao) {
+    config.avaliacoes = { nota: place.avaliacao, total: place.totalAvaliacoes ?? 0, fonte: "Google" };
+  }
   if (place.reviews.length && isRecord(config.avaliacoes)) {
     (config.avaliacoes as Record<string, unknown>).itens = place.reviews;
   }

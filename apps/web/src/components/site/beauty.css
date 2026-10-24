@@ -75,6 +75,39 @@
   --bb-line: #1e273617; --bb-line-2: #1e27362e; --bb-text: #1e2736; --bb-muted: #6d7688;
   --bb-accent: #2f4d8f; --bb-accent-2: #6d8cc4; --bb-accent-ink: #f0f5fd; --bb-espresso: #101a30;
 }
+/* Tatuagem: tinta sobre papel escuro — preto, osso e vermelho sangue. */
+.bbeauty[data-palette="tattoo"], .bbeauty-book-modal-bg[data-palette="tattoo"], .bbeauty-lightbox[data-palette="tattoo"] {
+  --bb-bg: #121114; --bb-bg-2: #17161a; --bb-panel: #1b1a1f; --bb-panel-2: #211f26;
+  --bb-line: #ffffff14; --bb-line-2: #ffffff28; --bb-text: #ece7df; --bb-muted: #a29a90;
+  --bb-accent: #d8402f; --bb-accent-2: #e8875a; --bb-accent-ink: #d8402f; --bb-espresso: #0a090b;
+}
+/* Estética automotiva/detailing: grafite + âmbar de farol. */
+.bbeauty[data-palette="carbono"], .bbeauty-book-modal-bg[data-palette="carbono"], .bbeauty-lightbox[data-palette="carbono"] {
+  --bb-bg: #131518; --bb-bg-2: #181b1f; --bb-panel: #1d2025; --bb-panel-2: #23272d;
+  --bb-line: #ffffff14; --bb-line-2: #ffffff26; --bb-text: #e9ecef; --bb-muted: #98a1ab;
+  --bb-accent: #e09b2d; --bb-accent-2: #f0c56d; --bb-accent-ink: #e09b2d; --bb-espresso: #0b0c0e;
+}
+
+/* ---------- Variantes de composição (o mesmo nicho não sai clone) ---------- */
+/* b: fotos à esquerda, frame retangular, polaroid pro outro lado. */
+.bbeauty[data-variant="b"] .bbeauty-hero-photos { order: -1; }
+.bbeauty[data-variant="b"] .bbeauty-hero-photo {
+  right: auto; left: 0; border-radius: 26px;
+}
+.bbeauty[data-variant="b"] .bbeauty-hero-polaroid {
+  left: auto; right: 0; transform: rotate(4deg);
+}
+.bbeauty[data-variant="b"] .bbeauty-hero-ring { right: auto; left: -34px; }
+/* c: frame orgânico invertido + serviços em lista única. */
+.bbeauty[data-variant="c"] .bbeauty-hero-photo {
+  border-radius: 22px 22px 200px 200px;
+}
+.bbeauty[data-variant="c"] .bbeauty-hero-polaroid { transform: rotate(6deg) translateY(-10px); }
+.bbeauty[data-variant="c"] .bbeauty-services { grid-template-columns: 1fr; max-width: 720px; }
+.bbeauty[data-variant="c"] .bbeauty-service-cat h3 { font-size: 36px; }
+@media (max-width: 900px) {
+  .bbeauty[data-variant="b"] .bbeauty-hero-photos { order: -1; }
+}
 .bbeauty {
   background: var(--bb-bg);
   min-height: 100dvh;
