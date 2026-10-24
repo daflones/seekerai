@@ -570,7 +570,8 @@ a.bbeauty-nav-cta, a.bbeauty-mobile-cta { text-decoration: none; display: inline
 }
 .bbeauty-review .stars { color: var(--bb-accent); letter-spacing: 3px; font-size: 13px; }
 .bbeauty-review p { font-family: var(--bb-font-display); font-size: 19px; line-height: 1.5; font-weight: 500; margin: 12px 0 18px; }
-.bbeauty-review footer { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 700; color: var(--bb-muted); }
+.bbeauty-review footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; color: var(--bb-muted); }
+.bbeauty-review-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1px solid var(--bb-line-2); flex-shrink: 0; }
 .bbeauty-review-print {
   grid-row: span 1; padding: 10px; border-radius: 20px;
   border: 1px solid var(--bb-line-2); background: var(--bb-panel);

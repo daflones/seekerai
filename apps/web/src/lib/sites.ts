@@ -73,7 +73,7 @@ export interface SiteConfig {
     nota: number;
     total: number;
     fonte: string;
-    itens?: { autor: string; nota?: number; texto: string; quando?: string }[];
+    itens?: { autor: string; nota?: number; texto: string; quando?: string; foto?: string }[];
     /** Print/depoimento real em imagem (ex.: recado de cliente no WhatsApp). */
     print?: string;
   };

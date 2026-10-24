@@ -124,7 +124,8 @@ async function searchGooglePlaces(query: string, regionCode: string): Promise<No
     const comps = (Array.isArray(place.addressComponents) ? place.addressComponents : [])
       .filter(isRecord);
     const comp = (...types: string[]) =>
-      comps.find((c) => Array.isArray(c.types) && types.some((t) => c.types.includes(t)));
+      comps.find((c) =>
+        Array.isArray(c.types) && types.some((t) => (c.types as unknown[]).includes(t)));
     return {
       id: asString(place.id, 300),
       nome: isRecord(place.displayName) ? asString(place.displayName.text) : null,
@@ -240,6 +241,82 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
           });
         return out.length ? out : null;
       })(),
+    };
+  });
+}
+
+/**
+ * Serper.dev /maps — raspador de Google Maps barato (~$1/1k buscas).
+ * Devolve dados que nem o Places New traz: horários em pt-BR,
+ * thumbnail e category em português. Terceira fonte da cadeia.
+ */
+async function searchSerper(query: string, regionCode: string): Promise<NormalizedPlace[]> {
+  const key = await requireSecret("SERPER_API_KEY");
+  const res = await fetch("https://google.serper.dev/maps", {
+    method: "POST",
+    headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      q: query,
+      gl: regionCode.toLowerCase(),
+      hl: "pt-br",
+      num: 20,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  }).catch(() => null);
+  if (!res?.ok) throw httpError(502, "Serper indisponível no momento");
+  const data = await res.json().catch(() => null);
+  const places = isRecord(data) && Array.isArray(data.places) ? data.places : [];
+  if (!places.length) throw httpError(502, "Serper não retornou resultados");
+
+  // "Av. X, 1310 - Bairro, Cidade - UF, CEP, Brasil" → partes.
+  const parseAddress = (address: string | null) => {
+    const parts = (address ?? "").split(", ");
+    const ufIdx = parts.findIndex((s) => / - [A-Za-z]{2}$/.test(s.trim()));
+    const ufPart = ufIdx >= 0 ? parts[ufIdx].split(" - ") : null;
+    const ruaBairro = parts[0]?.split(" - ");
+    return {
+      bairro: ruaBairro && ruaBairro.length > 1 ? asString(ruaBairro[ruaBairro.length - 1], 150) : null,
+      cidade: ufPart ? asString(ufPart[0], 150) : null,
+      uf: ufPart ? asString(ufPart[1], 50)?.toUpperCase() ?? null : null,
+    };
+  };
+
+  const DAY_ORDER = [
+    "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+    "sexta-feira", "sábado", "domingo",
+  ];
+
+  return places.filter(isRecord).map((p) => {
+    const addr = parseAddress(asString(p.address, 500));
+    const oh = isRecord(p.openingHours) ? p.openingHours : null;
+    const horariosLabel = oh
+      ? DAY_ORDER.flatMap((d): [string, string][] => {
+        const h = asString(oh[d], 120);
+        return h ? [[d[0].toUpperCase() + d.slice(1), h]] : [];
+      })
+      : [];
+    const cid = asString(p.cid, 200);
+    return {
+      id: asString(p.placeId ?? p.cid ?? p.fid, 300),
+      nome: asString(p.title),
+      endereco: asString(p.address, 500),
+      bairro: addr.bairro,
+      cidade: addr.cidade,
+      uf: addr.uf,
+      pais: "BR",
+      telefone: asString(p.phoneNumber),
+      site: asString(p.website, 500),
+      avaliacao: typeof p.rating === "number" ? p.rating : null,
+      totalAvaliacoes: typeof p.ratingCount === "number" ? p.ratingCount : null,
+      status: "OPERATIONAL",
+      categoria: asString(p.type, 150),
+      mapsUrl: cid ? `https://www.google.com/maps?cid=${cid}` : null,
+      imagem: asString(p.thumbnailUrl, 1200),
+      lat: typeof p.latitude === "number" ? p.latitude : null,
+      lng: typeof p.longitude === "number" ? p.longitude : null,
+      whatsapp: null,
+      instagram: null,
+      horariosLabel: horariosLabel.length ? horariosLabel : null,
     };
   });
 }
@@ -582,23 +659,37 @@ Deno.serve(async (req) => {
     });
 
     try {
-      // Provedor primário cai → a busca segue com o outro (ex.: Apify sem
-      // crédito continua servindo resultados do Google Places).
-      let resultados: NormalizedPlace[];
+      // Provedor configurado primeiro; se cair, a busca segue pelos
+      // outros (Apify sem crédito → Google Places → Serper).
+      const providers: [string, () => Promise<NormalizedPlace[]>][] = [
+        ["google_places", () => searchGooglePlaces(query, regionCode)],
+        ["apify", () => searchApify(query)],
+        ["serper", () => searchSerper(query, regionCode)],
+      ].sort((a) => a[0] === provider ? -1 : 0) as [
+        string,
+        () => Promise<NormalizedPlace[]>,
+      ][];
+
+      let resultados: NormalizedPlace[] | null = null;
       let provedor = provider;
-      try {
-        resultados = provider === "apify"
-          ? await searchApify(query)
-          : await searchGooglePlaces(query, regionCode);
-      } catch (err) {
-        console.error(
-          `[places-search] ${provider} falhou, tentando fallback:`,
-          err instanceof Error ? err.message : err,
-        );
-        resultados = provider === "apify"
-          ? await searchGooglePlaces(query, regionCode)
-          : await searchApify(query);
-        provedor = provider === "apify" ? "google_places" : "apify";
+      let lastErr: unknown = null;
+      for (const [name, run] of providers) {
+        try {
+          resultados = await run();
+          provedor = name;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.error(
+            `[places-search] ${name} falhou, tentando próximo:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+      if (!resultados) {
+        throw lastErr instanceof Error
+          ? lastErr
+          : httpError(502, "Busca indisponível no momento");
       }
 
       // Enriquecimento: WhatsApp em lote (grátis) + varredura dos sites

@@ -767,7 +767,7 @@ async function fetchVideoBytes(
 const APIFY_PLACES_ACTOR = (optionalEnv("APIFY_PLACES_ACTOR") ?? "compass/crawler-google-places").replace("/", "~");
 const APIFY_IG_ACTOR = (optionalEnv("APIFY_IG_ACTOR") ?? "apify/instagram-scraper").replace("/", "~");
 
-interface PlaceReview { autor: string; nota: number; texto: string; quando?: string }
+interface PlaceReview { autor: string; nota: number; texto: string; quando?: string; foto?: string }
 interface PlaceDetails {
   reviews: PlaceReview[];
   imageUrls: string[];
@@ -867,7 +867,8 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
         autor,
         nota: typeof r.stars === "number" ? r.stars : 5,
         texto,
-        quando: asString(r.publishAt ?? r.publishedAtDate ?? r.reviewPublishedDate, 40),
+        quando: asString(r.publishAt ?? r.publishedAtDate ?? r.reviewPublishedDate, 40) ?? undefined,
+        foto: asString(r.reviewerPhotoUrl ?? r.photoUrl, 800) ?? undefined,
       }];
     });
 
@@ -957,7 +958,10 @@ async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>): Promise<P
         autor: autor ?? "Cliente",
         nota: typeof r.rating === "number" ? r.rating : 5,
         texto,
-        quando: asString(r.relativePublishTimeDescription, 40),
+        quando: asString(r.relativePublishTimeDescription, 40) ?? undefined,
+        foto: isRecord(r.authorAttribution)
+          ? asString(r.authorAttribution.photoUri, 800) ?? undefined
+          : undefined,
       }];
     });
 
@@ -1007,6 +1011,90 @@ async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>): Promise<P
     ...(horariosLabel.length ? { horariosLabel } : {}),
     avaliacao: typeof place.rating === "number" ? place.rating : undefined,
     totalAvaliacoes: typeof place.userRatingCount === "number" ? place.userRatingCount : undefined,
+  };
+}
+
+/**
+ * Dados do Maps via Serper — cobre Apify/Google fora do ar.
+ * /reviews devolve texto, data em pt-BR e thumbnail do avaliador;
+ * /maps (só quando o lead não guarda cid) resolve o cid e traz
+ * horários/rating do estabelecimento (~$0.002 a dupla chamada).
+ */
+interface SerperDetails {
+  reviews: PlaceReview[];
+  horariosLabel: [string, string][];
+  avaliacao?: number;
+  totalAvaliacoes?: number;
+}
+
+async function fetchSerperReviews(lead: Record<string, unknown>): Promise<SerperDetails> {
+  const empty: SerperDetails = { reviews: [], horariosLabel: [] };
+  const key = await getSecret("SERPER_API_KEY");
+  if (!key) return empty;
+  const post = async (path: string, body: Record<string, unknown>) => {
+    const r = await fetch(`https://google.serper.dev${path}`, {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, gl: "br", hl: "pt-br" }),
+      signal: AbortSignal.timeout(20_000),
+    }).catch(() => null);
+    return r?.ok ? await r.json().catch(() => null) : null;
+  };
+  // /reviews só aceita cid numérico — lead vindo de busca Serper já guarda
+  // cid; lead com placeId ChIJ resolve o cid via busca por nome+cidade.
+  const placeId = asString(lead.place_id, 300);
+  let cid = placeId && /^\d+$/.test(placeId) ? placeId : null;
+  let hit: Record<string, unknown> | null = null;
+  if (!cid) {
+    const nome = asString(lead.nome, 150);
+    const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
+    if (!nome) return empty;
+    const m = await post("/maps", { q: `${nome} ${cidade}`.trim(), num: 3 });
+    const places = isRecord(m) && Array.isArray(m.places) ? m.places : [];
+    // match pelo endereço quando o lead tem; senão primeiro resultado.
+    const endereco = (asString(lead.endereco, 300) ?? "").toLowerCase();
+    hit = (places.filter(isRecord).find((p) => {
+      const a = (asString(p.address, 300) ?? "").toLowerCase();
+      const rua = endereco.split(",")[0]?.trim();
+      return rua && a.includes(rua.slice(0, 12));
+    }) ?? places[0]) as Record<string, unknown> | undefined ?? null;
+    cid = hit ? asString(hit.cid, 40) : null;
+  }
+  if (!cid) return empty;
+
+  // Horários em pt-BR vêm junto no place — cobre o slot quando Apify/Google falharam.
+  const DAY_ORDER = [
+    "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+    "sexta-feira", "sábado", "domingo",
+  ];
+  const oh = hit && isRecord(hit.openingHours) ? hit.openingHours : null;
+  const horariosLabel: [string, string][] = oh
+    ? DAY_ORDER.flatMap((d): [string, string][] => {
+      const h = asString(oh[d], 120);
+      return h ? [[d[0].toUpperCase() + d.slice(1), h]] : [];
+    })
+    : [];
+
+  const data = await post("/reviews", { cid, num: 10 });
+  const reviews = (isRecord(data) && Array.isArray(data.reviews) ? data.reviews : [])
+    .slice(0, 6).flatMap((r): PlaceReview[] => {
+      if (!isRecord(r)) return [];
+      const texto = asString(r.snippet, 500);
+      if (!texto || texto.length < 12) return [];
+      const user = isRecord(r.user) ? r.user : {};
+      return [{
+        autor: asString(user.name, 80) ?? "Cliente",
+        nota: typeof r.rating === "number" ? r.rating : 5,
+        texto,
+        quando: asString(r.date, 40) ?? undefined,
+        foto: asString(user.thumbnail, 800) ?? undefined,
+      }];
+    });
+  return {
+    reviews,
+    horariosLabel,
+    avaliacao: hit && typeof hit.rating === "number" ? hit.rating : undefined,
+    totalAvaliacoes: hit && typeof hit.ratingCount === "number" ? hit.ratingCount : undefined,
   };
 }
 
@@ -1468,7 +1556,7 @@ async function publishPremiumSite(
     if (ap.reviews.length || ap.horariosLabel?.length) return ap;
     console.log("[site] apify vazio — fallback Google Places");
     const g = await fetchPlaceDetailsGoogle(lead);
-    return {
+    const merged = {
       reviews: ap.reviews.length ? ap.reviews : g.reviews,
       imageUrls: ap.imageUrls.length ? ap.imageUrls : g.imageUrls,
       instagram: ap.instagram ?? g.instagram,
@@ -1477,6 +1565,20 @@ async function publishPremiumSite(
       avaliacao: ap.avaliacao ?? g.avaliacao,
       totalAvaliacoes: ap.totalAvaliacoes ?? g.totalAvaliacoes,
     };
+    // Faltou reviews/fotos ou horários → Serper cobre os três de uma vez.
+    if (!merged.reviews.length || !merged.reviews.some((r) => r.foto)
+      || !merged.horariosLabel?.length || !merged.avaliacao) {
+      const sp = await fetchSerperReviews(lead);
+      if (sp.reviews.length
+        && (!merged.reviews.length || !merged.reviews.some((r) => r.foto))) {
+        merged.reviews = sp.reviews;
+      }
+      merged.horariosLabel = merged.horariosLabel?.length
+        ? merged.horariosLabel : (sp.horariosLabel.length ? sp.horariosLabel : undefined);
+      merged.avaliacao = merged.avaliacao ?? sp.avaliacao;
+      merged.totalAvaliacoes = merged.totalAvaliacoes ?? sp.totalAvaliacoes;
+    }
+    return merged;
   })();
   // Instagram: o @ do lead (vem do Maps) dispara o scrape já; sem @, tenta
   // o website do place e, por último, a descoberta social (crawl pesado).
@@ -1561,7 +1663,7 @@ async function publishPremiumSite(
 
     const prompts = siteAssetPrompts(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
-      tipo === "barbearia" ? "barbearia" : paleta, visualRef,
+      tipo === "barbearia" ? "barbearia" : (paleta as "beleza"), visualRef,
     ).slice(0, faltando);
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.

@@ -139,8 +139,9 @@ export async function igCacheGet<T>(handle: string, part: "perfil" | "media"): P
     const { data } = await serviceClient()
       .from("ig_cache").select(`${part}, ${part}_at`)
       .eq("handle", handle.toLowerCase()).maybeSingle();
-    const at = data?.[`${part}_at`] ? Date.parse(data[`${part}_at`]) : 0;
-    if (data?.[part] && Date.now() - at < CACHE_MS) return data[part] as T;
+    const row = data as Record<string, unknown> | null;
+    const at = row?.[`${part}_at`] ? Date.parse(String(row[`${part}_at`])) : 0;
+    if (row?.[part] && Date.now() - at < CACHE_MS) return row[part] as T;
   } catch { /* cache miss vira scrape */ }
   return null;
 }

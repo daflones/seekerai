@@ -536,7 +536,13 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                     transition={{ duration: 0.6, delay: (i % 4) * 0.08, ease: EASE }}>
                     <span className="stars">{"★".repeat(r.nota ?? 5)}</span>
                     <p>“{r.texto}”</p>
-                    <footer><span>{r.autor}</span>{r.quando && <span>{r.quando}</span>}</footer>
+                    <footer>
+                      {r.foto && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img className="bbeauty-review-avatar" src={r.foto} alt="" loading="lazy" />
+                      )}
+                      <span>{r.autor}</span>{r.quando && <span>{r.quando}</span>}
+                    </footer>
                   </motion.article>
                 ))}
               </div>

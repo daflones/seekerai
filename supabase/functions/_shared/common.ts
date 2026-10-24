@@ -98,12 +98,16 @@ export async function hmacSha256Hex(
   const msgBytes = typeof message === "string" ? new TextEncoder().encode(message) : message;
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    keyBytes,
+    keyBytes as unknown as BufferSource,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign("HMAC", cryptoKey, msgBytes);
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    msgBytes as unknown as BufferSource,
+  );
   return toHex(new Uint8Array(signature));
 }
 
