@@ -2089,7 +2089,9 @@ async function publishPremiumSite(
     config.avaliacoes = { nota: place.avaliacao, total: place.totalAvaliacoes ?? 0, fonte: "Google" };
   }
   if (place.reviews.length && isRecord(config.avaliacoes)) {
-    (config.avaliacoes as Record<string, unknown>).itens = place.reviews;
+    // Site é vitrine: só entra review 4★+ — reclamação real não vira conteúdo de venda.
+    const boas = place.reviews.filter((r) => r.nota >= 4);
+    (config.avaliacoes as Record<string, unknown>).itens = boas.length ? boas : place.reviews.slice(0, 3);
   }
 
   // 4) Publica.
