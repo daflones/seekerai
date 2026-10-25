@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadSite } from "@/lib/sites";
@@ -59,7 +60,7 @@ function SiteGate({ nome }: { nome: string }) {
           Se você é o proprietário, assine um plano na sua conta SeekerAi e ele
           volta ao ar imediatamente.
         </p>
-        <a href="/" style={gateStyle.link}>Criado com SeekerAi →</a>
+        <Link href="/" style={gateStyle.link}>Criado com SeekerAi →</Link>
       </div>
     </main>
   );
