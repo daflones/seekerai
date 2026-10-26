@@ -17,6 +17,12 @@ export interface SiteConfig {
   tipo: "barbearia" | string;
   nome: string;
   marca: string;
+  /** Idioma do site — derivado do país do lead na geração
+      ("pt" | "en" | "es" | …). Ausente = "pt" (sites antigos). */
+  lang?: string;
+  /** ISO do país do estabelecimento ("BR", "US"…) — usado pra
+      normalizar o WhatsApp sem assumir "+55". Ausente = "BR". */
+  pais?: string;
   logo?: string;
   tagline?: string;
   cidade?: string;

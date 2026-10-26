@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadSite } from "@/lib/sites";
+import { siteStrings } from "@/components/site/site-i18n";
 import { BarbershopSite } from "@/components/site/barbershop-site";
 import { BeautySite } from "@/components/site/beauty-site";
 
@@ -49,18 +50,17 @@ const gateStyle: Record<string, React.CSSProperties> = {
   link: { fontSize: 13, color: "#a78bfa", textDecoration: "none" },
 };
 
-function SiteGate({ nome }: { nome: string }) {
+function SiteGate({ nome, lang }: { nome: string; lang?: string }) {
+  const S = siteStrings(lang);
   return (
     <main style={gateStyle.main}>
       <div style={gateStyle.card}>
         <p style={gateStyle.brand}>SEEKERAI</p>
-        <h1 style={gateStyle.title}>Site em pausa</h1>
+        <h1 style={gateStyle.title}>{S.gateTitle}</h1>
         <p style={gateStyle.text}>
-          O site de <strong>{nome}</strong> está temporariamente indisponível.
-          Se você é o proprietário, assine um plano na sua conta SeekerAi e ele
-          volta ao ar imediatamente.
+          {S.gateA} <strong>{nome}</strong> {S.gateB}
         </p>
-        <Link href="/" style={gateStyle.link}>Criado com SeekerAi →</Link>
+        <Link href="/" style={gateStyle.link}>{S.gateCta}</Link>
       </div>
     </main>
   );
@@ -71,7 +71,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const site = await loadSite(slug);
   if (!site) return { title: "Site", robots: { index: false } };
   if (await siteBlocked(site.lead_id)) {
-    return { title: "Site em pausa", robots: { index: false } };
+    return { title: siteStrings(site.config.lang).gateTitle, robots: { index: false } };
   }
   return {
     title: site.config.seo?.title ?? site.nome,
@@ -85,7 +85,7 @@ export default async function SitePage({ params }: Props) {
   if (!/^[a-z0-9-]{2,80}$/.test(slug)) notFound();
   const site = await loadSite(slug);
   if (site) {
-    if (await siteBlocked(site.lead_id)) return <SiteGate nome={site.nome} />;
+    if (await siteBlocked(site.lead_id)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
     if (site.tipo === "beleza") return <BeautySite slug={slug} config={site.config} />;
     return <BarbershopSite slug={slug} config={site.config} />;
   }

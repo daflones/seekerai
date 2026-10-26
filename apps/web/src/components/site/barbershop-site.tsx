@@ -15,9 +15,10 @@ import {
 import type { SiteConfig } from "@/lib/sites";
 import { ImageStreamHero } from "./image-stream-hero";
 import {
-  CountUp, DOWS, EASE, FadeUp, fmtDate, fmtMoney, Magnetic, RevealText, Spotlight,
+  CountUp, EASE, FadeUp, Magnetic, RevealText, Spotlight,
   useBooking, useOverlayLock, VideoCard,
 } from "./primitives";
+import { siteLocale, siteMoney, siteStrings } from "./site-i18n";
 import "./site.css";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
@@ -103,9 +104,14 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
     lightbox: { index: lightbox, total: galeria.length, go: setLightbox },
   });
 
+  const S = siteStrings(cfg.lang);
+  const dows = S.dows;
+  const money = siteMoney(cfg.lang);
+  const fmtDia = new Intl.DateTimeFormat(siteLocale(cfg.lang), { day: "numeric", month: "short" });
+
   const marqueeItems = [
     ...(cfg.servicos ?? []).map((s) => s.nome),
-    cfg.tagline ?? "", "Desde o primeiro corte", marca,
+    cfg.tagline ?? "", S.marqueeBarber, marca,
   ].filter(Boolean);
 
   const anchor = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); setMenuOpen(false); scrollTo(href); };
@@ -134,11 +140,11 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           {marca.toUpperCase()}
         </a>
         <div className="bshop-nav-links">
-          {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>História</a>}
-          <a href="#galeria" onClick={anchor("#galeria")}>Galeria</a>
-          <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
-          <a href="#contato" onClick={anchor("#contato")}>Contato</a>
-          <button className="bshop-nav-cta" onClick={() => openBook()}>Agendar horário</button>
+          {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>{S.navHistoria}</a>}
+          <a href="#galeria" onClick={anchor("#galeria")}>{S.navGaleria}</a>
+          <a href="#servicos" onClick={anchor("#servicos")}>{S.navServicos}</a>
+          <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
+          <button className="bshop-nav-cta" onClick={() => openBook()}>{S.ctaAgendarHorario}</button>
         </div>
         <button className="bshop-nav-burger" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -149,11 +155,11 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           <motion.div className="bshop-mobile-menu"
             initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.25, ease: EASE }}>
-            {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>História</a>}
-            <a href="#galeria" onClick={anchor("#galeria")}>Galeria</a>
-            <a href="#servicos" onClick={anchor("#servicos")}>Serviços</a>
-            <a href="#contato" onClick={anchor("#contato")}>Contato</a>
-            <button className="bshop-mobile-cta" onClick={() => { setMenuOpen(false); openBook(); }}>Agendar horário</button>
+            {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>{S.navHistoria}</a>}
+            <a href="#galeria" onClick={anchor("#galeria")}>{S.navGaleria}</a>
+            <a href="#servicos" onClick={anchor("#servicos")}>{S.navServicos}</a>
+            <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
+            <button className="bshop-mobile-cta" onClick={() => { setMenuOpen(false); openBook(); }}>{S.ctaAgendarHorario}</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -162,14 +168,14 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       <header className="bshop-hero" id="top">
         <div className="bshop-hero-bg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {cfg.fotos.hero && <img ref={heroImgRef} src={cfg.fotos.hero} alt={`${cfg.nome} — equipe e ambiente`} />}
+          {cfg.fotos.hero && <img ref={heroImgRef} src={cfg.fotos.hero} alt={`${cfg.nome} — ${S.heroAlt}`} />}
         </div>
         <div className="bshop-hero-content bshop-wrap">
           <div className="bshop-hero-main">
           <motion.span className="bshop-eyebrow"
             initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: 0.15, ease: EASE }}>
-            {cfg.cidade ?? "Barbearia"}
+            {cfg.cidade ?? S.cidadeFb}
           </motion.span>
           <h1>
             <RevealText text={marca.toUpperCase()} delay={0.2} />
@@ -182,18 +188,16 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               {cfg.avaliacoes && (
                 <span className="bshop-rating-chip">
                   <span className="stars">★★★★★</span>
-                  {cfg.avaliacoes.nota.toFixed(1)} · {cfg.avaliacoes.total} avaliações no {cfg.avaliacoes.fonte}
+                  {cfg.avaliacoes.nota.toFixed(1)} · {S.reviewsTotal(cfg.avaliacoes.total, cfg.avaliacoes.fonte)}
                 </span>
               )}
-              <p className="bshop-hero-desc">
-                Escolha seu serviço, seu horário e confirme direto pelo WhatsApp. Sem app, sem cadastro — do jeito que deve ser.
-              </p>
+              <p className="bshop-hero-desc">{S.heroDesc}</p>
             </motion.div>
             <motion.div className="bshop-hero-actions"
               initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.9, ease: EASE }}>
               <a className="bshop-scroll-hint" href="#historia" onClick={anchor("#historia")}>
-                <span className="bshop-shader-text">Role para conhecer nossa história</span>
+                <span className="bshop-shader-text">{S.scrollHistoria}</span>
                 <span className="bshop-scroll-hint-line" aria-hidden />
               </a>
             </motion.div>
@@ -207,10 +211,10 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               animate={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
               transition={{ duration: 1.1, delay: 0.45, ease: EASE }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={cfg.fotos.hero} alt={`Equipe da ${cfg.nome}`} />
+              <img src={cfg.fotos.hero} alt={S.equipeAlt(cfg.nome)} />
               <figcaption className="bshop-hero-photo-cap">
                 {cfg.avaliacoes && <span className="stars">★★★★★ {cfg.avaliacoes.nota.toFixed(1)}</span>}
-                <span>A equipe · {cfg.cidade ?? cfg.nome}</span>
+                <span>{S.equipeCap} · {cfg.cidade ?? cfg.nome}</span>
               </figcaption>
             </motion.figure>
           )}
@@ -243,8 +247,8 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
             <div className="bshop-story">
               <div className="bshop-story-text">
                 <div className="bshop-section-head">
-                  <FadeUp y={16}><span className="bshop-eyebrow">Nossa história</span></FadeUp>
-                  <h2 className="bshop-h2"><RevealText text={cfg.historia?.titulo ?? "De onde viemos"} /></h2>
+                  <FadeUp y={16}><span className="bshop-eyebrow">{S.nossaHistoria}</span></FadeUp>
+                  <h2 className="bshop-h2"><RevealText text={cfg.historia?.titulo ?? S.deOndeViemos} /></h2>
                 </div>
                 {(cfg.historia?.paragrafos ?? []).map((p, i) => (
                   <FadeUp key={i} delay={i * 0.08}><p dangerouslySetInnerHTML={{ __html: p }} /></FadeUp>
@@ -258,7 +262,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
             </div>
             {outrosVideos.length > 0 && (
               <div className="bshop-reels-wrap">
-                <FadeUp y={14}><span className="bshop-eyebrow bshop-eyebrow-solo">Nos reels</span></FadeUp>
+                <FadeUp y={14}><span className="bshop-eyebrow bshop-eyebrow-solo">{S.reelsEyebrow}</span></FadeUp>
                 <div className="bshop-reels">
                   {outrosVideos.map((v, i) => (
                     <motion.div key={i} className="bshop-reel"
@@ -278,16 +282,16 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
       {/* ---------- CORREDOR 3D (image-stream-hero do 21st.dev, adaptado) ---------- */}
       {galeria.length > 0 && (
-        <section className="bshop-corridor" aria-label="Fotos da barbearia em movimento">
+        <section className="bshop-corridor" aria-label={S.corridorBarberEyebrow}>
           <ImageStreamHero
             images={galeria.map((src, i) => ({ src, alt: `${cfg.nome} — foto ${i + 1}` }))}
             cards={9}
             speed={22}
             className="bshop-corridor-stream">
             <div className="bshop-corridor-overlay">
-              <FadeUp><span className="bshop-eyebrow">O dia a dia</span></FadeUp>
+              <FadeUp><span className="bshop-eyebrow">{S.corridorBarberEyebrow}</span></FadeUp>
               <h2 className="bshop-corridor-title">
-                <RevealText text="Cada corte conta" /> <em><RevealText text="uma história" delay={0.3} /></em>
+                <RevealText text={S.corridorBarberA} /> <em><RevealText text={S.corridorBarberB} delay={0.3} /></em>
               </h2>
             </div>
           </ImageStreamHero>
@@ -299,8 +303,8 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         <section className="bshop-section" id="galeria" style={{ paddingTop: 0 }}>
           <div className="bshop-wrap">
             <div className="bshop-section-head">
-              <FadeUp y={16}><span className="bshop-eyebrow">Galeria</span></FadeUp>
-              <h2 className="bshop-h2"><RevealText text="Por dentro da" /> <em><RevealText text={marca} delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bshop-eyebrow">{S.galeriaEyebrow}</span></FadeUp>
+              <h2 className="bshop-h2"><RevealText text={S.porDentroA} /> <em><RevealText text={marca} delay={0.25} /></em></h2>
             </div>
             <div className="bshop-gallery">
               {galeria.map((src, i) => (
@@ -314,7 +318,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt={`${cfg.nome} — foto ${i + 1}`} loading="lazy" />
                   <span className="bshop-gallery-cap">
-                    <span>{cfg.nome}</span><small>Foto {i + 1} · ampliar</small>
+                    <span>{cfg.nome}</span><small>{S.fotoCap(i + 1)}</small>
                   </span>
                 </motion.button>
               ))}
@@ -327,9 +331,9 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       <section className="bshop-section" id="servicos">
         <div className="bshop-wrap">
           <div className="bshop-section-head">
-            <FadeUp y={16}><span className="bshop-eyebrow">Serviços</span></FadeUp>
+            <FadeUp y={16}><span className="bshop-eyebrow">{S.servicosEyebrow}</span></FadeUp>
             <h2 className="bshop-h2">
-              <RevealText text="O que a gente faz" /> <em><RevealText text="de melhor" delay={0.25} /></em>
+              <RevealText text={S.oQueFazemosA} /> <em><RevealText text={S.deMelhorB} delay={0.25} /></em>
             </h2>
           </div>
           <div className="bshop-services">
@@ -346,7 +350,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                     {s.duracaoMin && <span><Clock size={11} style={{ verticalAlign: -1 }} /> ~{s.duracaoMin} min</span>}
                   </div>
                   <div className="bshop-service-price">
-                    {s.preco ? <strong>{fmtMoney.format(s.preco)}</strong> : <span className="ask">Valor no balcão</span>}
+                    {s.preco ? <strong>{money.format(s.preco)}</strong> : <span className="ask">{S.valorBalcao}</span>}
                   </div>
                 </Spotlight>
               </motion.article>
@@ -360,8 +364,8 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         <section className="bshop-section" style={{ paddingTop: 0 }}>
           <div className="bshop-wrap">
             <div className="bshop-section-head">
-              <FadeUp y={16}><span className="bshop-eyebrow">A experiência</span></FadeUp>
-              <h2 className="bshop-h2"><RevealText text="Cada detalhe" /> <em><RevealText text="conta" delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bshop-eyebrow">{S.experienciaEyebrow}</span></FadeUp>
+              <h2 className="bshop-h2"><RevealText text={S.cadaDetalheA} /> <em><RevealText text={S.contaB} delay={0.25} /></em></h2>
             </div>
             <div className="bshop-perks">
               {(cfg.diferenciais ?? []).map((d, i) => (
@@ -386,7 +390,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               <div className="bshop-rating-hero">
                 <div className="big"><CountUp to={cfg.avaliacoes.nota} /></div>
                 <div className="stars">★★★★★</div>
-                <small>{cfg.avaliacoes.total} avaliações reais no {cfg.avaliacoes.fonte}</small>
+                <small>{S.reviewsReal(cfg.avaliacoes.total, cfg.avaliacoes.fonte)}</small>
               </div>
             </FadeUp>
             {(cfg.avaliacoes.itens?.length ?? 0) > 0 && (
@@ -414,17 +418,17 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       <section className="bshop-section" id="contato">
         <div className="bshop-wrap">
           <div className="bshop-section-head">
-            <FadeUp y={16}><span className="bshop-eyebrow">Onde estamos</span></FadeUp>
-            <h2 className="bshop-h2"><RevealText text="Passa" /> <em><RevealText text="aqui" delay={0.25} /></em></h2>
+            <FadeUp y={16}><span className="bshop-eyebrow">{S.ondeEstamos}</span></FadeUp>
+            <h2 className="bshop-h2"><RevealText text={S.passaAquiA} /> <em><RevealText text={S.esperamosB} delay={0.25} /></em></h2>
           </div>
           <div className="bshop-contact">
             <FadeUp delay={0}>
               <Spotlight className="bshop-contact-card">
-                <h3><MapPin size={17} /> Endereço</h3>
+                <h3><MapPin size={17} /> {S.endereco}</h3>
                 <p>{cfg.contato.endereco}</p>
                 {cfg.contato.mapsUrl && (
                   <div className="bshop-contact-links">
-                    <a href={cfg.contato.mapsUrl} target="_blank" rel="noopener">Abrir no Google Maps <ArrowRight size={13} /></a>
+                    <a href={cfg.contato.mapsUrl} target="_blank" rel="noopener">{S.abrirMaps} <ArrowRight size={13} /></a>
                   </div>
                 )}
               </Spotlight>
@@ -432,7 +436,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
             {(cfg.horariosLabel?.length ?? 0) > 0 && (
               <FadeUp delay={0.1}>
                 <Spotlight className="bshop-contact-card">
-                  <h3><CalendarDays size={17} /> Horários</h3>
+                  <h3><CalendarDays size={17} /> {S.horarios}</h3>
                   {(cfg.horariosLabel ?? []).map(([d, h]) => (
                     <div key={d} className="hours-line"><span>{d}</span><strong>{h}</strong></div>
                   ))}
@@ -441,12 +445,12 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
             )}
             <FadeUp delay={0.2}>
               <Spotlight className="bshop-contact-card">
-                <h3><Phone size={17} /> Contato</h3>
+                <h3><Phone size={17} /> {S.contato}</h3>
                 {cfg.contato.telefone && <p>{cfg.contato.telefone}</p>}
                 <div className="bshop-contact-links">
-                  {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={14} /> Chamar no WhatsApp</a>}
+                  {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={14} /> {S.chamarWa}</a>}
                   {cfg.contato.instagram && <a href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={14} /> @{cfg.contato.instagram}</a>}
-                  {cfg.contato.telefone && <a href={`tel:${cfg.contato.telefone.replace(/\D/g, "")}`}><Phone size={14} /> Ligar agora</a>}
+                  {cfg.contato.telefone && <a href={`tel:${cfg.contato.telefone.replace(/\D/g, "")}`}><Phone size={14} /> {S.ligar}</a>}
                 </div>
               </Spotlight>
             </FadeUp>
@@ -459,8 +463,8 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         <section className="bshop-section" style={{ paddingTop: 0 }}>
           <div className="bshop-wrap">
             <div className="bshop-section-head">
-              <FadeUp y={16}><span className="bshop-eyebrow">Dúvidas</span></FadeUp>
-              <h2 className="bshop-h2"><RevealText text="Perguntas" /> <em><RevealText text="frequentes" delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bshop-eyebrow">{S.duvidas}</span></FadeUp>
+              <h2 className="bshop-h2"><RevealText text={S.faqA} /> <em><RevealText text={S.faqB} delay={0.25} /></em></h2>
             </div>
             <FadeUp>
               <div className="bshop-faq">
@@ -511,22 +515,22 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           </div>
 
           <div className="bshop-footer-body" ref={footBodyRef}>
-            <h2 className="bshop-footer-h2">Bora renovar<br />o <em>visual?</em></h2>
+            <h2 className="bshop-footer-h2">{S.footerBarberA}<br /><em>{S.footerBarberB}</em></h2>
             <div className="bshop-footer-pills">
-              <Magnetic><button className="bshop-pill primary" onClick={() => openBook()}><Scissors size={15} /> Agendar agora</button></Magnetic>
+              <Magnetic><button className="bshop-pill primary" onClick={() => openBook()}><Scissors size={15} /> {S.agendarAgora}</button></Magnetic>
               {waNumber && <Magnetic><a className="bshop-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
-              {cfg.contato.mapsUrl && <Magnetic><a className="bshop-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> Como chegar</a></Magnetic>}
+              {cfg.contato.mapsUrl && <Magnetic><a className="bshop-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> {S.comoChegar}</a></Magnetic>}
               {cfg.contato.instagram && <Magnetic><a className="bshop-pill" href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
             </div>
           </div>
 
           <div className="bshop-footer-bar">
-            <small>© {new Date().getFullYear()} {cfg.nome} · Todos os direitos</small>
+            <small>© {new Date().getFullYear()} {cfg.nome} · {S.direitos}</small>
             <div className="bshop-pill bshop-footer-craft">
-              <small>Feito com</small><span className="bshop-heart">♥</span><small>por</small><strong>SeekerAi</strong>
+              <small>{S.feitoCom}</small><span className="bshop-heart">♥</span><small>{S.por}</small><strong>SeekerAi</strong>
             </div>
             <Magnetic>
-              <button className="bshop-pill bshop-footer-top" aria-label="Voltar ao topo"
+              <button className="bshop-pill bshop-footer-top" aria-label={S.voltarTopo}
                 onClick={() => (lenisRef.current ? lenisRef.current.scrollTo(0) : window.scrollTo({ top: 0, behavior: "smooth" }))}>
                 <ArrowUp size={17} />
               </button>
@@ -537,8 +541,8 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
       {/* ---------- WhatsApp flutuante ---------- */}
       {waNumber && (
-        <a className="bshop-wa-float" href={`https://wa.me/${waNumber}?text=${encodeURIComponent(`Olá! Vim pelo site da ${cfg.nome} 💈`)}`}
-          target="_blank" rel="noopener" aria-label="Chamar no WhatsApp">
+        <a className="bshop-wa-float" href={`https://wa.me/${waNumber}?text=${encodeURIComponent(S.waBarberFloat(cfg.nome))}`}
+          target="_blank" rel="noopener" aria-label={S.chamarWa}>
           <MessageCircle size={26} />
         </a>
       )}
@@ -557,10 +561,10 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                 exit={{ opacity: 0, y: 30, scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 260, damping: 26 }}
                 onClick={(e) => e.stopPropagation()}>
-                <button className="bshop-modal-close" aria-label="Fechar" onClick={() => setBookOpen(false)}><X size={17} /></button>
+                <button className="bshop-modal-close" aria-label={S.fechar} onClick={() => setBookOpen(false)}><X size={17} /></button>
                 <div className="bshop-book-modal-head">
-                  <span className="bshop-eyebrow">Agendamento</span>
-                  <h2 className="bshop-modal-h2">Reserve em <em>30 segundos</em></h2>
+                  <span className="bshop-eyebrow">{S.agendamento}</span>
+                  <h2 className="bshop-modal-h2">{S.reserveBarberA} <em>{S.reserveBarberB}</em></h2>
                 </div>
                 <div className="bshop-steps">{Array.from({ length: stepsTotal }).map((_, i) => <i key={i} className={i <= step ? "on" : ""} />)}</div>
 
@@ -573,13 +577,13 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
                     {step === 0 && (
                       <>
-                        <h3 className="bshop-step-title">1. Escolha o serviço</h3>
+                        <h3 className="bshop-step-title">{S.stepServico}</h3>
                         <div className="bshop-pick-grid">
                           {cfg.servicos.map((s) => (
                             <button key={s.nome} className={`bshop-pick${bk.servico?.nome === s.nome ? " on" : ""}`}
                               onClick={() => setBk((b) => ({ ...b, servico: s, hora: null }))}>
                               <strong>{s.nome}</strong>
-                              <small>{s.duracaoMin ? `~${s.duracaoMin} min` : ""}{s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}</small>
+                              <small>{s.duracaoMin ? `~${s.duracaoMin} min` : ""}{s.preco ? ` · ${money.format(s.preco)}` : ""}</small>
                             </button>
                           ))}
                         </div>
@@ -588,16 +592,16 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
                     {hasPros && step === 1 && (
                       <>
-                        <h3 className="bshop-step-title">2. Escolha o profissional</h3>
+                        <h3 className="bshop-step-title">{S.stepProfBarber}</h3>
                         <div className="bshop-pick-grid">
-                          <button className={`bshop-pick${bk.profissional === "Sem preferência" ? " on" : ""}`}
-                            onClick={() => setBk((b) => ({ ...b, profissional: "Sem preferência" }))}>
-                            <strong>Sem preferência</strong><small>Primeiro disponível</small>
+                          <button className={`bshop-pick${bk.profissional === S.semPref ? " on" : ""}`}
+                            onClick={() => setBk((b) => ({ ...b, profissional: S.semPref }))}>
+                            <strong>{S.semPref}</strong><small>{S.primeiroDisp}</small>
                           </button>
                           {pros.map((p) => (
                             <button key={p.nome} className={`bshop-pick${bk.profissional === p.nome ? " on" : ""}`}
                               onClick={() => setBk((b) => ({ ...b, profissional: p.nome }))}>
-                              <strong>{p.nome}</strong><small>{p.especialidade ?? "Barbeiro"}</small>
+                              <strong>{p.nome}</strong><small>{p.especialidade ?? S.barbeiro}</small>
                             </button>
                           ))}
                         </div>
@@ -606,15 +610,15 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
                     {step === dataStep && (
                       <>
-                        <h3 className="bshop-step-title">{hasPros ? "3" : "2"}. Escolha a data</h3>
+                        <h3 className="bshop-step-title">{hasPros ? "3" : "2"}. {S.stepData}</h3>
                         <div className="bshop-days">
                           {dias.map(({ d, aberto }) => (
                             <button key={d.toISOString()} disabled={!aberto}
                               className={`bshop-day${bk.data?.toDateString() === d.toDateString() ? " on" : ""}${aberto ? "" : " off"}`}
                               onClick={() => aberto && setBk((b) => ({ ...b, data: d, hora: null }))}>
-                              <div className="dow">{DOWS[d.getDay()]}</div>
+                              <div className="dow">{dows[d.getDay()]}</div>
                               <div className="num">{d.getDate()}</div>
-                              <div className="mon">{fmtDate.format(d).split(" ")[2] ?? ""}</div>
+                              <div className="mon">{fmtDia.format(d).split(" ")[2] ?? ""}</div>
                             </button>
                           ))}
                         </div>
@@ -623,9 +627,9 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
                     {step === horaStep && (
                       <>
-                        <h3 className="bshop-step-title">{hasPros ? "4" : "3"}. Escolha o horário</h3>
+                        <h3 className="bshop-step-title">{hasPros ? "4" : "3"}. {S.stepHora}</h3>
                         {slots.length === 0
-                          ? <p className="bshop-book-error">Sem horários livres nesse dia — escolhe outra data.</p>
+                          ? <p className="bshop-book-error">{S.semHorarios}</p>
                           : <div className="bshop-slots">
                               {slots.map((h) => (
                                 <button key={h} className={`bshop-slot${bk.hora === h ? " on" : ""}`}
@@ -637,20 +641,20 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
                     {step === finalStep && (
                       <>
-                        <h3 className="bshop-step-title">{hasPros ? "5" : "4"}. Confirme no WhatsApp</h3>
+                        <h3 className="bshop-step-title">{hasPros ? "5" : "4"}. {S.stepConfirma}</h3>
                         <dl className="bshop-summary">
-                          <div><dt>Serviço</dt><dd>{bk.servico?.nome}{bk.servico?.preco ? ` — ${fmtMoney.format(bk.servico.preco)}` : ""}</dd></div>
-                          {bk.profissional && bk.profissional !== "Sem preferência" && <div><dt>Profissional</dt><dd>{bk.profissional}</dd></div>}
-                          <div><dt>Data</dt><dd>{dataLabel}</dd></div>
-                          <div><dt>Horário</dt><dd>{bk.hora}</dd></div>
+                          <div><dt>{S.sumServico}</dt><dd>{bk.servico?.nome}{bk.servico?.preco ? ` — ${money.format(bk.servico.preco)}` : ""}</dd></div>
+                          {bk.profissional && bk.profissional !== S.semPref && <div><dt>{S.sumProf}</dt><dd>{bk.profissional}</dd></div>}
+                          <div><dt>{S.sumData}</dt><dd>{dataLabel}</dd></div>
+                          <div><dt>{S.sumHora}</dt><dd>{bk.hora}</dd></div>
                         </dl>
                         <div className="bshop-field">
-                          <label htmlFor="bk-nome">Seu nome</label>
-                          <input id="bk-nome" value={bk.nome} onChange={(e) => setBk((b) => ({ ...b, nome: e.target.value }))} placeholder="Como te chamamos?" />
+                          <label htmlFor="bk-nome">{S.seuNome}</label>
+                          <input id="bk-nome" value={bk.nome} onChange={(e) => setBk((b) => ({ ...b, nome: e.target.value }))} placeholder={S.nomePh} />
                         </div>
                         <div className="bshop-field">
-                          <label htmlFor="bk-tel">Seu WhatsApp (opcional)</label>
-                          <input id="bk-tel" type="tel" value={bk.telefone} onChange={(e) => setBk((b) => ({ ...b, telefone: e.target.value }))} placeholder="(21) 90000-0000" />
+                          <label htmlFor="bk-tel">{S.seuWhats}</label>
+                          <input id="bk-tel" type="tel" value={bk.telefone} onChange={(e) => setBk((b) => ({ ...b, telefone: e.target.value }))} placeholder={S.telPh} />
                         </div>
                       </>
                     )}
@@ -660,13 +664,13 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                 {erro && <p className="bshop-book-error">{erro}</p>}
                 <div className="bshop-book-actions">
                   {step > 0
-                    ? <button className="bshop-btn-back" onClick={back}><ArrowLeft size={13} style={{ verticalAlign: -2 }} /> Voltar</button>
+                    ? <button className="bshop-btn-back" onClick={back}><ArrowLeft size={13} style={{ verticalAlign: -2 }} /> {S.voltar}</button>
                     : <span />}
                   <button className="bshop-btn bshop-btn-primary" onClick={next}>
-                    {step === finalStep ? <><MessageCircle size={15} /> Enviar no WhatsApp</> : <>Continuar <ArrowRight size={15} /></>}
+                    {step === finalStep ? <><MessageCircle size={15} /> {S.enviarWhats}</> : <>{S.continuar} <ArrowRight size={15} /></>}
                   </button>
                 </div>
-                <p className="bshop-book-msg">A mensagem é montada com suas escolhas — é só enviar e a gente confirma na hora.</p>
+                <p className="bshop-book-msg">{S.bookMsg}</p>
               </motion.div>
             </motion.div>
           )}
@@ -700,21 +704,21 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                 onClick={(e) => e.stopPropagation()} />
               <span className="bshop-lightbox-cap">
                 {cfg.nome} · {lightbox + 1}/{galeria.length}
-                {galeria.length > 1 && <em className="bshop-lightbox-swipe">← arraste →</em>}
+                {galeria.length > 1 && <em className="bshop-lightbox-swipe">{S.arraste}</em>}
               </span>
               {galeria.length > 1 && (
                 <>
-                  <button className="bshop-lightbox-nav prev" aria-label="Anterior"
+                  <button className="bshop-lightbox-nav prev" aria-label={S.anterior}
                     onClick={(e) => { e.stopPropagation(); setLightbox((lightbox - 1 + galeria.length) % galeria.length); }}>
                     <ArrowLeft size={18} />
                   </button>
-                  <button className="bshop-lightbox-nav next" aria-label="Próxima"
+                  <button className="bshop-lightbox-nav next" aria-label={S.proxima}
                     onClick={(e) => { e.stopPropagation(); setLightbox((lightbox + 1) % galeria.length); }}>
                     <ArrowRight size={18} />
                   </button>
                 </>
               )}
-              <button className="bshop-lightbox-close" aria-label="Fechar" onClick={() => setLightbox(null)}><X size={18} /></button>
+              <button className="bshop-lightbox-close" aria-label={S.fechar} onClick={() => setLightbox(null)}><X size={18} /></button>
             </motion.div>
           )}
         </AnimatePresence>,

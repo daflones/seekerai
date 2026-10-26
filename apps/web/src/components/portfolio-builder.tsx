@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, ExternalLink, ImagePlus, Loader2, Lock, MessageCircle, Star } from "lucide-react";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import { toE164 } from "@/lib/phone";
 
 interface Trabalho { nome: string; descricao: string; resultado: string; foto: string | null }
 export interface PortfolioData {
@@ -266,7 +267,7 @@ export function PortfolioPreview({ data, initials, t }: { data: PortfolioData; i
       <small>{data.profissao || tt.yourService}</small>
       <p>{[data.audiencia && `${tt.help} ${data.audiencia}`, data.diferencial].filter(Boolean).join(". ")}</p>
       <div className="pf-view-actions">
-        {data.whatsapp && <a className="pf-view-wpp" href={`https://wa.me/${data.whatsapp}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} />{tt.wa}</a>}
+        {data.whatsapp && <a className="pf-view-wpp" href={`https://wa.me/${toE164(data.whatsapp) ?? data.whatsapp}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} />{tt.wa}</a>}
         {data.instagram && <span className="pf-view-ig">{data.instagram.startsWith("@") ? data.instagram : `@${data.instagram}`}</span>}
       </div>
     </div>

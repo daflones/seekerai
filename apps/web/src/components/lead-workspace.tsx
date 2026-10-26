@@ -12,6 +12,7 @@ import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from
 import { promptFor } from "@/lib/ai-prompts";
 import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import { callingCodeFor, toE164 } from "@/lib/phone";
 import { LeadAssistant } from "./lead-assistant";
 
 interface OutputRow {
@@ -74,10 +75,14 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     : siteCheck?.estado === "bom" ? t.labels.siteBom
     : siteCheck?.estado === "ok" ? t.labels.siteComum : null;
   const canImage = enabledActions.includes("generate_image");
-  const waDigits = (lead.telefone ?? "").replace(/\D/g, "");
-  const waLink = waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}` : null;
+  // wa.me precisa do DDI do país do lead — "+55" cego quebra número gringo.
+  const leadPais = lead.pais
+    ?? (typeof (lead.dados as Record<string, unknown> | null | undefined)?.pais === "string"
+      ? (lead.dados as Record<string, unknown>).pais as string : null);
+  const waDigits = toE164(lead.telefone, callingCodeFor(leadPais));
+  const waLink = waDigits ? `https://wa.me/${waDigits}` : null;
   const waMsgLink = (text: string) =>
-    waDigits ? `https://wa.me/${waDigits.startsWith("55") ? waDigits : `55${waDigits}`}?text=${encodeURIComponent(text)}` : null;
+    waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(text)}` : null;
   const hasStrategy = outputs.some((o) => o.tipo === "deep_strategy");
   const latestReply = outputs.find((o) => o.tipo === "sales_reply");
   const latestImage = outputs.find((o) => o.tipo === "generate_image");

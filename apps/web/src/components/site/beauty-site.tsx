@@ -15,9 +15,10 @@ import {
 import type { SiteConfig, SiteServico } from "@/lib/sites";
 import { ImageStreamHero } from "./image-stream-hero";
 import {
-  CountUp, DOWS, EASE, FadeUp, fmtDate, fmtMoney, Magnetic, RevealText, Spotlight,
+  CountUp, EASE, FadeUp, Magnetic, RevealText, Spotlight,
   useBooking, useOverlayLock, VideoCard,
 } from "./primitives";
+import { conjLugar, conjNoLugar, siteLocale, siteMoney, siteStrings } from "./site-i18n";
 import "./beauty.css";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
@@ -56,7 +57,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
   // Serviços agrupados por categoria (menu editorial)
   const servicosPorCat = (cfg.servicos ?? []).reduce<Record<string, SiteServico[]>>((acc, s) => {
-    const cat = s.categoria ?? "Serviços";
+    const cat = s.categoria ?? siteStrings(cfg.lang).catFallback;
     (acc[cat] ??= []).push(s);
     return acc;
   }, {});
@@ -115,14 +116,18 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
   });
 
   const vocab = cfg.vocab;
-  // "o estúdio" → "do estúdio"/"no estúdio" pras seções derivadas.
-  const deLugar = (vocab?.prep ?? "o espaço").replace(/^o /, "do ").replace(/^a /, "da ");
-  const noLugar = deLugar.replace(/^do /, "no ").replace(/^da /, "na ");
+  const S = siteStrings(cfg.lang);
+  const money = siteMoney(cfg.lang);
+  const dows = S.dows;
+  const fmtDia = new Intl.DateTimeFormat(siteLocale(cfg.lang), { day: "numeric", month: "short" });
+  // "o estúdio" → "do estúdio"/"no estúdio" (ou "at the studio"… no idioma do site).
+  const deLugar = conjLugar(vocab?.prep ?? S.prepFallback, cfg.lang);
+  const noLugar = conjNoLugar(deLugar, cfg.lang);
 
   // CTA por nicho: "agendar" abre o fluxo de horário; "zap" pede pelo
   // WhatsApp; "mapa" leva ao endereço. Sem destino, cai pro #contato.
   const ctaKind = vocab?.cta ?? "agendar";
-  const ctaLabel = vocab?.ctaLabel ?? "Agendar";
+  const ctaLabel = vocab?.ctaLabel ?? S.ctaAgendar;
   const waHref = waNumber ? `https://wa.me/${waNumber}` : null;
   const telHref = cfg.contato.telefone ? `tel:${cfg.contato.telefone.replace(/\D/g, "")}` : null;
   const ctaHref = ctaKind === "mapa"
@@ -130,9 +135,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
     : ctaKind === "zap"
       ? (waHref ?? cfg.contato.mapsUrl ?? telHref)
       : null;
-  const servicosLabel = vocab?.servicosLabel ?? "Serviços";
+  const servicosLabel = vocab?.servicosLabel ?? S.catFallback;
   const temOfertas = (cfg.ofertas?.length ?? 0) > 0 && Boolean(vocab?.ofertasTitle);
-  const ofertasNav = vocab?.ofertasTitle?.split(" ")[0] ?? "Ofertas";
+  const ofertasNav = vocab?.ofertasTitle?.split(" ")[0] ?? S.ofertas;
 
   const CtaButton = ({ className, onClick, children }: { className: string; onClick?: () => void; children: React.ReactNode }) =>
     ctaHref
@@ -146,12 +151,12 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           }}>{children}</button>;
 
   const waServico = (nome: string) => waNumber
-    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(`Olá! Vim pelo site d${deLugar.slice(1)} e quero saber sobre ${nome}.`)}`
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(S.waServicoMsg(vocab?.prep ?? S.prepFallback, nome))}`
     : null;
 
   const marqueeItems = [
     ...Object.keys(servicosPorCat),
-    cfg.tagline ?? "", vocab?.marquee ?? "Um lugar para você se cuidar", marca,
+    cfg.tagline ?? "", vocab?.marquee ?? S.marqueeFallback, marca,
   ].filter(Boolean);
 
   const anchor = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); setMenuOpen(false); scrollTo(href); };
@@ -188,9 +193,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
           <a href="#servicos" onClick={anchor("#servicos")}>{servicosLabel}</a>
           {temOfertas && <a href="#ofertas" onClick={anchor("#ofertas")} className="bbeauty-nav-ofertas">{ofertasNav}</a>}
-          <a href="#portfolio" onClick={anchor("#portfolio")}>Portfólio</a>
-          {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>Dúvidas</a>}
-          <a href="#contato" onClick={anchor("#contato")}>Contato</a>
+          <a href="#portfolio" onClick={anchor("#portfolio")}>{S.navPortfolio}</a>
+          {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>{S.navDuvidas}</a>}
+          <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
           <CtaButton className="bbeauty-nav-cta">{ctaLabel}</CtaButton>
         </div>
         <button className="bbeauty-nav-burger" aria-label="Menu" onClick={() => setMenuOpen(!menuOpen)}>
@@ -205,9 +210,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
             <a href="#servicos" onClick={anchor("#servicos")}>{servicosLabel}</a>
             {temOfertas && <a href="#ofertas" onClick={anchor("#ofertas")}>{ofertasNav}</a>}
-            <a href="#portfolio" onClick={anchor("#portfolio")}>Portfólio</a>
-            {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>Dúvidas</a>}
-            <a href="#contato" onClick={anchor("#contato")}>Contato</a>
+            <a href="#portfolio" onClick={anchor("#portfolio")}>{S.navPortfolio}</a>
+            {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>{S.navDuvidas}</a>}
+            <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
             <CtaButton className="bbeauty-mobile-cta" onClick={() => setMenuOpen(false)}>{ctaLabel}</CtaButton>
           </motion.div>
         )}
@@ -223,7 +228,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
               {cfg.cidade ?? vocab?.rotulo ?? "Estabelecimento"}
             </motion.span>
             <h1>
-              <RevealText text="Um lugar para você" delay={0.2} />
+              <RevealText text={S.heroTop} delay={0.2} />
               <span className="h1-em"><RevealText text={vocab?.em ?? "se cuidar e se amar"} delay={0.55} /></span>
             </h1>
             <div className="bbeauty-hero-bottom">
@@ -233,7 +238,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 {cfg.avaliacoes && (
                   <span className="bbeauty-rating-chip">
                     <span className="stars">★★★★★</span>
-                    {cfg.avaliacoes.nota.toFixed(1)} · {cfg.avaliacoes.total} avaliações no {cfg.avaliacoes.fonte}
+                    {cfg.avaliacoes.nota.toFixed(1)} · {S.reviewsTotal(cfg.avaliacoes.total, cfg.avaliacoes.fonte)}
                   </span>
                 )}
                 <p className="bbeauty-hero-desc">
@@ -244,7 +249,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.9, ease: EASE }}>
                 <a className="bbeauty-scroll-hint" href="#espaco" onClick={anchor("#espaco")}>
-                  <span className="bbeauty-shader-text">Role para conhecer {vocab?.prep ?? "o espaço"}</span>
+                  <span className="bbeauty-shader-text">{S.scrollConhecer(vocab?.prep ?? S.prepFallback)}</span>
                   <span className="bbeauty-scroll-hint-line" aria-hidden />
                 </a>
               </motion.div>
@@ -317,7 +322,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             </div>
             {outrosVideos.length > 0 && (
               <div className="bbeauty-reels-wrap">
-                <FadeUp y={14}><span className="bbeauty-eyebrow bbeauty-eyebrow-solo">Nos reels</span></FadeUp>
+                <FadeUp y={14}><span className="bbeauty-eyebrow bbeauty-eyebrow-solo">{S.reelsEyebrow}</span></FadeUp>
                 <div className="bbeauty-reels">
                   {outrosVideos.map((v, i) => (
                     <motion.div key={i} className="bbeauty-reel"
@@ -340,7 +345,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <div className="bbeauty-wrap">
           <div className="bbeauty-section-head">
             <FadeUp y={16}><span className="bbeauty-eyebrow">{servicosLabel}</span></FadeUp>
-            <h2 className="bbeauty-h2"><RevealText text={vocab?.servicosTitle ?? "Escolha o seu"} /> <em><RevealText text={vocab?.servicosEm ?? "momento"} delay={0.25} /></em></h2>
+            <h2 className="bbeauty-h2"><RevealText text={vocab?.servicosTitle ?? S.servicosTitleFb} /> <em><RevealText text={vocab?.servicosEm ?? S.momentoFb} delay={0.25} /></em></h2>
           </div>
           <div className="bbeauty-services">
             {Object.entries(servicosPorCat).map(([cat, itens], ci) => (
@@ -351,8 +356,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                   {itens.map((s) => {
                     const meta = <>
                       {s.duracaoMin ? `~${s.duracaoMin} min` : ""}
-                      {s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}
-                      {ctaKind === "agendar" && !s.preco && !s.duracaoMin ? <span className="ask">Sob consulta</span> : null}
+                      {s.preco ? ` · ${money.format(s.preco)}` : ""}
+                      {ctaKind === "agendar" && !s.preco && !s.duracaoMin ? <span className="ask">{S.sobConsulta}</span> : null}
                       {ctaKind === "agendar" && !s.preco && s.duracaoMin ? <span className="ask"> · valor {noLugar}</span> : null}
                       {ctaKind !== "agendar" && !s.preco ? <span className="ask">›</span> : null}
                     </>;
@@ -375,7 +380,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
               </FadeUp>
             ))}
           </div>
-          <FadeUp><p className="bbeauty-service-note">Valores e disponibilidade confirmados no WhatsApp — sem compromisso.</p></FadeUp>
+          <FadeUp><p className="bbeauty-service-note">{S.serviceNote}</p></FadeUp>
         </div>
       </section>
 
@@ -384,7 +389,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <section className="bbeauty-section bbeauty-ofertas" id="ofertas" style={{ paddingTop: 0 }}>
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
-              <FadeUp y={16}><span className="bbeauty-eyebrow">Só aqui</span></FadeUp>
+              <FadeUp y={16}><span className="bbeauty-eyebrow">{S.ofertasEyebrow}</span></FadeUp>
               <h2 className="bbeauty-h2"><RevealText text={vocab?.ofertasTitle ?? "Ofertas"} /></h2>
             </div>
             <div className="bbeauty-deals">
@@ -399,7 +404,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                   {o.texto && <p>{o.texto}</p>}
                   {waNumber && (
                     <a className="bbeauty-deal-cta" href={waServico(o.titulo) ?? `https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer">
-                      {ctaKind === "mapa" ? "Aproveitar" : "Quero essa"} <ArrowRight size={13} />
+                      {ctaKind === "mapa" ? S.dealAproveitar : S.dealQuero} <ArrowRight size={13} />
                     </a>
                   )}
                 </motion.article>
@@ -411,16 +416,16 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
       {/* ---------- CORREDOR 3D ---------- */}
       {galeria.length > 0 && (
-        <section className="bbeauty-corridor" aria-label={`Trabalhos ${deLugar} em movimento`}>
+        <section className="bbeauty-corridor" aria-label={`${S.trabalhosA} ${deLugar}`}>
           <ImageStreamHero
-            images={galeria.map((src, i) => ({ src, alt: `${cfg.nome} — trabalho ${i + 1}` }))}
+            images={galeria.map((src, i) => ({ src, alt: `${cfg.nome} — ${S.trabalhosA.toLowerCase()} ${i + 1}` }))}
             cards={9}
             speed={24}
             className="bbeauty-corridor-stream">
             <div className="bbeauty-corridor-overlay">
-              <FadeUp><span className="bbeauty-eyebrow">Portfólio</span></FadeUp>
+              <FadeUp><span className="bbeauty-eyebrow">{S.portfolioEyebrow}</span></FadeUp>
               <h2 className="bbeauty-corridor-title">
-                <RevealText text="Detalhes que" /> <em><RevealText text="fazem a diferença" delay={0.3} /></em>
+                <RevealText text={S.corridorA} /> <em><RevealText text={S.corridorB} delay={0.3} /></em>
               </h2>
             </div>
           </ImageStreamHero>
@@ -432,8 +437,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <section className="bbeauty-section" id="portfolio" style={{ paddingTop: 0 }}>
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
-              <FadeUp y={16}><span className="bbeauty-eyebrow">Portfólio</span></FadeUp>
-              <h2 className="bbeauty-h2"><RevealText text={`Trabalhos ${deLugar}`} /> <em><RevealText text="em destaque" delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bbeauty-eyebrow">{S.portfolioEyebrow}</span></FadeUp>
+              <h2 className="bbeauty-h2"><RevealText text={`${S.trabalhosA} ${deLugar}`} /> <em><RevealText text={S.emDestaque} delay={0.25} /></em></h2>
             </div>
             <div className="bbeauty-gallery">
               {galeria.map((src, i) => (
@@ -461,8 +466,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <section className="bbeauty-section" style={{ paddingTop: 0 }}>
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
-              <FadeUp y={16}><span className="bbeauty-eyebrow">A experiência</span></FadeUp>
-              <h2 className="bbeauty-h2"><RevealText text="Pensado nos" /> <em><RevealText text="detalhes" delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bbeauty-eyebrow">{S.experienciaEyebrow}</span></FadeUp>
+              <h2 className="bbeauty-h2"><RevealText text={S.pensadoA} /> <em><RevealText text={S.pensadoB} delay={0.25} /></em></h2>
             </div>
             <div className="bbeauty-perks">
               {(cfg.diferenciais ?? []).map((d, i) => (
@@ -484,8 +489,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <section className="bbeauty-section" style={{ paddingTop: 0 }}>
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
-              <FadeUp y={16}><span className="bbeauty-eyebrow">Quem cuida de você</span></FadeUp>
-              <h2 className="bbeauty-h2"><RevealText text="Nossa" /> <em><RevealText text="equipe" delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bbeauty-eyebrow">{S.equipeEyebrow}</span></FadeUp>
+              <h2 className="bbeauty-h2"><RevealText text={S.equipeA} /> <em><RevealText text={S.equipeB} delay={0.25} /></em></h2>
             </div>
             <div className="bbeauty-team">
               {pros.map((p, i) => (
@@ -496,7 +501,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                   transition={{ duration: 0.55, delay: i * 0.08, ease: EASE }}>
                   <span className="m-mono">{p.nome[0]}</span>
                   <strong>{p.nome}</strong>
-                  <small>{p.especialidade ?? "Profissional"}</small>
+                  <small>{p.especialidade ?? S.profissional}</small>
                 </motion.div>
               ))}
             </div>
@@ -512,7 +517,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
               <div className="bbeauty-rating-hero">
                 <div className="big"><CountUp to={cfg.avaliacoes.nota} /></div>
                 <div className="stars">★★★★★</div>
-                <small>{cfg.avaliacoes.total} avaliações reais no {cfg.avaliacoes.fonte}</small>
+                <small>{S.reviewsReal(cfg.avaliacoes.total, cfg.avaliacoes.fonte)}</small>
               </div>
             </FadeUp>
             {(cfg.avaliacoes.itens?.length ?? 0) > 0 && (
@@ -524,8 +529,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                     viewport={{ once: true }}
                     transition={{ duration: 0.6, ease: EASE }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={cfg.avaliacoes.print} alt="Recado real de cliente" loading="lazy" />
-                    <small>Recado real de cliente · WhatsApp</small>
+                    <img src={cfg.avaliacoes.print} alt={S.recadoAlt} loading="lazy" />
+                    <small>{S.recadoCliente}</small>
                   </motion.div>
                 )}
                 {(cfg.avaliacoes.itens ?? []).map((r, i) => (
@@ -555,17 +560,17 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
       <section className="bbeauty-section" id="contato" style={{ paddingTop: 0 }}>
         <div className="bbeauty-wrap">
           <div className="bbeauty-section-head">
-            <FadeUp y={16}><span className="bbeauty-eyebrow">Onde estamos</span></FadeUp>
-            <h2 className="bbeauty-h2"><RevealText text="Te esperamos" /> <em><RevealText text="aqui" delay={0.25} /></em></h2>
+            <FadeUp y={16}><span className="bbeauty-eyebrow">{S.ondeEstamos}</span></FadeUp>
+            <h2 className="bbeauty-h2"><RevealText text={S.esperamosA} /> <em><RevealText text={S.esperamosB} delay={0.25} /></em></h2>
           </div>
           <div className="bbeauty-contact">
             <FadeUp delay={0}>
               <Spotlight className="bbeauty-contact-card">
-                <h3><MapPin size={17} /> Endereço</h3>
+                <h3><MapPin size={17} /> {S.endereco}</h3>
                 <p>{cfg.contato.endereco}</p>
                 {cfg.contato.mapsUrl && (
                   <div className="bbeauty-contact-links">
-                    <a href={cfg.contato.mapsUrl} target="_blank" rel="noopener">Abrir no Google Maps <ArrowRight size={13} /></a>
+                    <a href={cfg.contato.mapsUrl} target="_blank" rel="noopener">{S.abrirMaps} <ArrowRight size={13} /></a>
                   </div>
                 )}
               </Spotlight>
@@ -573,7 +578,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             {(cfg.horariosLabel?.length ?? 0) > 0 && (
               <FadeUp delay={0.1}>
                 <Spotlight className="bbeauty-contact-card">
-                  <h3><CalendarDays size={17} /> Horários</h3>
+                  <h3><CalendarDays size={17} /> {S.horarios}</h3>
                   {(cfg.horariosLabel ?? []).map(([d, h]) => (
                     <div key={d} className="bbeauty-hours-line"><span>{d}</span><strong>{h}</strong></div>
                   ))}
@@ -582,12 +587,12 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             )}
             <FadeUp delay={0.2}>
               <Spotlight className="bbeauty-contact-card">
-                <h3><Phone size={17} /> Contato</h3>
+                <h3><Phone size={17} /> {S.contato}</h3>
                 {cfg.contato.telefone && <p>{cfg.contato.telefone}</p>}
                 <div className="bbeauty-contact-links">
-                  {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={14} /> Chamar no WhatsApp</a>}
+                  {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={14} /> {S.chamarWa}</a>}
                   {cfg.contato.instagram && <a href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={14} /> @{cfg.contato.instagram}</a>}
-                  {cfg.contato.telefone && <a href={`tel:${cfg.contato.telefone.replace(/\D/g, "")}`}><Phone size={14} /> Ligar agora</a>}
+                  {cfg.contato.telefone && <a href={`tel:${cfg.contato.telefone.replace(/\D/g, "")}`}><Phone size={14} /> {S.ligar}</a>}
                 </div>
               </Spotlight>
             </FadeUp>
@@ -600,8 +605,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         <section className="bbeauty-section" id="duvidas" style={{ paddingTop: 0 }}>
           <div className="bbeauty-wrap">
             <div className="bbeauty-section-head">
-              <FadeUp y={16}><span className="bbeauty-eyebrow">Dúvidas</span></FadeUp>
-              <h2 className="bbeauty-h2"><RevealText text="Perguntas" /> <em><RevealText text="frequentes" delay={0.25} /></em></h2>
+              <FadeUp y={16}><span className="bbeauty-eyebrow">{S.duvidas}</span></FadeUp>
+              <h2 className="bbeauty-h2"><RevealText text={S.faqA} /> <em><RevealText text={S.faqB} delay={0.25} /></em></h2>
             </div>
             {faqImagens.length > 0 ? (
               <div className="bbeauty-duvidas">
@@ -613,7 +618,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                     viewport={{ once: true, margin: "-40px" }}
                     transition={{ duration: 0.55, delay: i * 0.07, ease: EASE }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={`Dúvidas frequentes ${i + 1} de ${faqImagens.length}`} loading="lazy" />
+                    <img src={src} alt={`${S.faqA} ${S.faqB} ${i + 1} / ${faqImagens.length}`} loading="lazy" />
                   </motion.button>
                 ))}
               </div>
@@ -668,11 +673,11 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           </div>
 
           <div className="bbeauty-footer-body" ref={footBodyRef}>
-            <h2 className="bbeauty-footer-h2">Seu momento de<br /><em>{vocab?.ctaEm ?? "se cuidar"}</em></h2>
+            <h2 className="bbeauty-footer-h2">{S.footerA}<br /><em>{vocab?.ctaEm ?? S.ctaEmFb}</em></h2>
             <div className="bbeauty-footer-pills">
               <Magnetic><CtaButton className="bbeauty-pill primary"><Sparkles size={15} /> {ctaLabel}</CtaButton></Magnetic>
               {waNumber && <Magnetic><a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
-              {cfg.contato.mapsUrl && <Magnetic><a className="bbeauty-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> Como chegar</a></Magnetic>}
+              {cfg.contato.mapsUrl && <Magnetic><a className="bbeauty-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> {S.comoChegar}</a></Magnetic>}
               {cfg.contato.instagram && <Magnetic><a className="bbeauty-pill" href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
             </div>
           </div>
@@ -680,10 +685,10 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           <div className="bbeauty-footer-bar">
             <small>© {new Date().getFullYear()} {cfg.nome} · Todos os direitos</small>
             <div className="bbeauty-pill bbeauty-footer-craft">
-              <small>Feito com</small><span className="bbeauty-heart">♥</span><small>por</small><strong>SeekerAi</strong>
+              <small>{S.feitoCom}</small><span className="bbeauty-heart">♥</span><small>{S.por}</small><strong>SeekerAi</strong>
             </div>
             <Magnetic>
-              <button className="bbeauty-pill bbeauty-footer-top" aria-label="Voltar ao topo"
+              <button className="bbeauty-pill bbeauty-footer-top" aria-label={S.voltarTopo}
                 onClick={() => (lenisRef.current ? lenisRef.current.scrollTo(0) : window.scrollTo({ top: 0, behavior: "smooth" }))}>
                 <ArrowUp size={17} />
               </button>
@@ -694,8 +699,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
       {/* ---------- WhatsApp flutuante ---------- */}
       {waNumber && (
-        <a className="bbeauty-wa-float" href={`https://wa.me/${waNumber}?text=${encodeURIComponent(`Olá! Vim pelo site do ${cfg.nome} ✨`)}`}
-          target="_blank" rel="noopener" aria-label="Chamar no WhatsApp">
+        <a className="bbeauty-wa-float" href={`https://wa.me/${waNumber}?text=${encodeURIComponent(S.waFloatMsg(cfg.nome))}`}
+          target="_blank" rel="noopener" aria-label={S.chamarWa}>
           <MessageCircle size={26} />
         </a>
       )}
@@ -714,10 +719,10 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 exit={{ opacity: 0, y: 30, scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 260, damping: 26 }}
                 onClick={(e) => e.stopPropagation()}>
-                <button className="bbeauty-modal-close" aria-label="Fechar" onClick={() => setBookOpen(false)}><X size={17} /></button>
+                <button className="bbeauty-modal-close" aria-label={S.fechar} onClick={() => setBookOpen(false)}><X size={17} /></button>
                 <div className="bbeauty-book-modal-head">
-                  <span className="bbeauty-eyebrow">Agendamento</span>
-                  <h2 className="bbeauty-modal-h2">Reserve seu <em>momento</em></h2>
+                  <span className="bbeauty-eyebrow">{S.agendamento}</span>
+                  <h2 className="bbeauty-modal-h2">{S.reserveA} <em>{S.reserveB}</em></h2>
                 </div>
                 <div className="bbeauty-steps">{Array.from({ length: stepsTotal }).map((_, i) => <i key={i} className={i <= step ? "on" : ""} />)}</div>
 
@@ -730,13 +735,13 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
                     {step === 0 && (
                       <>
-                        <h3 className="bbeauty-step-title">1. Escolha o serviço</h3>
+                        <h3 className="bbeauty-step-title">{S.stepServico}</h3>
                         <div className="bbeauty-pick-grid">
                           {cfg.servicos.map((s) => (
                             <button key={s.nome} className={`bbeauty-pick${bk.servico?.nome === s.nome ? " on" : ""}`}
                               onClick={() => setBk((b) => ({ ...b, servico: s, hora: null }))}>
                               <strong>{s.nome}</strong>
-                              <small>{s.categoria ?? ""}{s.duracaoMin ? ` · ~${s.duracaoMin} min` : ""}{s.preco ? ` · ${fmtMoney.format(s.preco)}` : ""}</small>
+                              <small>{s.categoria ?? ""}{s.duracaoMin ? ` · ~${s.duracaoMin} min` : ""}{s.preco ? ` · ${money.format(s.preco)}` : ""}</small>
                             </button>
                           ))}
                         </div>
@@ -745,16 +750,16 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
                     {hasPros && step === 1 && (
                       <>
-                        <h3 className="bbeauty-step-title">2. Com quem você prefere?</h3>
+                        <h3 className="bbeauty-step-title">{S.stepProf}</h3>
                         <div className="bbeauty-pick-grid">
-                          <button className={`bbeauty-pick${bk.profissional === "Sem preferência" ? " on" : ""}`}
-                            onClick={() => setBk((b) => ({ ...b, profissional: "Sem preferência" }))}>
-                            <strong>Sem preferência</strong><small>Primeira disponível</small>
+                          <button className={`bbeauty-pick${bk.profissional === S.semPref ? " on" : ""}`}
+                            onClick={() => setBk((b) => ({ ...b, profissional: S.semPref }))}>
+                            <strong>{S.semPref}</strong><small>{S.primeiraDisp}</small>
                           </button>
                           {pros.map((p) => (
                             <button key={p.nome} className={`bbeauty-pick${bk.profissional === p.nome ? " on" : ""}`}
                               onClick={() => setBk((b) => ({ ...b, profissional: p.nome }))}>
-                              <strong>{p.nome}</strong><small>{p.especialidade ?? "Profissional"}</small>
+                              <strong>{p.nome}</strong><small>{p.especialidade ?? S.profissional}</small>
                             </button>
                           ))}
                         </div>
@@ -763,15 +768,15 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
                     {step === dataStep && (
                       <>
-                        <h3 className="bbeauty-step-title">{hasPros ? "3" : "2"}. Escolha a data</h3>
+                        <h3 className="bbeauty-step-title">{hasPros ? "3" : "2"}. {S.stepData}</h3>
                         <div className="bbeauty-days">
                           {dias.map(({ d, aberto }) => (
                             <button key={d.toISOString()} disabled={!aberto}
                               className={`bbeauty-day${bk.data?.toDateString() === d.toDateString() ? " on" : ""}${aberto ? "" : " off"}`}
                               onClick={() => aberto && setBk((b) => ({ ...b, data: d, hora: null }))}>
-                              <div className="dow">{DOWS[d.getDay()]}</div>
+                              <div className="dow">{dows[d.getDay()]}</div>
                               <div className="num">{d.getDate()}</div>
-                              <div className="mon">{fmtDate.format(d).split(" ")[2] ?? ""}</div>
+                              <div className="mon">{fmtDia.format(d).split(" ")[2] ?? ""}</div>
                             </button>
                           ))}
                         </div>
@@ -780,9 +785,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
                     {step === horaStep && (
                       <>
-                        <h3 className="bbeauty-step-title">{hasPros ? "4" : "3"}. Escolha o horário</h3>
+                        <h3 className="bbeauty-step-title">{hasPros ? "4" : "3"}. {S.stepHora}</h3>
                         {slots.length === 0
-                          ? <p className="bbeauty-book-error">Sem horários livres nesse dia — escolhe outra data.</p>
+                          ? <p className="bbeauty-book-error">{S.semHorarios}</p>
                           : <div className="bbeauty-slots">
                               {slots.map((h) => (
                                 <button key={h} className={`bbeauty-slot${bk.hora === h ? " on" : ""}`}
@@ -794,20 +799,20 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
                     {step === finalStep && (
                       <>
-                        <h3 className="bbeauty-step-title">{hasPros ? "5" : "4"}. Confirme no WhatsApp</h3>
+                        <h3 className="bbeauty-step-title">{hasPros ? "5" : "4"}. {S.stepConfirma}</h3>
                         <dl className="bbeauty-summary">
-                          <div><dt>Serviço</dt><dd>{bk.servico?.nome}{bk.servico?.preco ? ` — ${fmtMoney.format(bk.servico.preco)}` : ""}</dd></div>
-                          {bk.profissional && bk.profissional !== "Sem preferência" && <div><dt>Profissional</dt><dd>{bk.profissional}</dd></div>}
-                          <div><dt>Data</dt><dd>{dataLabel}</dd></div>
-                          <div><dt>Horário</dt><dd>{bk.hora}</dd></div>
+                          <div><dt>{S.sumServico}</dt><dd>{bk.servico?.nome}{bk.servico?.preco ? ` — ${money.format(bk.servico.preco)}` : ""}</dd></div>
+                          {bk.profissional && bk.profissional !== S.semPref && <div><dt>{S.sumProf}</dt><dd>{bk.profissional}</dd></div>}
+                          <div><dt>{S.sumData}</dt><dd>{dataLabel}</dd></div>
+                          <div><dt>{S.sumHora}</dt><dd>{bk.hora}</dd></div>
                         </dl>
                         <div className="bbeauty-field">
-                          <label htmlFor="bk-nome">Seu nome</label>
-                          <input id="bk-nome" value={bk.nome} onChange={(e) => setBk((b) => ({ ...b, nome: e.target.value }))} placeholder="Como te chamamos?" />
+                          <label htmlFor="bk-nome">{S.seuNome}</label>
+                          <input id="bk-nome" value={bk.nome} onChange={(e) => setBk((b) => ({ ...b, nome: e.target.value }))} placeholder={S.nomePh} />
                         </div>
                         <div className="bbeauty-field">
-                          <label htmlFor="bk-tel">Seu WhatsApp (opcional)</label>
-                          <input id="bk-tel" type="tel" value={bk.telefone} onChange={(e) => setBk((b) => ({ ...b, telefone: e.target.value }))} placeholder="(21) 90000-0000" />
+                          <label htmlFor="bk-tel">{S.seuWhats}</label>
+                          <input id="bk-tel" type="tel" value={bk.telefone} onChange={(e) => setBk((b) => ({ ...b, telefone: e.target.value }))} placeholder={S.telPh} />
                         </div>
                       </>
                     )}
@@ -817,13 +822,13 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 {erro && <p className="bbeauty-book-error">{erro}</p>}
                 <div className="bbeauty-book-actions">
                   {step > 0
-                    ? <button className="bbeauty-btn-back" onClick={back}><ArrowLeft size={13} style={{ verticalAlign: -2 }} /> Voltar</button>
+                    ? <button className="bbeauty-btn-back" onClick={back}><ArrowLeft size={13} style={{ verticalAlign: -2 }} /> {S.voltar}</button>
                     : <span />}
                   <button className="bbeauty-btn bbeauty-btn-primary" onClick={next}>
-                    {step === finalStep ? <><MessageCircle size={15} /> Enviar no WhatsApp</> : <>Continuar <ArrowRight size={15} /></>}
+                    {step === finalStep ? <><MessageCircle size={15} /> {S.enviarWhats}</> : <>{S.continuar} <ArrowRight size={15} /></>}
                   </button>
                 </div>
-                <p className="bbeauty-book-msg">A mensagem é montada com suas escolhas — é só enviar e a gente confirma na hora.</p>
+                <p className="bbeauty-book-msg">{S.bookMsg}</p>
               </motion.div>
             </motion.div>
           )}
@@ -845,10 +850,10 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 exit={{ opacity: 0, y: 30, scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 260, damping: 26 }}
                 onClick={(e) => e.stopPropagation()}>
-                <button className="bbeauty-modal-close" aria-label="Fechar" onClick={() => setVisitOpen(false)}><X size={17} /></button>
+                <button className="bbeauty-modal-close" aria-label={S.fechar} onClick={() => setVisitOpen(false)}><X size={17} /></button>
                 <div className="bbeauty-book-modal-head">
-                  <span className="bbeauty-eyebrow">Visite-nos</span>
-                  <h2 className="bbeauty-modal-h2">Te esperamos <em>{noLugar}</em></h2>
+                  <span className="bbeauty-eyebrow">{S.visitEyebrow}</span>
+                  <h2 className="bbeauty-modal-h2">{S.visitTitle(noLugar).replace(noLugar, "").trim()} <em>{noLugar}</em></h2>
                 </div>
                 {cfg.contato.endereco && (
                   <p className="bbeauty-visit-line"><MapPin size={15} />{cfg.contato.endereco}</p>
@@ -863,7 +868,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 <div className="bbeauty-visit-actions">
                   {cfg.contato.mapsUrl && (
                     <a className="bbeauty-pill primary" href={cfg.contato.mapsUrl} target="_blank" rel="noopener noreferrer">
-                      <MapPin size={15} /> Traçar rota
+                      <MapPin size={15} /> {S.tracaRota}
                     </a>
                   )}
                   {waNumber && (
@@ -871,7 +876,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                       <MessageCircle size={15} /> WhatsApp
                     </a>
                   )}
-                  {telHref && <a className="bbeauty-pill" href={telHref}><Phone size={15} /> Ligar</a>}
+                  {telHref && <a className="bbeauty-pill" href={telHref}><Phone size={15} /> {S.ligarShort}</a>}
                 </div>
               </motion.div>
             </motion.div>
@@ -906,21 +911,21 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 onClick={(e) => e.stopPropagation()} />
               <span className="bbeauty-lightbox-cap">
                 {cfg.nome} · {lightbox + 1}/{lightboxImgs.length}
-                {lightboxImgs.length > 1 && <em className="bbeauty-lightbox-swipe">← arraste →</em>}
+                {lightboxImgs.length > 1 && <em className="bbeauty-lightbox-swipe">{S.arraste}</em>}
               </span>
               {lightboxImgs.length > 1 && (
                 <>
-                  <button className="bbeauty-lightbox-nav prev" aria-label="Anterior"
+                  <button className="bbeauty-lightbox-nav prev" aria-label={S.anterior}
                     onClick={(e) => { e.stopPropagation(); setLightbox((lightbox - 1 + lightboxImgs.length) % lightboxImgs.length); }}>
                     <ArrowLeft size={18} />
                   </button>
-                  <button className="bbeauty-lightbox-nav next" aria-label="Próxima"
+                  <button className="bbeauty-lightbox-nav next" aria-label={S.proxima}
                     onClick={(e) => { e.stopPropagation(); setLightbox((lightbox + 1) % lightboxImgs.length); }}>
                     <ArrowRight size={18} />
                   </button>
                 </>
               )}
-              <button className="bbeauty-lightbox-close" aria-label="Fechar" onClick={() => setLightbox(null)}><X size={18} /></button>
+              <button className="bbeauty-lightbox-close" aria-label={S.fechar} onClick={() => setLightbox(null)}><X size={18} /></button>
             </motion.div>
           )}
         </AnimatePresence>,

@@ -30,9 +30,16 @@ export function toE164(raw: string | null | undefined, defaultCc = "55"): string
   if (!raw) return null;
   const trimmed = raw.trim();
   let digits = trimmed.replace(/\D/g, "");
-  if (digits.startsWith("00")) digits = digits.replace(/^0+/, "");
+  // "00" é prefixo de discagem internacional — o número já é E.164.
+  if (digits.startsWith("00")) {
+    digits = digits.slice(2);
+    return digits.length >= 10 && digits.length <= 15 ? digits : null;
+  }
   if (digits.length < 7 || digits.length > 15) return null;
   if (trimmed.startsWith("+")) return digits;
-  if (digits.length >= 12) return digits;
+  // Já com DDI: 12+ dígitos, ou começa com o código do país e o restante
+  // tem tamanho de número nacional (ex.: EUA "1" + 10 dígitos = 11).
+  const rest = digits.length - defaultCc.length;
+  if (digits.length >= 12 || (digits.startsWith(defaultCc) && rest >= 8 && rest <= 11)) return digits;
   return `${defaultCc}${digits}`;
 }

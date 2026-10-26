@@ -26,6 +26,7 @@ import {
 import { getSecret, requireSecret } from "../_shared/secrets.ts";
 import { igCachePut, igMediaCached } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
+import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
 const ACTIONS = new Set([
   "deep_strategy",
@@ -184,6 +185,46 @@ const LANG_NAMES: Record<string, string> = {
 function langName(lang: string | undefined): string {
   return LANG_NAMES[lang ?? "pt"] ?? LANG_NAMES.pt;
 }
+
+/* ---------- idioma do site pelo país do lead ---------- */
+
+// País ISO → idioma do site gerado. Desconhecido cai em inglês (o PT só
+// entra quando o país é BR/PT — nunca por "default cego").
+const COUNTRY_LANG: Record<string, string> = {
+  BR: "pt", PT: "pt",
+  US: "en", GB: "en", IE: "en", AU: "en", NZ: "en", CA: "en",
+  ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es", UY: "es",
+  PY: "es", BO: "es", EC: "es", VE: "es", GT: "es", HN: "es", SV: "es",
+  NI: "es", CR: "es", PA: "es", DO: "es", CU: "es",
+  FR: "fr", DE: "de", IT: "it",
+};
+
+function leadPais(lead: Record<string, unknown>): string | null {
+  const dados = isRecord(lead.dados) ? lead.dados : {};
+  return (asString(lead.pais, 8) ?? asString(dados.pais, 8))?.toUpperCase() ?? null;
+}
+
+/** Idioma do site: deriva do país do estabelecimento, não do usuário. */
+function siteLangFor(lead: Record<string, unknown>): string {
+  const pais = leadPais(lead);
+  if (!pais) return "pt"; // lead antigo sem país → comportamento BR preservado
+  return COUNTRY_LANG[pais] ?? "en";
+}
+
+/** languageCode pro Google Places / language do Apify / hl do Serper. */
+function placesLang(lang: string): string {
+  return { pt: "pt-BR", en: "en", es: "es", fr: "fr", de: "de", it: "it" }[lang] ?? "en";
+}
+
+// Adjetivo do país nos prompts de imagem — "a Brazilian barbershop" não
+// pode aparecer em site de lead americano.
+const COUNTRY_ADJ: Record<string, string> = {
+  BR: "Brazilian", PT: "Portuguese", US: "American", CA: "Canadian",
+  GB: "British", IE: "Irish", AU: "Australian", NZ: "New Zealand",
+  MX: "Mexican", AR: "Argentinian", CO: "Colombian", CL: "Chilean",
+  PE: "Peruvian", UY: "Uruguayan", PY: "Paraguayan", ES: "Spanish",
+  FR: "French", DE: "German", IT: "Italian", JP: "Japanese",
+};
 
 function systemPromptFor(action: string, lang: string): string {
   const L = langName(lang);
@@ -685,7 +726,65 @@ function nicheVocab(paleta: string, categoria: string | null): NichoVocab {
  * Fallback determinístico quando a IA não devolve servicos (timeout,
  * modelo fora do ar) — a seção nunca renderiza vazia.
  */
-function defaultServicos(paleta: string): Record<string, unknown>[] {
+function defaultServicos(paleta: string, lang = "pt"): Record<string, unknown>[] {
+  // Fallback localizado — só roda quando a IA não devolveu serviços.
+  if (lang !== "pt") {
+    const GEN: Record<string, [string, string, string | null][]> = {
+      en: [["Signature service", "Our most requested option", null],
+        ["Popular choice", "A favorite among regulars", null],
+        ["Custom request", "Tell us what you need — we make it happen", null]],
+      es: [["Servicio destacado", "La opción más pedida", null],
+        ["Favorito de la casa", "El preferido de los clientes", null],
+        ["A pedido", "Cuéntanos qué necesitas — lo resolvemos", null]],
+    };
+    const L2: Record<string, Record<string, [string, string, string | null][]>> = {
+      en: {
+        barbearia: [["Haircut", "Classic or modern cut with finish", "40-60"],
+          ["Beard", "Full beard with razor and hot towel", "30-45"],
+          ["Eyebrows", "Trim and design", "15-20"]],
+        beleza: [["Hair", "Cut, blowout, color and treatments", "60-120"],
+          ["Facial", "Skin cleansing and facial treatments", "45-90"],
+          ["Nails", "Manicure and pedicure", "45-60"]],
+        tattoo: [["Custom tattoo", "Original piece designed with the artist", "120-240"],
+          ["Realism", "Black & grey or full color", "180-360"],
+          ["Piercing", "Applied with single-use materials", "30-60"]],
+        mercado: [["Fresh produce", "Fruits and vegetables every day", null],
+          ["Butcher", "Fresh and special cuts", null],
+          ["Bakery", "Breads and deli at the counter", null],
+          ["Weekly deals", "New promotions every week", null]],
+        trattoria: [["House dishes", "Homemade specialties", null],
+          ["Desserts", "Artisanal sweets to finish", null],
+          ["Delivery", "Order at home on WhatsApp", null]],
+        padaria: [["Artisan breads", "Natural fermentation, baked daily", null],
+          ["Pastry", "Cakes and house sweets", null],
+          ["Breakfast", "Coffee, sandwiches and fresh snacks", null]],
+        cafe: [["Specialty coffee", "Espresso, pour-over and methods", null],
+          ["Snacks", "Toast, sandwiches and house snacks", null],
+          ["Sweets", "Desserts to go with your coffee", null]],
+      },
+      es: {
+        barbearia: [["Corte", "Corte clásico o moderno con acabado", "40-60"],
+          ["Barba", "Barba completa con navaja y toalla caliente", "30-45"],
+          ["Cejas", "Diseño y perfilado", "15-20"]],
+        beleza: [["Cabello", "Corte, peinado, color y tratamientos", "60-120"],
+          ["Facial", "Limpieza facial y tratamientos", "45-90"],
+          ["Uñas", "Manicura y pedicura", "45-60"]],
+        tattoo: [["Tatuaje autoral", "Pieza original diseñada con el artista", "120-240"],
+          ["Realismo", "Sombreado o a color", "180-360"],
+          ["Piercing", "Con material desechable", "30-60"]],
+        mercado: [["Frutas y verduras", "Frescura todos los días", null],
+          ["Carnicería", "Cortes frescos y especiales", null],
+          ["Panadería", "Panes y fiambres en el mostrador", null],
+          ["Ofertas de la semana", "Promociones nuevas cada semana", null]],
+      },
+    };
+    const t = L2[lang] ?? L2.en;
+    const list = t[paleta] ?? (GEN[lang] ?? GEN.en);
+    return list.map(([nome, descricao, d]) => {
+      const [a, b] = (d ?? "").split("-").map(Number);
+      return { nome, descricao, duracaoMin: a ? Math.round((a + (b ?? a)) / 2) : null };
+    });
+  }
   const S: Record<string, [string, string, string | null][]> = {
     beleza: [
       ["Cabelo", "Corte, escova, coloração e tratamentos capilares", "60-120"],
@@ -830,18 +929,12 @@ function defaultServicos(paleta: string): Record<string, unknown>[] {
   }));
 }
 
-const NICHO_CLASSIFY_SYSTEM = `Você classifica o nicho de um estabelecimento brasileiro para personalizar o site dele.
-Analise categoria do Maps, nome, descrições das fotos reais, bio e legendas do Instagram.
-
-Responda SOMENTE com JSON nesta forma exata:
-{"paleta":"...", "vocab":{...} | null}
-
-- "paleta": se o negócio encaixar CLARAMENTE num destes, retorne a chave e vocab:null —
-  beleza, barbearia, tattoo, mercado, padaria, trattoria, cafe, clinica, studio, pet, flora,
-  carbono, corporativo, varejo, hotel, educacao, eventos, acougue, farmacia, otica,
-  assistencia, auto, construcao, viagem, imobiliaria, arquitetura.
-- Se NÃO encaixar em nenhum, invente uma chave curta em português minúsculo sem acento
-  (ex.: "sorveteria", "chacara", "igreja", "lavanderia") e preencha o vocab em pt-BR:
+/** Prompt do classificador de nicho — o vocab pedido sai no idioma do site
+    (derivado do país do lead), nunca fixo em pt-BR. */
+function nichoClassifySystem(lang: string): string {
+  const L = langName(lang);
+  const vocabSpec = lang === "pt"
+    ? `preencha o vocab em pt-BR:
   {"rotulo":"RÓTULO DO NICHO EM CAIXA ALTA","em":"frase em itálico do hero",
    "desc":"linha de apresentação do negócio, uma frase","prep":"o/a + substantivo do lugar",
    "marquee":"frase curta de destaque","ctaEm":"verbo em itálico do CTA final",
@@ -850,9 +943,69 @@ Responda SOMENTE com JSON nesta forma exata:
    "servicosEm":"palavra em itálico do h2","servicosHint":"dica sob cada item",
    "ofertasTitle":"título da seção de ofertas ou null","guia":"instruções pro redator: o que
    servicos contém neste nicho, se duracaoMin faz sentido (só serviços com hora marcada),
-   e o que o FAQ deve cobrir"}
-- "agendar" só pra negócio com hora marcada; "zap" pra orçamento/pedido; "mapa" pra visita sem aviso.
-- NUNCA use linguagem de salão de beleza pra nichos que não são beleza.`;
+   e o que o FAQ deve cobrir"}`
+    : `fill the vocab ENTIRELY IN ${L} (every string, including "guia"):
+  {"rotulo":"NICHE LABEL IN UPPERCASE","em":"italic hero phrase",
+   "desc":"one-line business intro","prep":"article + noun for the place (e.g. 'the studio')",
+   "marquee":"short punchy phrase","ctaEm":"italic verb for the final CTA",
+   "schema":"appropriate schema.org @type","cta":"zap|agendar|mapa","ctaLabel":"button text",
+   "servicosLabel":"services/offers section label","servicosTitle":"start of the section h2",
+   "servicosEm":"italic word of the h2","servicosHint":"hint under each item",
+   "ofertasTitle":"offers section title or null","guia":"writer's guide: what servicos
+   contains in this niche, whether duracaoMin makes sense (only for booked services),
+   and what the FAQ should cover"}`;
+  const invent = lang === "pt"
+    ? `Se NÃO encaixar em nenhum, invente uma chave curta em português minúsculo sem acento
+  (ex.: "sorveteria", "chacara", "igreja", "lavanderia") e ${vocabSpec}`
+    : `If it does NOT clearly fit any, invent a short lowercase key in ${L} without accents
+  and ${vocabSpec}`;
+  return `You classify the niche of a local business to personalize its website.
+Analyze the Maps category, name, real photo descriptions, Instagram bio and captions.
+
+Respond ONLY with JSON in this exact shape:
+{"paleta":"...", "vocab":{...} | null}
+
+- "paleta": if the business CLEARLY fits one of these, return the key and vocab:null —
+  beleza, barbearia, tattoo, mercado, padaria, trattoria, cafe, clinica, studio, pet, flora,
+  carbono, corporativo, varejo, hotel, educacao, eventos, acougue, farmacia, otica,
+  assistencia, auto, construcao, viagem, imobiliaria, arquitetura.
+- ${invent}
+- "agendar" only for appointment-based business; "zap" for quotes/orders; "mapa" for walk-in visits.
+- NEVER use beauty-salon language for niches that aren't beauty.
+- The site language is ${L} — every user-facing string you produce must be in ${L}.`;
+}
+
+const CTA_ZAP_LABEL: Record<string, string> = {
+  pt: "Agendar pelo WhatsApp", en: "Book on WhatsApp", es: "Reservar por WhatsApp",
+  fr: "Réserver sur WhatsApp", de: "Per WhatsApp buchen", it: "Prenota su WhatsApp",
+};
+
+/** Vocab genérico no idioma do site — última linha de defesa quando a IA
+    não devolveu patch.vocab. Nunca deixa texto PT vazar em site gringo. */
+function vocabLocalFallback(v: NichoVocab, lang: string): NichoVocab {
+  if (lang === "es") {
+    return {
+      ...v,
+      rotulo: "NEGOCIO LOCAL", em: "sentirte en casa",
+      desc: "atención de verdad, como mereces.",
+      prep: "el lugar", marquee: "Un lugar para ti", ctaEm: "conocer",
+      ctaLabel: "Contactar", servicosLabel: "Servicios",
+      servicosTitle: "Elige lo", servicosEm: "tuyo",
+      servicosHint: "escríbenos por WhatsApp",
+      ofertasTitle: v.ofertasTitle ? "Ofertas" : null,
+    };
+  }
+  return {
+    ...v,
+    rotulo: "LOCAL BUSINESS", em: "feel at home",
+    desc: "quality service, the way you deserve.",
+    prep: "the place", marquee: "A place for you", ctaEm: "visit",
+    ctaLabel: "Contact us", servicosLabel: "Services",
+    servicosTitle: "What we", servicosEm: "offer",
+    servicosHint: "message us on WhatsApp",
+    ofertasTitle: v.ofertasTitle ? "Offers" : null,
+  };
+}
 
 interface NichoResult { paleta: string; vocab: NichoVocab | null }
 
@@ -865,7 +1018,9 @@ async function classifyNichoAI(
   apiKey: string | null,
   lead: Record<string, unknown>,
   ctx: { descs: string[]; captions: string[]; bio?: string | null },
+  lang = "pt",
 ): Promise<NichoResult | null> {
+  const classifySystem = nichoClassifySystem(lang);
   const userContent = [
     `Estabelecimento: ${asString(lead.nome, 150) ?? "?"} — categoria: ${asString(lead.categoria, 150) ?? "?"}, ${asString(lead.cidade, 80) ?? ""}`,
     ctx.bio ? `Bio do Instagram: ${asString(ctx.bio, 300)}` : "",
@@ -885,7 +1040,7 @@ async function classifyNichoAI(
         model: TEXT_MODEL, max_tokens: 900,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: NICHO_CLASSIFY_SYSTEM },
+          { role: "system", content: classifySystem },
           { role: "user", content: userContent },
         ],
       }),
@@ -899,7 +1054,7 @@ async function classifyNichoAI(
     }
   }
   if (typeof content !== "string" || !content.trim()) {
-    const nv = await nvidiaChat(NICHO_CLASSIFY_SYSTEM, userContent, 900, 30_000);
+    const nv = await nvidiaChat(classifySystem, userContent, 900, 30_000);
     const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
     content = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
       ? nvChoices[0].message.content : null;
@@ -954,6 +1109,15 @@ const DOW_NAME: Record<string, string> = {
   sexta: "5", "sexta-feira": "5", "sábado": "6",
   sunday: "0", monday: "1", tuesday: "2", wednesday: "3", thursday: "4",
   friday: "5", saturday: "6",
+  lunes: "1", martes: "2", "miércoles": "3", miercoles: "3", jueves: "4",
+  viernes: "5", sabado: "6",
+  "lunedì": "1", lunedi: "1", "martedì": "2", martedi: "2",
+  "mercoledì": "3", mercoledi: "3", "giovedì": "4", giovedi: "4",
+  "venerdì": "5", venerdi: "5", domenica: "0",
+  montag: "1", dienstag: "2", mittwoch: "3", donnerstag: "4",
+  freitag: "5", samstag: "6", sonntag: "0",
+  lundi: "1", mardi: "2", mercredi: "3", jeudi: "4", vendredi: "5",
+  samedi: "6", dimanche: "0",
 };
 
 /** Labels reais ("Segunda", "09:00 – 19:00") → mapa de janelas pro booking. */
@@ -1058,15 +1222,44 @@ const DAY_KEY: Record<string, string> = {
   monday: "1", tuesday: "2", wednesday: "3", thursday: "4", friday: "5", saturday: "6", sunday: "0",
   "segunda-feira": "1", "terça-feira": "2", "quarta-feira": "3",
   "quinta-feira": "4", "sexta-feira": "5", "sábado": "6", "domingo": "0",
+  lunes: "1", martes: "2", "miércoles": "3", miercoles: "3", jueves: "4",
+  viernes: "5", sabado: "6",
+  "lunedì": "1", lunedi: "1", "martedì": "2", martedi: "2",
+  "mercoledì": "3", mercoledi: "3", "giovedì": "4", giovedi: "4",
+  "venerdì": "5", venerdi: "5", domenica: "0",
+  montag: "1", dienstag: "2", mittwoch: "3", donnerstag: "4",
+  freitag: "5", samstag: "6", sonntag: "0",
+  lundi: "1", mardi: "2", mercredi: "3", jeudi: "4", vendredi: "5",
+  samedi: "6", dimanche: "0",
 };
-const DAY_PT: Record<string, string> = {
-  "1": "Segunda", "2": "Terça", "3": "Quarta", "4": "Quinta", "5": "Sexta", "6": "Sábado", "0": "Domingo",
+const DAY_LABEL: Record<string, Record<string, string>> = {
+  pt: { "1": "Segunda", "2": "Terça", "3": "Quarta", "4": "Quinta", "5": "Sexta", "6": "Sábado", "0": "Domingo" },
+  en: { "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday", "0": "Sunday" },
+  es: { "1": "Lunes", "2": "Martes", "3": "Miércoles", "4": "Jueves", "5": "Viernes", "6": "Sábado", "0": "Domingo" },
+  fr: { "1": "Lundi", "2": "Mardi", "3": "Mercredi", "4": "Jeudi", "5": "Vendredi", "6": "Samedi", "0": "Dimanche" },
+  de: { "1": "Montag", "2": "Dienstag", "3": "Mittwoch", "4": "Donnerstag", "5": "Freitag", "6": "Samstag", "0": "Sonntag" },
+  it: { "1": "Lunedì", "2": "Martedì", "3": "Mercoledì", "4": "Giovedì", "5": "Venerdì", "6": "Sabato", "0": "Domenica" },
 };
+function dayLabel(key: string, lang: string): string {
+  return (DAY_LABEL[lang] ?? DAY_LABEL.en)[key] ?? key;
+}
+const CLOSED_LABEL: Record<string, string> = {
+  pt: "Fechado", en: "Closed", es: "Cerrado", fr: "Fermé", de: "Geschlossen", it: "Chiuso",
+};
+function closedLabel(lang: string): string {
+  return CLOSED_LABEL[lang] ?? "Closed";
+}
+const OPEN24_LABEL: Record<string, string> = {
+  pt: "Aberto 24h", en: "Open 24 hours", es: "Abierto 24h", fr: "Ouvert 24h", de: "24h geöffnet", it: "Aperto 24h",
+};
+function open24Label(lang: string): string {
+  return OPEN24_LABEL[lang] ?? "Open 24 hours";
+}
 
 /** "9:00 AM to 7:00 PM" / "05:00 to 21:00" (e múltiplas janelas) → [["09:00","19:00"], ...]. */
 function parseOpeningHours(hours: string): [string, string][] | null {
-  if (/closed|fechado/i.test(hours)) return null;
-  if (/24\s*(hours|horas)/i.test(hours)) return [["00:00", "23:59"]];
+  if (/closed|fechado|cerrado|fermé|geschlossen|chiuso/i.test(hours)) return null;
+  if (/24\s*(hours|horas|heures|h)/i.test(hours)) return [["00:00", "23:59"]];
   const to24 = (h: string, m: string, ap: string | undefined) => {
     let hh = Number(h);
     if (ap?.toUpperCase() === "PM" && hh < 12) hh += 12;
@@ -1085,7 +1278,7 @@ function parseOpeningHours(hours: string): [string, string][] | null {
  * roda com maxReviews: 0, então aqui fazemos uma chamada mirada só
  * quando o site está sendo gerado (até 6 reviews).
  */
-async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDetails> {
+async function fetchPlaceDetails(lead: Record<string, unknown>, lang = "pt"): Promise<PlaceDetails> {
   const empty: PlaceDetails = { reviews: [], imageUrls: [] };
   const token = await getSecret("APIFY_API_TOKEN");
   if (!token) return empty;
@@ -1102,7 +1295,7 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
     maxReviews: 6,
     reviewsSort: "newest",
     maxImages: 10,
-    language: "pt-BR",
+    language: placesLang(lang),
   };
   const res = await fetch(
     `https://api.apify.com/v2/actors/${APIFY_PLACES_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=55`,
@@ -1157,7 +1350,7 @@ async function fetchPlaceDetails(lead: Record<string, unknown>): Promise<PlaceDe
     if (!key) continue;
     const windows = parseOpeningHours(asString(d.hours, 160) ?? "");
     horarios[key] = windows;
-    byDay.set(key, [DAY_PT[key], windows ? windows.map((w) => `${w[0]} – ${w[1]}`).join(", ") : "Fechado"]);
+    byDay.set(key, [dayLabel(key, lang), windows ? windows.map((w) => `${w[0]} – ${w[1]}`).join(", ") : closedLabel(lang)]);
   }
   const horariosLabel = ["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []);
   return {
@@ -1192,16 +1385,17 @@ async function instagramFromWebsite(url: string): Promise<string | undefined> {
  * Places (New) devolve reviews, horários, fotos e rating pelo place_id
  * que o lead já guarda da busca.
  */
-async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>): Promise<PlaceDetails> {
+async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>, lang = "pt"): Promise<PlaceDetails> {
   const empty: PlaceDetails = { reviews: [], imageUrls: [] };
   const key = await getSecret("GOOGLE_PLACES_API_KEY");
   if (!key) return empty;
+  const lc = placesLang(lang);
   const MASK = "id,displayName,rating,userRatingCount,reviews,regularOpeningHours,photos,websiteUri";
   const placeId = asString(lead.place_id, 300);
   let place: Record<string, unknown> | null = null;
   if (placeId) {
     const res = await fetch(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=pt-BR`,
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=${lc}`,
       { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": MASK }, signal: AbortSignal.timeout(20_000) },
     ).catch(() => null);
     if (res?.ok) place = await res.json().catch(() => null) as Record<string, unknown>;
@@ -1213,7 +1407,7 @@ async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>): Promise<P
     const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": MASK },
-      body: JSON.stringify({ textQuery: `${nome} ${cidade}`.trim(), languageCode: "pt-BR", maxResultCount: 1 }),
+      body: JSON.stringify({ textQuery: `${nome} ${cidade}`.trim(), languageCode: lc, maxResultCount: 1 }),
       signal: AbortSignal.timeout(20_000),
     }).catch(() => null);
     const data = res?.ok ? await res.json().catch(() => null) : null;
@@ -1258,10 +1452,10 @@ async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>): Promise<P
       const fmt = (t: Record<string, unknown>) =>
         `${String(typeof t.hour === "number" ? t.hour : 0).padStart(2, "0")}:${String(typeof t.minute === "number" ? t.minute : 0).padStart(2, "0")}`;
       const key2 = String(p.open.day);
-      const win = isRecord(p.close) ? `${fmt(p.open)} – ${fmt(p.close)}` : "Aberto 24h";
+      const win = isRecord(p.close) ? `${fmt(p.open)} – ${fmt(p.close)}` : open24Label(lang);
       if (!byDay.has(key2)) {
         horarios[key2] = [isRecord(p.close) ? [fmt(p.open), fmt(p.close)] : ["00:00", "23:59"]];
-        byDay.set(key2, [DAY_PT[key2] ?? key2, win]);
+        byDay.set(key2, [dayLabel(key2, lang), win]);
       }
     }
     horariosLabel.push(...["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []));
@@ -1303,15 +1497,16 @@ interface SerperDetails {
   totalAvaliacoes?: number;
 }
 
-async function fetchSerperReviews(lead: Record<string, unknown>): Promise<SerperDetails> {
+async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): Promise<SerperDetails> {
   const empty: SerperDetails = { reviews: [], horariosLabel: [] };
   const key = await getSecret("SERPER_API_KEY");
   if (!key) return empty;
+  const gl = (leadPais(lead) ?? "BR").toLowerCase();
   const post = async (path: string, body: Record<string, unknown>) => {
     const r = await fetch(`https://google.serper.dev${path}`, {
       method: "POST",
       headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, gl: "br", hl: "pt-br" }),
+      body: JSON.stringify({ ...body, gl, hl: placesLang(lang) }),
       signal: AbortSignal.timeout(20_000),
     }).catch(() => null);
     return r?.ok ? await r.json().catch(() => null) : null;
@@ -1338,14 +1533,20 @@ async function fetchSerperReviews(lead: Record<string, unknown>): Promise<Serper
   }
   if (!cid) return empty;
 
-  // Horários em pt-BR vêm junto no place — cobre o slot quando Apify/Google falharam.
-  const DAY_ORDER = [
-    "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
-    "sexta-feira", "sábado", "domingo",
-  ];
+  // Horários vêm junto no place, no idioma pedido via hl — as chaves do
+  // objeto openingHours são os nomes de dia localizados.
+  const DAY_ORDER: Record<string, string[]> = {
+    pt: ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"],
+    en: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+    es: ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"],
+    fr: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
+    de: ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"],
+    it: ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"],
+  };
+  const days = DAY_ORDER[lang] ?? DAY_ORDER.en;
   const oh = hit && isRecord(hit.openingHours) ? hit.openingHours : null;
   const horariosLabel: [string, string][] = oh
-    ? DAY_ORDER.flatMap((d): [string, string][] => {
+    ? days.flatMap((d): [string, string][] => {
       const h = asString(oh[d], 120);
       return h ? [[d[0].toUpperCase() + d.slice(1), h]] : [];
     })
@@ -1400,7 +1601,7 @@ async function fetchPlaceInstagram(lead: Record<string, unknown>): Promise<strin
           spotifys: false, threads: false,
         },
         maxReviews: 0,
-        language: "pt-BR",
+        language: placesLang(siteLangFor(lead)),
       }),
       signal: AbortSignal.timeout(100_000),
     },
@@ -1540,6 +1741,7 @@ function siteAssetPrompts(
   lead: { nome: string; categoria: string | null; cidade: string | null },
   tipo: string,
   visualRef?: string | null,
+  pais?: string | null,
 ): string[] {
   // Sem o nome literal do negócio e com categoria em inglês: modelos de
   // imagem renderizam palavras do prompt como letreiro/embalagem na foto.
@@ -1568,7 +1770,8 @@ function siteAssetPrompts(
   const catEn = CAT_EN[catKey] ?? CAT_EN[catKey.replace(/\s*-\s*.*/, "")] ?? lead.categoria ?? "local business";
   // Nem nome nem cidade no texto do prompt: qualquer substantivo próprio
   // vira letreiro/marca d'água na imagem gerada.
-  const biz = `a Brazilian ${catEn}`;
+  const adj = pais ? COUNTRY_ADJ[pais] : "Brazilian";
+  const biz = adj ? `a ${adj} ${catEn}` : `a ${catEn}`;
   const DIRECTIONS: Record<string, string> = {
     barbearia: "dark moody cinematic look, charcoal and amber tones, brass and leather textures, shallow depth of field",
     beleza: "bright editorial look, ivory and champagne tones, soft window light, delicate gold accents, shallow depth of field",
@@ -1621,12 +1824,15 @@ function baseSiteConfig(lead: Record<string, unknown>, tipo: string): Record<str
   const cidade = [asString(lead.cidade), asString(lead.uf)].filter(Boolean).join(" · ");
   const instagram = asString(lead.instagram, 200);
   const telefone = asString(lead.telefone, 60);
+  // wa.me exige DDI do país do estabelecimento — nunca "+55" cego.
+  const cc = callingCodeFor(leadPais(lead));
   const whatsapp = lead.whatsapp === "sim" || dados.whatsapp === true
-    ? (telefone ?? "").replace(/\D/g, "") : undefined;
+    ? toE164(telefone, cc) : undefined;
   return {
     tipo,
     nome: asString(lead.nome, 150) ?? "Estabelecimento",
     marca: asString(lead.nome, 150) ?? "Estabelecimento",
+    pais: leadPais(lead) ?? undefined,
     cidade: cidade || undefined,
     contato: {
       telefone: telefone ?? undefined,
@@ -1700,40 +1906,68 @@ function sanitizeConfigPatch(raw: unknown): Record<string, unknown> {
     const desc = str(raw.seo.description, 160);
     if (desc) patch.seo = { description: desc };
   }
+  // vocab traduzido/adaptado pela IA pro idioma do site — cta/schema/guia
+  // não passam pelo modelo, ficam com os valores determinísticos.
+  if (isRecord(raw.vocab)) {
+    const v = raw.vocab;
+    const vocab: Record<string, unknown> = {};
+    for (const k of ["rotulo", "em", "desc", "prep", "marquee", "ctaEm", "ctaLabel",
+      "servicosLabel", "servicosTitle", "servicosEm", "servicosHint"] as const) {
+      const s = str(v[k], 220);
+      if (s) vocab[k] = s;
+    }
+    if (typeof v.ofertasTitle === "string" && v.ofertasTitle.trim()) {
+      vocab.ofertasTitle = str(v.ofertasTitle, 60);
+    } else if (v.ofertasTitle === null) {
+      vocab.ofertasTitle = null;
+    }
+    if (Object.keys(vocab).length) patch.vocab = vocab;
+  }
   for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
   return patch;
 }
 
-const CONFIG_PATCH_SYSTEM = [
-  "Você é um diretor de arte e copywriter sênior montando o SiteConfig JSON de um site premium.",
-  "Responda APENAS com JSON válido (sem markdown, sem comentários) neste formato exato:",
-  '{ "tagline": "frase curta de marca", "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null}],',
-  '  "historia": {"titulo":"…","paragrafos":["…","…"]}, "diferenciais":["…"],',
-  '  "ofertas": [{"titulo":"…","texto":"…","tag":"OFERTA"}],',
-  '  "faq":[{"q":"…","a":"…"}], "seo":{"description":"…"} }',
-  "REGRAS:",
-  "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados, legendas do Instagram). Não invente preços, profissionais, prêmios ou números.",
-  "- Siga o GUIA DO NICHO enviado junto com os fatos — ele define o que 'servicos' representa nesse negócio (cardápio, setores, tratamentos…) e se duracaoMin deve ser null.",
-  "- Se os serviços reais não estiverem claros, proponha 4-8 itens típicos da categoria, respeitando o guia do nicho, e preco SEMPRE null.",
-  "- ofertas: SÓ preencha quando o material real (legendas/fotos do Instagram) mostrar promoções, panfletos, combos, pacotes ou campanhas — ex.: panfleto de mercado, happy hour, combo de banho+tosa. tag é um selo curto ('OFERTA DA SEMANA', 'COMBO'). Sem material promocional, omita o campo. Nunca invente preço ou validade; pode mencionar valores apenas se estiverem escritos nas legendas.",
-  "- tagline: elegante, max 8 palavras, no tom do negócio.",
-  "- historia: 2 parágrafos acolhedores sobre a proposta do lugar — sem inventar datas/fatos; pode falar de proposta e experiência, não de biografia.",
-  "- faq: 4-6 perguntas práticas ADAPTADAS ao nicho (o guia diz quais temas fazem sentido — entrega, estacionamento, matrícula, orçamento… nunca agendamento quando o negócio não agenda).",
-  "- seo.description: 1 frase com nome + categoria + cidade.",
-  "- Todo o texto em português brasileiro, sem emojis.",
-].join("\n");
+function configPatchSystem(lang: string): string {
+  const L = langName(lang);
+  return [
+    "Você é um diretor de arte e copywriter sênior montando o SiteConfig JSON de um site premium.",
+    "Responda APENAS com JSON válido (sem markdown, sem comentários) neste formato exato:",
+    '{ "tagline": "frase curta de marca", "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null}],',
+    '  "historia": {"titulo":"…","paragrafos":["…","…"]}, "diferenciais":["…"],',
+    '  "ofertas": [{"titulo":"…","texto":"…","tag":"OFERTA"}],',
+    '  "faq":[{"q":"…","a":"…"}], "seo":{"description":"…"}',
+    lang === "pt" ? "}" : ',  "vocab":{"rotulo":"…","em":"…","desc":"…","prep":"…","marquee":"…","ctaEm":"…","ctaLabel":"…","servicosLabel":"…","servicosTitle":"…","servicosEm":"…","servicosHint":"…","ofertasTitle":"… ou null"} }',
+    "REGRAS:",
+    "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados, legendas do Instagram). Não invente preços, profissionais, prêmios ou números.",
+    "- Siga o GUIA DO NICHO enviado junto com os fatos — ele define o que 'servicos' representa nesse negócio (cardápio, setores, tratamentos…) e se duracaoMin deve ser null.",
+    "- Se os serviços reais não estiverem claros, proponha 4-8 itens típicos da categoria, respeitando o guia do nicho, e preco SEMPRE null.",
+    "- ofertas: SÓ preencha quando o material real (legendas/fotos do Instagram) mostrar promoções, panfletos, combos, pacotes ou campanhas — ex.: panfleto de mercado, happy hour, combo de banho+tosa. tag é um selo curto ('OFERTA DA SEMANA', 'COMBO'). Sem material promocional, omita o campo. Nunca invente preço ou validade; pode mencionar valores apenas se estiverem escritos nas legendas.",
+    "- tagline: elegante, max 8 palavras, no tom do negócio.",
+    "- historia: 2 parágrafos acolhedores sobre a proposta do lugar — sem inventar datas/fatos; pode falar de proposta e experiência, não de biografia.",
+    "- faq: 4-6 perguntas práticas ADAPTADAS ao nicho (o guia diz quais temas fazem sentido — entrega, estacionamento, matrícula, orçamento… nunca agendamento quando o negócio não agenda).",
+    "- seo.description: 1 frase com nome + categoria + cidade.",
+    ...(lang === "pt" ? [] : [
+      `- O site será exibido em ${L}. Escreva TODO o texto em ${L} — nada em português.`,
+      `- vocab: o VOCAB BASE enviado nos fatos está em português como referência de SEMÂNTICA. Devolva cada campo adaptado naturalmente a ${L} e ao nicho — prep mantém artigo+substantivo ("the studio", "el mercado"); servicosHint é o microcopy do card; ofertasTitle null se o VOCAB BASE for null.`,
+    ]),
+    `- Todo o texto em ${L}, sem emojis.`,
+  ].join("\n");
+}
 
 async function configPatchFromAi(
   apiKey: string | null,
   lead: Record<string, unknown>,
   extraFacts?: string,
+  lang = "pt",
 ): Promise<{ patch: Record<string, unknown>; modelo: string }> {
   const facts = {
     nome: lead.nome, categoria: lead.categoria, cidade: lead.cidade, uf: lead.uf,
     endereco: lead.endereco, avaliacao: lead.avaliacao, totalAvaliacoes: lead.total_avaliacoes,
     instagram: lead.instagram, temWhatsApp: lead.whatsapp === "sim",
+    pais: leadPais(lead), idiomaSite: langName(lang),
   };
   const userContent = `Estabelecimento:\n${JSON.stringify(facts)}${extraFacts ?? ""}`;
+  const system = configPatchSystem(lang);
 
   // OpenRouter primeiro; NVIDIA gratuita se falhar ou não houver chave.
   let content: unknown = null;
@@ -1750,7 +1984,7 @@ async function configPatchFromAi(
         max_tokens: 2500,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: CONFIG_PATCH_SYSTEM },
+          { role: "system", content: system },
           { role: "user", content: userContent },
         ],
       }),
@@ -1768,7 +2002,7 @@ async function configPatchFromAi(
   if (typeof content !== "string" || !content.trim()) {
     // Uma falha transitória não deve derrubar o patch — uma retentativa.
     for (let t = 0; t < 2; t++) {
-      const nv = await nvidiaChat(CONFIG_PATCH_SYSTEM, userContent, 3000, 60_000);
+      const nv = await nvidiaChat(system, userContent, 3000, 60_000);
       const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
       const nvContent = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
         ? nvChoices[0].message.content : null;
@@ -1794,9 +2028,10 @@ async function configPatchFromAi(
 }
 
 /** Card HTML que vai pro lead_outputs — o workspace renderiza em iframe. */
-function siteCardHtml(slug: string, nome: string, hero: string | null): string {
+function siteCardHtml(slug: string, nome: string, hero: string | null, lang = "pt"): string {
   const esc = (s: string) => s.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!);
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+  const htmlLang = { pt: "pt-BR", en: "en", es: "es" }[lang] ?? lang;
+  return `<!doctype html><html lang="${htmlLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0e0b08;color:#f5ead9;font-family:system-ui,sans-serif}
 .card{max-width:420px;width:calc(100% - 48px);text-align:center;padding:32px 28px;border:1px solid #3a3128;border-radius:18px;background:#171310}
 .card img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;margin-bottom:18px}
@@ -1817,12 +2052,16 @@ async function publishPremiumSite(
   apiKey: string | null,
   leadId: string,
   context: Record<string, unknown>,
-): Promise<{ slug: string; nome: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number; imagemErros: string[]; debug: Record<string, unknown> }> {
+): Promise<{ slug: string; nome: string; lang: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number; imagemErros: string[]; debug: Record<string, unknown> }> {
   const { data: lead } = await db.from("leads").select("*").eq("id", leadId).maybeSingle();
   if (!lead) throw httpError(404, "Lead não encontrado");
 
   const dados = isRecord(lead.dados) ? lead.dados : {};
   const nome = asString(lead.nome, 150) ?? "estabelecimento";
+  // Idioma do site deriva do país do estabelecimento (lead.pais vem do
+  // Maps na busca). Tudo downstream — copy, vocab, horários, reviews —
+  // respeita esse idioma, nunca o do usuário da plataforma.
+  const siteLang = siteLangFor(lead);
   const { tipo, paleta: paleta0 } = siteThemeFor(asString(lead.categoria, 150));
   let paleta = paleta0;
   // Nicho fora do mapa (paleta "generico") → a IA classifica a partir de
@@ -1853,10 +2092,10 @@ async function publishPremiumSite(
   // Apify primeiro; sem reviews/horários (ex.: sem crédito) o Google
   // Places cobre com os dados que o place_id do lead já referencia.
   const placePromise = (async () => {
-    const ap = await fetchPlaceDetails(lead);
+    const ap = await fetchPlaceDetails(lead, siteLang);
     if (ap.reviews.length || ap.horariosLabel?.length) return ap;
     console.log("[site] apify vazio — fallback Google Places");
-    const g = await fetchPlaceDetailsGoogle(lead);
+    const g = await fetchPlaceDetailsGoogle(lead, siteLang);
     const merged = {
       reviews: ap.reviews.length ? ap.reviews : g.reviews,
       imageUrls: ap.imageUrls.length ? ap.imageUrls : g.imageUrls,
@@ -1869,7 +2108,7 @@ async function publishPremiumSite(
     // Faltou reviews/fotos ou horários → Serper cobre os três de uma vez.
     if (!merged.reviews.length || !merged.reviews.some((r) => r.foto)
       || !merged.horariosLabel?.length || !merged.avaliacao) {
-      const sp = await fetchSerperReviews(lead);
+      const sp = await fetchSerperReviews(lead, siteLang);
       if (sp.reviews.length
         && (!merged.reviews.length || !merged.reviews.some((r) => r.foto))) {
         merged.reviews = sp.reviews;
@@ -1915,11 +2154,12 @@ async function publishPremiumSite(
       ?? nicheVocab(nicho?.paleta ?? paleta, asString(lead.categoria, 150));
     const extra = [
       `GUIA DO NICHO (${vocab.rotulo}): ${vocab.guia}`,
+      siteLang === "pt" ? "" : `VOCAB BASE (traduza/adapte cada campo pro idioma do site no campo "vocab" da resposta): ${JSON.stringify({ rotulo: vocab.rotulo, em: vocab.em, desc: vocab.desc, prep: vocab.prep, marquee: vocab.marquee, ctaEm: vocab.ctaEm, ctaLabel: vocab.ctaLabel, servicosLabel: vocab.servicosLabel, servicosTitle: vocab.servicosTitle, servicosEm: vocab.servicosEm, servicosHint: vocab.servicosHint, ofertasTitle: vocab.ofertasTitle })}`,
       facts.length ? `Dados reais do Instagram:\n${facts.join("\n")}` : "",
       captions ? `Legendas reais do Instagram do estabelecimento (use pra inferir serviços, ofertas, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}` : "",
       ig?.videos?.length ? `O perfil tem ${ig.videos.length} reels/vídeos recentes — se as legendas indicarem bastidores/produção, a seção de história pode mencionar esse processo.` : "",
     ].filter(Boolean).join("\n\n");
-    return configPatchFromAi(apiKey, lead, extra ? `\n${extra}` : "");
+    return configPatchFromAi(apiKey, lead, extra ? `\n${extra}` : "", siteLang);
   })();
 
   // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
@@ -1968,7 +2208,7 @@ async function publishPremiumSite(
     try {
       const nicho = await classifyNichoAI(apiKey, lead, {
         descs, captions: ig?.captions ?? [], bio: igBio,
-      });
+      }, siteLang);
       if (nicho) {
         paleta = nicho.paleta;
         resolvedVocab = nicho.vocab;
@@ -1989,7 +2229,7 @@ async function publishPremiumSite(
 
     const prompts = siteAssetPrompts(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
-      tipo === "barbearia" ? "barbearia" : paleta, visualRef,
+      tipo === "barbearia" ? "barbearia" : paleta, visualRef, leadPais(lead),
     ).slice(0, faltando);
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.
@@ -2044,12 +2284,17 @@ async function publishPremiumSite(
   }))).filter((u): u is string => Boolean(u));
 
   const config = baseSiteConfig(lead, tipo);
+  config.lang = siteLang;
   const { patch, modelo } = await patchPromise;
+  // patch.vocab (campos traduzidos) é merge no vocab determinístico mais
+  // adiante — sai do assign pra não ser sobrescrito pelo nicheVocab.
+  const patchVocab = isRecord(patch.vocab) ? patch.vocab : null;
+  delete patch.vocab;
   Object.assign(config, patch);
   if (patch.seo) config.seo = { ...(isRecord(config.seo) ? config.seo : {}), ...patch.seo };
   // IA fora do ar/timeout → serviços padrão do nicho, a seção nunca fica vazia.
   if (!Array.isArray(config.servicos) || !config.servicos.length) {
-    config.servicos = defaultServicos(paleta);
+    config.servicos = defaultServicos(paleta, siteLang);
   }
   const realPhotos = publicUrls.filter((x) => x.real).map((x) => x.url);
   const genPhotos = publicUrls.filter((x) => !x.real).map((x) => x.url);
@@ -2063,7 +2308,14 @@ async function publishPremiumSite(
   let h = 0;
   for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   config.tema = { paleta, variant: variants[h % 3], ...(cores ? { cores } : {}) };
-  config.vocab = resolvedVocab ?? nicheVocab(paleta, asString(lead.categoria, 150));
+  const vocabBase = resolvedVocab ?? nicheVocab(paleta, asString(lead.categoria, 150));
+  // Idioma do site ≠ pt: a IA devolve os campos adaptados (patch.vocab);
+  // sem patch (modelo fora), cai num vocab genérico no idioma em vez de PT.
+  config.vocab = siteLang === "pt"
+    ? vocabBase
+    : patchVocab
+      ? { ...vocabBase, ...patchVocab }
+      : vocabLocalFallback(vocabBase, siteLang);
   // Fatos reais vencem o patch — horários e avaliações vêm do Maps,
   // e o Instagram descoberto completa o contato.
   if (place.instagram && isRecord(config.contato) && !config.contato.instagram) {
@@ -2080,7 +2332,7 @@ async function publishPremiumSite(
   const vocabCfg = config.vocab as NichoVocab | undefined;
   if (vocabCfg?.cta === "agendar" && !config.horarios) {
     vocabCfg.cta = "zap";
-    vocabCfg.ctaLabel = "Agendar pelo WhatsApp";
+    vocabCfg.ctaLabel = CTA_ZAP_LABEL[siteLang] ?? CTA_ZAP_LABEL.en;
   }
   if (videos.length) config.videos = videos;
   // Nota/reviews do Maps também preenchem o que o lead não tinha (ex.:
@@ -2105,6 +2357,7 @@ async function publishPremiumSite(
   return {
     slug,
     nome,
+    lang: siteLang,
     siteUrl: `/site/${slug}`,
     hero: publicUrls[0]?.url ?? null,
     modelo,
@@ -2135,7 +2388,7 @@ Deno.serve(async (req) => {
     refForNotify = businessRef;
     const requestRef = asString(body.requestRef, 150);
     const prompt = asString(body.prompt, 20_000);
-    const lang = asString(body.lang, 10) || "pt";
+    let lang = asString(body.lang, 10) || "pt";
     if (!action || !ACTIONS.has(action) || !service || !businessRef || !requestRef || !prompt) {
       throw httpError(400, "Informe action, serviceSlug, businessRef, requestRef e prompt");
     }
@@ -2145,6 +2398,13 @@ Deno.serve(async (req) => {
       JSON.stringify({ action, businessRef, service, prompt, context: body.context ?? null }),
     );
     const db = serviceClient();
+    // Copy dirigida ao estabelecimento (abordagem de vendas) sai no idioma
+    // do LEAD — derivado do país — não no idioma da interface do usuário.
+    if (action === "sales_reply") {
+      const { data: leadRow } = await db.from("leads")
+        .select("*").eq("id", businessRef).maybeSingle();
+      if (leadRow) lang = siteLangFor(leadRow);
+    }
     const reservation = await reserveAction(db, {
       userId: user.id,
       action,
@@ -2181,7 +2441,7 @@ Deno.serve(async (req) => {
         }
         await settleAction(db, user.id, requestRef, "completed");
         return json({
-          conteudo: siteCardHtml(site.slug, site.nome, site.hero),
+          conteudo: siteCardHtml(site.slug, site.nome, site.hero, site.lang),
           siteSlug: site.slug,
           siteUrl: site.siteUrl,
           imagensReais: site.reais,

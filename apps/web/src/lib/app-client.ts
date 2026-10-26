@@ -98,6 +98,7 @@ export interface LeadRow {
   maps_url: string | null;
   imagem: string | null;
   instagram: string | null;
+  pais?: string | null;
   status: "novo" | "contatado" | "respondeu" | "proposta" | "ganho" | "perdido";
   whatsapp: "sim" | "nao" | null;
   notas: string | null;

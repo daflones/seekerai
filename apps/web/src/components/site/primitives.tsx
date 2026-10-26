@@ -9,11 +9,10 @@ import { animate, motion, useInView, useReducedMotion } from "framer-motion";
 import { gsap } from "gsap";
 import { Play } from "lucide-react";
 import type { SiteConfig, SiteServico } from "@/lib/sites";
+import { callingCodeFor, toE164 } from "@/lib/phone";
+import { siteLocale, siteStrings } from "./site-i18n";
 
 export const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-export const DOWS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-export const fmtDate = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short" });
-export const fmtMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export function toMin(t: string) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
 export function toHHMM(min: number) { return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`; }
@@ -173,8 +172,13 @@ export function useBooking(cfg: SiteConfig) {
   const [step, setStep] = useState(0);
   const [bk, setBk] = useState<Booking>({ servico: null, profissional: null, data: null, hora: null, nome: "", telefone: "" });
   const [erro, setErro] = useState("");
+  const s = siteStrings(cfg.lang);
+  const dows = s.dows;
+  const fmtDia = new Intl.DateTimeFormat(siteLocale(cfg.lang), { day: "numeric", month: "short" });
 
-  const waNumber = (cfg.contato.whatsapp ?? cfg.contato.telefone ?? "").replace(/\D/g, "");
+  // wa.me precisa de E.164 com o DDI do país do estabelecimento —
+  // "+55" cego quebra site gringo.
+  const waNumber = toE164(cfg.contato.whatsapp ?? cfg.contato.telefone, callingCodeFor(cfg.pais)) ?? "";
   const pros = cfg.profissionais ?? [];
   const hasPros = pros.length > 0;
 
@@ -216,28 +220,28 @@ export function useBooking(cfg: SiteConfig) {
     setStep(0); setErro(""); setBookOpen(true);
   }, []);
 
-  const dataLabel = bk.data ? `${DOWS[bk.data.getDay()]}, ${fmtDate.format(bk.data)}` : "—";
+  const dataLabel = bk.data ? `${dows[bk.data.getDay()]}, ${fmtDia.format(bk.data)}` : "—";
   const waMsg = () => [
-    `Olá! Quero agendar no ${cfg.nome} ✨`,
-    `• Serviço: ${bk.servico?.nome}`,
-    bk.profissional && bk.profissional !== "Sem preferência" ? `• Profissional: ${bk.profissional}` : null,
-    `• Data: ${dataLabel}`,
-    `• Horário: ${bk.hora}`,
-    bk.nome ? `• Nome: ${bk.nome}` : null,
-    bk.telefone ? `• Telefone: ${bk.telefone}` : null,
+    s.waBookHello(cfg.nome),
+    `• ${s.sumServico}: ${bk.servico?.nome}`,
+    bk.profissional && bk.profissional !== s.semPref ? `• ${s.sumProf}: ${bk.profissional}` : null,
+    `• ${s.sumData}: ${dataLabel}`,
+    `• ${s.sumHora}: ${bk.hora}`,
+    bk.nome ? `• ${s.sumNome}: ${bk.nome}` : null,
+    bk.telefone ? `• ${s.sumTel}: ${bk.telefone}` : null,
   ].filter(Boolean).join("\n");
 
   const enviarWhats = () => {
-    if (!bk.nome.trim()) return setErro("Informe seu nome pra identificar o agendamento.");
+    if (!bk.nome.trim()) return setErro(s.errNome);
     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg())}`, "_blank", "noopener");
   };
 
   const next = () => {
     setErro("");
-    if (step === 0 && !bk.servico) return setErro("Escolha um serviço pra continuar.");
-    if (hasPros && step === 1 && bk.profissional === null) return setErro("Escolha um profissional ou 'Sem preferência'.");
-    if (step === dataStep && !bk.data) return setErro("Escolha uma data.");
-    if (step === horaStep && !bk.hora) return setErro("Escolha um horário.");
+    if (step === 0 && !bk.servico) return setErro(s.errServico);
+    if (hasPros && step === 1 && bk.profissional === null) return setErro(s.errProf);
+    if (step === dataStep && !bk.data) return setErro(s.errData);
+    if (step === horaStep && !bk.hora) return setErro(s.errHora);
     if (step === finalStep) return enviarWhats();
     setStep(step + 1);
   };
