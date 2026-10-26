@@ -92,7 +92,41 @@ async function promptCreds() {
   return { email: email.trim(), password };
 }
 
+function setSession(d, idFallback) {
+  session = {
+    access_token: d.access_token,
+    refresh_token: d.refresh_token,
+    expires_at: Date.now() + ((d.expires_in ?? 3600) - 60) * 1000,
+  };
+  log(`logado como ${d.user?.email ?? idFallback}`);
+  if (d.user?.id && d.user.id !== CFG.USER_ID) {
+    log(`AVISO: user ${d.user.id} != USER_ID configurado — ajuste CFG.USER_ID`);
+    CFG.USER_ID = d.user.id;
+  }
+}
+
 async function login() {
+  // Sem senha: a Admin API (service key local) emite um magiclink do dono
+  // e /verify vira sessão real — o bot roda 100% autônomo.
+  const u = await fetch(`${SB_URL}/auth/v1/admin/users/${CFG.USER_ID}`, {
+    headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+  }).then((r) => r.json()).catch(() => null);
+  if (u?.email) {
+    const gl = await fetch(`${SB_URL}/auth/v1/admin/generate_link`, {
+      method: "POST",
+      headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "magiclink", email: u.email }),
+    }).then((r) => r.json()).catch(() => null);
+    if (gl?.hashed_token) {
+      const d = await fetch(`${SB_URL}/auth/v1/verify`, {
+        method: "POST",
+        headers: { apikey: SB_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "magiclink", token_hash: gl.hashed_token }),
+      }).then((r) => r.json()).catch(() => null);
+      if (d?.access_token) return setSession(d, u.email);
+    }
+  }
+  log("sessão via Admin API falhou — caindo pra email/senha");
   const { email, password } = await promptCreds();
   const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
     method: "POST",
@@ -101,16 +135,7 @@ async function login() {
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.access_token) die(`Login falhou: ${JSON.stringify(d)}`);
-  session = {
-    access_token: d.access_token,
-    refresh_token: d.refresh_token,
-    expires_at: Date.now() + (d.expires_in - 60) * 1000,
-  };
-  log(`logado como ${d.user?.email} (${d.user?.id})`);
-  if (d.user?.id !== CFG.USER_ID) {
-    log(`AVISO: user ${d.user?.id} != USER_ID configurado — ajuste CFG.USER_ID`);
-    CFG.USER_ID = d.user.id;
-  }
+  setSession(d);
 }
 
 async function token() {
@@ -180,8 +205,10 @@ async function serperMaps(q, page = 1) {
 async function phaseSearch(state) {
   log(`buscando barbearias em ${CIDADES.length} cidades (alvo: ${CFG.LIMIT})…`);
   const seen = new Set(state.found.map((f) => f.cid || f.phone || `${f.title}|${f.address}`));
+  // buffer pra absorver leads sem telefone/falhas — pequeno em runs curtas
+  const buffer = Math.min(40, Math.ceil(CFG.LIMIT / 2));
   outer: for (const [cidade, uf] of CIDADES) {
-    for (let page = 1; page <= 2 && state.found.length < CFG.LIMIT + 60; page++) {
+    for (let page = 1; page <= 2 && state.found.length < CFG.LIMIT + buffer; page++) {
       const places = await serperMaps(`barbearia ${cidade} ${uf}`, page);
       for (const p of places) {
         const key = p.cid || p.phoneNumber || `${p.title}|${p.address}`;
@@ -203,13 +230,59 @@ async function phaseSearch(state) {
       log(`  ${cidade}/${uf} p${page}: +${places.length} (total ${state.found.length})`);
       if (!places.length) break;
       await sleep(jitter(700, 1500));
-      if (state.found.length >= CFG.LIMIT + 60) break outer;
+      if (state.found.length >= CFG.LIMIT + buffer) break outer;
     }
   }
-  state.found = state.found.slice(0, CFG.LIMIT + 40);
-  state.phase = "save";
+  state.found = state.found.slice(0, CFG.LIMIT + buffer);
+  state.phase = "enrich";
   saveState(state);
   log(`busca concluída: ${state.found.length} estabelecimentos únicos`);
+}
+
+// --------------------------- Instagram ----------------------------------
+const IG_RE = /instagram\.com\/(?!p\/|reel|explore|stories|accounts)([A-Za-z0-9_.]{2,30})/i;
+
+function igHandle(url) {
+  const m = typeof url === "string" ? url.match(IG_RE) : null;
+  return m ? `@${m[1].replace(/\.$/, "")}` : null;
+}
+
+/** Prioridade: tem Instagram E não tem site → primeiro (o site gerado usa
+    as fotos reais do IG — o pitch fica muito melhor). Sem site sem IG
+    depois; quem já tem site por último. */
+async function phaseEnrich(state) {
+  let comIg = 0, descobertos = 0;
+  for (const f of state.found) {
+    if (f.igDone) { if (f.instagram) comIg++; continue; }
+    // website que É o instagram → não conta como site
+    const fromSite = igHandle(f.website);
+    if (fromSite) { f.instagram = fromSite; f.website = null; }
+    if (!f.instagram && !f.website) {
+      const r = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: { "X-API-KEY": SERPER, "Content-Type": "application/json" },
+        body: JSON.stringify({ q: `site:instagram.com "${f.title}" ${f.cidade} ${f.uf}`, gl: "br", hl: "pt-br", num: 5 }),
+        signal: AbortSignal.timeout(20_000),
+      }).catch(() => null);
+      if (r?.ok) {
+        const d = await r.json().catch(() => ({}));
+        const links = (d.organic ?? []).map((o) => o.link);
+        const hit = links.map(igHandle).find(Boolean);
+        if (hit) { f.instagram = hit; descobertos++; }
+      }
+      await sleep(jitter(300, 700));
+    }
+    if (f.instagram) comIg++;
+    f.igDone = true;
+  }
+  // ordenação: 0 = IG + sem site | 1 = sem site sem IG | 2 = já tem site
+  for (const f of state.found) {
+    f.prio = f.instagram && !f.website ? 0 : !f.website ? 1 : 2;
+  }
+  state.found.sort((a, b) => (a.prio ?? 2) - (b.prio ?? 2));
+  saveState(state);
+  state.phase = "save";
+  log(`instagram: ${comIg} com IG (${descobertos} descobertos na busca) — fila priorizada`);
 }
 
 // ----------------------------- leads -----------------------------------
@@ -235,9 +308,12 @@ async function phaseSave(state) {
       maps_url: f.cid ? `https://maps.google.com/?cid=${f.cid}` : null,
       lat: f.lat, lng: f.lng,
       whatsapp: f.phone ? "sim" : "nao",
-      dados: { pais: "BR", fonte: "prospect-bot" },
+      instagram: f.instagram ?? null,
+      dados: { pais: "BR", fonte: "prospect-bot", instagram: f.instagram ?? null },
     };
-    const r = await fetch(`${SB_URL}/rest/v1/leads`, {
+    // upsert no par (user_id, place_id) — duplicado devolve [] e cai no
+    // lookup abaixo; 409 (conflito fora do upsert) também vira lookup.
+    const r = await fetch(`${SB_URL}/rest/v1/leads?on_conflict=user_id,place_id`, {
       method: "POST",
       headers: { ...SH, Prefer: "return=representation,resolution=ignore-duplicates" },
       body: JSON.stringify(body),
@@ -245,10 +321,24 @@ async function phaseSave(state) {
     const rows = await r.json().catch(() => []);
     const row = Array.isArray(rows) ? rows[0] : null;
     if (row?.id) { state.leads[k] = { leadId: row.id, nome: f.title, telefone: f.phone, etapa: "saved" }; saved++; }
-    else if (r.ok && f.cid) { // duplicado — busca o id existente
-      const q = await fetch(`${SB_URL}/rest/v1/leads?user_id=eq.${CFG.USER_ID}&place_id=eq.${f.cid}&select=id&limit=1`, { headers: SH });
+    else if (f.cid) { // duplicado — busca o id existente e segue o pipeline
+      const q = await fetch(`${SB_URL}/rest/v1/leads?user_id=eq.${CFG.USER_ID}&place_id=eq.${f.cid}&select=id,status,dados,instagram&limit=1`, { headers: SH });
       const [ex] = await q.json().catch(() => []);
-      if (ex?.id) { state.leads[k] = { leadId: ex.id, nome: f.title, telefone: f.phone, etapa: "saved" }; skipped++; }
+      if (ex?.id) {
+        // lead já com site: pula geração e vai direto pra mensagem
+        const done = ex.dados?.siteSlug;
+        state.leads[k] = { leadId: ex.id, nome: f.title, telefone: f.phone,
+          etapa: done ? "site" : "saved",
+          ...(done ? { siteUrl: `${APP_URL}/site/${done}` } : {}) };
+        skipped++;
+        // IG descoberto agora → completa o lead antigo (site usa as fotos)
+        if (f.instagram && !ex.instagram) {
+          await fetch(`${SB_URL}/rest/v1/leads?id=eq.${ex.id}`, {
+            method: "PATCH", headers: SH,
+            body: JSON.stringify({ instagram: f.instagram, dados: { ...(ex.dados ?? {}), instagram: f.instagram } }),
+          });
+        }
+      }
     } else if (r.ok) { skipped++; } else {
       log(`  save falhou (${r.status}): ${f.title} — ${JSON.stringify(rows).slice(0, 120)}`);
     }
@@ -446,6 +536,7 @@ if (phasesNeedAuth) await login();
 
 if (!sendOnly) {
   if (state.phase === "search") await phaseSearch(state);
+  if (state.phase === "enrich") await phaseEnrich(state);
   if (state.phase === "save") await phaseSave(state);
   if (!searchOnly) {
     if (state.phase === "sites") await phaseSites(state);
