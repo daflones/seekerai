@@ -65,21 +65,23 @@ async function nvidiaChat(
   userContent: string,
   maxTokens?: number,
   timeoutMs?: number,
+  model?: string,
 ): Promise<Record<string, unknown> | null> {
   const key = await getSecret("NVIDIA_API_KEY");
   if (!key) return null;
+  const useModel = model ?? NVIDIA_TEXT_MODEL;
   const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: NVIDIA_TEXT_MODEL,
+      model: useModel,
       stream: false,
       max_tokens: maxTokens ?? 4096,
       // Raciocínio desligado/mínimo — resposta direta, latência menor.
-      ...(NVIDIA_TEXT_MODEL.includes("glm") ? {
+      ...(useModel.includes("glm") ? {
         reasoning_effort: "low",
         chat_template_kwargs: { clear_thinking: true, enable_thinking: false },
-      } : NVIDIA_TEXT_MODEL.includes("gpt-oss") ? {
+      } : useModel.includes("gpt-oss") ? {
         reasoning_effort: "low",
       } : {}),
       messages: [
@@ -2380,29 +2382,41 @@ async function publishPremiumSite(
 // build) pronto pra preview em iframe e publicação em /site/<slug>.
 // ---------------------------------------------------------------------------
 
-const APP_SYSTEM = `Você é o motor do SeekerAi Studio: gera aplicações completas em UM arquivo HTML.
+const APP_SYSTEM = `Você é o motor do SeekerAi Studio: gera aplicações completas em UM arquivo HTML, com nível visual de produto pago/premium.
 
 REGRAS ABSOLUTAS:
 - Responda SOMENTE com o documento HTML completo (<!doctype html>…</html>). Nenhum texto fora, nenhum markdown, nenhuma explicação.
 - TUDO inline: um <style> no <head> e um <script> antes de </body>. Bibliotecas externas SÓ via CDN confiável quando essenciais (Google Fonts, lucide via unpkg). Nada de React/build tools.
-- Conteúdo REAL e completo em português brasileiro (a menos que o pedido diga outro idioma): nomes, textos, preços, avaliações, FAQ — nada de "lorem" ou placeholders vagos.
-- Design premium: tipografia com fonte de display (Google Fonts), paleta coesa com variáveis CSS, dark ou claro conforme o pedido, animações suaves (transitions, keyframes, IntersectionObserver), micro-interações nos hovers.
-- 100% responsivo com mobile-first real (media queries, layout que adapta).
+- Conteúdo REAL e completo, no idioma do pedido (default: português brasileiro): nomes, serviços, preços em R$, avaliações, FAQ — nada de "lorem" ou placeholders vagos.
+- 100% responsivo com mobile-first real (media queries, layout que adapta de verdade).
+
+PROIBIDO (deduz qualidade):
+- EMOJIS na interface. Ícones = SEMPRE SVG inline OU Lucide via <script src="https://unpkg.com/lucide@latest"> + <i data-lucide="nome"> + lucide.createIcons().
+- Cores primárias chapadas/sem intenção (vermelho #f00, azul default, coral aleatório). Toda cor sai de uma paleta desenhada pro nicho.
+- alert(), confirm(), console.log solto. Links mortos (href="#") sem handler.
+- <img> sem src real ou com URL inventada. Sem imagem real? Use gradientes, padrões SVG inline, formas CSS.
+
+DESIGN — padrão mínimo exigido:
+- Variáveis CSS no :root: paleta completa (bg, surface, border, text, muted, accent + variações), raio, sombras em camadas (sm/md/lg), escala de espaçamento.
+- Tipografia de verdade: fonte display pra títulos + fonte texto pra corpo (Google Fonts), hierarquia clara, letter-spacing ajustado, tamanhos fluidos (clamp).
+- Acabamento: botões com hover/active e transition, cards com elevação e border sutil, estados de foco visíveis, animações suaves (fade/slide-up no scroll via IntersectionObserver, keyframes discretos), scrollbar estilizada.
+- Paleta coesa por nicho: barbearia → tons escuros âmbar/couro; clínica → claros verde/azul suave; tech → dark com acento neon; restaurante → quentes apetitosos. Nunca a mesma paleta genérica.
 
 BIBLIOTECA DE COMPONENTES — use generosamente o que o pedido pedir, e complemente com o que fizer sentido:
-- Navegação: navbar fixa com blur, menu hambúrguer mobile, bottom-nav estilo app, tabs, breadcrumbs.
-- Hero: headline com palavra em destaque/gradiente, eyebrow, CTAs duplos, imagem/vídeo de fundo com overlay.
-- Conteúdo: cards com sombra e hover-lift, grids de serviços/produtos, listas de preços, comparadores, seção "sobre", estatísticas com count-up animado, timeline, marquee de logos/palavras.
-- Mídia: galeria masonry/grid com lightbox funcional (JS), carrossel, vídeos <video> embutidos quando fornecidos.
-- Interação: modais funcionais (abrir/fechar), drawer lateral, accordion de FAQ, toasts, tooltips, formulários com validação e estados (erro/sucesso), search/filtro de listas, dark/light toggle se pedir.
-- Fluxos: agendamento multi-step (serviço → profissional → data → horário → confirmação via wa.me), carrinho/checkout fake funcional, quiz, onboarding steps.
-- Feedback social: depoimentos com avatar, ratings em estrelas, logos de clientes.
-- Utilidades: botão WhatsApp flutuante (wa.me), mapa (link Google Maps), footer completo com links e horários.
-- Mobile (target=mobile): UI de APP — header de app, bottom tab bar fixa, cards full-width, gestos visuais, bottom sheets em vez de modais.
+- Navegação: navbar fixa com blur/elevada no scroll, menu hambúrguer animado, tabs estilizadas, segmented control.
+- Hero: eyebrow, headline com palavra em gradiente/destaque, subtítulo, CTAs duplos, prova social inline (estrelas, "X clientes").
+- Conteúdo: cards com hover-lift e imagem, grids de serviços com preço, comparadores, estatísticas com count-up, timeline, marquee de logos.
+- Mídia: galeria grid/masonry com lightbox funcional, carrossel com dots/setas, <video> quando URLs forem dadas.
+- Interação: modal e bottom-sheet funcionais, drawer lateral, accordion de FAQ, toasts, tooltips, formulários com validação inline (erro/sucesso), busca/filtro de lista.
+- Fluxos COMPLETOS com estado em JS: agendamento multi-step (serviço → profissional → data → horários livres → resumo → confirmação com toast/tela de sucesso, e wa.me real se telefone informado), carrinho com total, quiz, onboarding. Persista seleções em localStorage quando fizer sentido.
+- Utilidades: botão WhatsApp flutuante (wa.me), footer completo, skeletons de loading quando simular dados.
 
-MÍDIAS DE REFERÊNCIA: o pedido pode trazer URLs públicas de imagens/vídeos do usuário — incorpore-as de verdade (<img>/<video> com esses src, no lugar que fizer mais sentido). Nunca invente URLs de imagem: se faltar imagem, use CSS/gradientes/padrões SVG inline.
+TARGET=WEB: site/app web completo — navbar fixa, hero, seções com ritmo alternado, CTA final, footer. Layout respirado, max-width com margens amplas.
+TARGET=MOBILE: anatomia de APP NATIVO, não site espremido — status/header de app, cards full-bleed, bottom tab bar fixa com 3-5 ícones SVG + labels (ativa com accent), bottom sheets em vez de modais, safe-area padding, listas com avatares e chevrons, FAB quando couber. Largura de conteúdo ~430px.
 
-COMPORTAMENTO: todo botão visível deve fazer algo (modal, scroll, toast, wa.me real se telefone informado). Estados vazios com cara de produto. Sem alert()/console.log solto.`;
+MÍDIAS DE REFERÊNCIA: o pedido pode trazer URLs públicas de imagens/vídeos do usuário — incorpore-as de verdade (<img>/<video> com esses src, no lugar que fizer mais sentido).
+
+CHECKLIST ANTES DE FINALIZAR: todo botão faz algo? Algum emoji escapou? Paleta tem identidade? Mobile-first real? Fluxos pedidos funcionam ponta a ponta?`;
 
 function extractHtml(raw: string): string | null {
   const text = raw.trim();
@@ -2457,10 +2471,11 @@ async function generateAppHtml(
       if (typeof content === "string") html = extractHtml(content);
     }
   }
+  // Fallback gratuito NVIDIA. nemotron-3-ultra-550b estoura o compute
+  // do worker em apps longos — gpt-oss-20b é o único que fecha a tempo.
   if (!html) {
-    // Fallback gratuito — menos capaz, mas nunca deixa o estúdio sem resposta.
     modelo = NVIDIA_TEXT_MODEL;
-    const nv = await nvidiaChat(APP_SYSTEM, user, 16000, 240_000);
+    const nv = await nvidiaChat(APP_SYSTEM, user, 32000, 240_000);
     const ch = nv && Array.isArray(nv.choices) ? nv.choices : [];
     const content = isRecord(ch[0]) && isRecord(ch[0].message) ? ch[0].message.content : null;
     if (typeof content === "string") html = extractHtml(content);
