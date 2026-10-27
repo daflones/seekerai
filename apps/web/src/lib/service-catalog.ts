@@ -1,4 +1,4 @@
-export type ServiceAction = "generate_site" | "generate_image";
+export type ServiceAction = "generate_site" | "generate_image" | "generate_app";
 
 export type ServiceDefinition = {
   id: string;
