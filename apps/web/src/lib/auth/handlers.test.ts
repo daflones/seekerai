@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  ready: vi.fn(), rate: vi.fn(), client: vi.fn(), admin: vi.fn(), captcha: vi.fn(),
+  ready: vi.fn(), rate: vi.fn(), client: vi.fn(), admin: vi.fn(), captcha: vi.fn(), welcome: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/config", () => ({ authReady: mocks.ready }));
@@ -10,6 +10,7 @@ vi.mock("@/lib/auth/rate-limit", () => ({ authRateLimit: mocks.rate }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: mocks.client }));
 vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: mocks.admin }));
 vi.mock("@/lib/auth/turnstile", () => ({ verifyAuthenticatedCaptcha: mocks.captcha }));
+vi.mock("@/lib/auth/welcome", () => ({ sendWelcomeWhatsapp: mocks.welcome }));
 
 import { POST } from "../../app/api/auth/[action]/route";
 

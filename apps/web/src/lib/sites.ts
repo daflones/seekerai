@@ -89,6 +89,12 @@ export interface SiteConfig {
   faqImagens?: string[];
   booking: { slotMin: number; diasFuturos: number; antecedenciaMin: number };
   seo?: { title?: string; description?: string };
+  /* Estúdio (tipo="custom"): HTML single-file gerado por IA. */
+  html?: string;
+  /** "web" | "mobile" — mobile renderiza em moldura de telefone. */
+  target?: string;
+  /** Dono do site (studio) — usado no gate de assinatura/trial. */
+  owner?: string;
 }
 
 export interface SiteRow {

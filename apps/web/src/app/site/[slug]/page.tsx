@@ -19,12 +19,16 @@ const TRIAL_MS = 7 * 24 * 3600 * 1000;
  * libera no próximo request; venceu o trial sem plano, pausa na hora.
  * Admin (donos) e sites sem dono rastreável nunca bloqueiam.
  */
-async function siteBlocked(leadId: string | null): Promise<boolean> {
-  if (!leadId || !process.env.SUPABASE_SECRET_KEY) return false;
+async function siteBlocked(leadId: string | null, ownerId?: string | null): Promise<boolean> {
+  if (!process.env.SUPABASE_SECRET_KEY) return false;
+  let userId = ownerId ?? null;
   const admin = createSupabaseAdminClient();
-  const { data: lead } = await admin.from("leads")
-    .select("user_id").eq("id", leadId).maybeSingle();
-  const userId = lead?.user_id as string | undefined;
+  if (!userId && leadId) {
+    const { data: lead } = await admin.from("leads")
+      .select("user_id").eq("id", leadId).maybeSingle();
+    userId = (lead?.user_id as string | undefined) ?? null;
+  }
+  if (!userId) return false;
   if (!userId) return false;
   const [{ data: sub }, { data: profile }] = await Promise.all([
     admin.from("subscriptions").select("user_id")
@@ -76,7 +80,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: site.config.seo?.title ?? site.nome,
     description: site.config.seo?.description ?? undefined,
-    openGraph: site.config.fotos.hero ? { images: [site.config.fotos.hero] } : undefined,
+    openGraph: site.config.fotos?.hero ? { images: [site.config.fotos.hero] } : undefined,
   };
 }
 
@@ -85,7 +89,31 @@ export default async function SitePage({ params }: Props) {
   if (!/^[a-z0-9-]{2,80}$/.test(slug)) notFound();
   const site = await loadSite(slug);
   if (site) {
-    if (await siteBlocked(site.lead_id)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
+    const owner = (site.config as { owner?: string }).owner ?? null;
+    if (await siteBlocked(site.lead_id, owner)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
+    // Projetos do estúdio: HTML gerado por IA, renderizado direto.
+    // target=mobile veste moldura de telefone.
+    if (site.tipo === "custom" && site.config.html) {
+      const isMobile = (site.config as { target?: string }).target === "mobile";
+      const frame = (
+        <iframe
+          srcDoc={site.config.html}
+          title={site.nome}
+          sandbox="allow-scripts allow-forms"
+          style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+        />
+      );
+      if (!isMobile) {
+        return <div style={{ height: "100dvh" }}>{frame}</div>;
+      }
+      return (
+        <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#0b0b10", padding: 24 }}>
+          <div style={{ width: 402, height: 820, maxWidth: "100%", borderRadius: 36, overflow: "hidden", border: "10px solid #1a1a22", boxShadow: "0 30px 80px rgba(0,0,0,.6)" }}>
+            {frame}
+          </div>
+        </main>
+      );
+    }
     if (site.tipo === "beleza") return <BeautySite slug={slug} config={site.config} />;
     return <BarbershopSite slug={slug} config={site.config} />;
   }
@@ -104,6 +132,7 @@ export default async function SitePage({ params }: Props) {
     <iframe
       srcDoc={output.conteudo}
       title="Site do estabelecimento"
+      sandbox="allow-scripts allow-forms"
       style={{ width: "100%", height: "100dvh", border: 0, display: "block" }}
     />
   );

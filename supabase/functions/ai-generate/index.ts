@@ -35,6 +35,7 @@ const ACTIONS = new Set([
   "generate_image",
   "lead_assist",
   "image_prompt",
+  "generate_app",
 ]);
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
@@ -2373,6 +2374,101 @@ async function publishPremiumSite(
   };
 }
 
+// ---------------------------------------------------------------------------
+// generate_app — estúdio de geração livre. O usuário descreve o app/site e
+// recebe um HTML single-file completo (inline CSS+JS, sem dependência de
+// build) pronto pra preview em iframe e publicação em /site/<slug>.
+// ---------------------------------------------------------------------------
+
+const APP_SYSTEM = `Você é o motor do SeekerAi Studio: gera aplicações completas em UM arquivo HTML.
+
+REGRAS ABSOLUTAS:
+- Responda SOMENTE com o documento HTML completo (<!doctype html>…</html>). Nenhum texto fora, nenhum markdown, nenhuma explicação.
+- TUDO inline: um <style> no <head> e um <script> antes de </body>. Bibliotecas externas SÓ via CDN confiável quando essenciais (Google Fonts, lucide via unpkg). Nada de React/build tools.
+- Conteúdo REAL e completo em português brasileiro (a menos que o pedido diga outro idioma): nomes, textos, preços, avaliações, FAQ — nada de "lorem" ou placeholders vagos.
+- Design premium: tipografia com fonte de display (Google Fonts), paleta coesa com variáveis CSS, dark ou claro conforme o pedido, animações suaves (transitions, keyframes, IntersectionObserver), micro-interações nos hovers.
+- 100% responsivo com mobile-first real (media queries, layout que adapta).
+
+BIBLIOTECA DE COMPONENTES — use generosamente o que o pedido pedir, e complemente com o que fizer sentido:
+- Navegação: navbar fixa com blur, menu hambúrguer mobile, bottom-nav estilo app, tabs, breadcrumbs.
+- Hero: headline com palavra em destaque/gradiente, eyebrow, CTAs duplos, imagem/vídeo de fundo com overlay.
+- Conteúdo: cards com sombra e hover-lift, grids de serviços/produtos, listas de preços, comparadores, seção "sobre", estatísticas com count-up animado, timeline, marquee de logos/palavras.
+- Mídia: galeria masonry/grid com lightbox funcional (JS), carrossel, vídeos <video> embutidos quando fornecidos.
+- Interação: modais funcionais (abrir/fechar), drawer lateral, accordion de FAQ, toasts, tooltips, formulários com validação e estados (erro/sucesso), search/filtro de listas, dark/light toggle se pedir.
+- Fluxos: agendamento multi-step (serviço → profissional → data → horário → confirmação via wa.me), carrinho/checkout fake funcional, quiz, onboarding steps.
+- Feedback social: depoimentos com avatar, ratings em estrelas, logos de clientes.
+- Utilidades: botão WhatsApp flutuante (wa.me), mapa (link Google Maps), footer completo com links e horários.
+- Mobile (target=mobile): UI de APP — header de app, bottom tab bar fixa, cards full-width, gestos visuais, bottom sheets em vez de modais.
+
+MÍDIAS DE REFERÊNCIA: o pedido pode trazer URLs públicas de imagens/vídeos do usuário — incorpore-as de verdade (<img>/<video> com esses src, no lugar que fizer mais sentido). Nunca invente URLs de imagem: se faltar imagem, use CSS/gradientes/padrões SVG inline.
+
+COMPORTAMENTO: todo botão visível deve fazer algo (modal, scroll, toast, wa.me real se telefone informado). Estados vazios com cara de produto. Sem alert()/console.log solto.`;
+
+function extractHtml(raw: string): string | null {
+  const text = raw.trim();
+  const fenced = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  const html = (fenced ? fenced[1] : text).trim();
+  const start = html.search(/<!doctype html|<html[\s>]/i);
+  if (start < 0) return null;
+  const end = html.search(/<\/html>\s*$/i);
+  return end >= 0 ? html.slice(start, end + 7) : html.slice(start);
+}
+
+async function generateAppHtml(
+  apiKey: string | null,
+  prompt: string,
+  context: Record<string, unknown>,
+): Promise<{ html: string; modelo: string }> {
+  const target = asString(context.target, 10) === "mobile" ? "mobile" : "web";
+  const refs = Array.isArray(context.refs) ? context.refs.filter(isRecord) : [];
+  const mediaLines = refs.map((r) => {
+    const url = asString(r.url, 800);
+    const kind = asString(r.kind, 10) ?? "image";
+    return url ? `- ${kind === "video" ? "Vídeo" : "Imagem"}: ${url}` : "";
+  }).filter(Boolean).join("\n");
+  const user = [
+    `Pedido do usuário:\n${prompt}`,
+    `\nAlvo: ${target === "mobile" ? "APLICATIVO MOBILE (UI de app, bottom nav, gestos)" : "APLICATIVO WEB (site/app web responsivo)"}`,
+    mediaLines ? `\nMídias de referência do usuário (incorpore estas URLs):\n${mediaLines}` : "",
+  ].join("");
+
+  let html: string | null = null;
+  let modelo = SITE_MODEL;
+  if (apiKey) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
+        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi Studio",
+      },
+      body: JSON.stringify({
+        model: SITE_MODEL, max_tokens: 32000, temperature: 0.7,
+        messages: [
+          { role: "system", content: APP_SYSTEM },
+          { role: "user", content: user },
+        ],
+      }),
+      signal: AbortSignal.timeout(240_000),
+    }).catch(() => null);
+    if (res?.ok) {
+      const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+      const ch = data && Array.isArray(data.choices) ? data.choices : [];
+      const content = isRecord(ch[0]) && isRecord(ch[0].message) ? ch[0].message.content : null;
+      if (typeof content === "string") html = extractHtml(content);
+    }
+  }
+  if (!html) {
+    // Fallback gratuito — menos capaz, mas nunca deixa o estúdio sem resposta.
+    modelo = NVIDIA_TEXT_MODEL;
+    const nv = await nvidiaChat(APP_SYSTEM, user, 16000, 240_000);
+    const ch = nv && Array.isArray(nv.choices) ? nv.choices : [];
+    const content = isRecord(ch[0]) && isRecord(ch[0].message) ? ch[0].message.content : null;
+    if (typeof content === "string") html = extractHtml(content);
+  }
+  if (!html) throw httpError(502, "A IA não devolveu o app desta vez — tente novamente.");
+  return { html, modelo };
+}
+
 Deno.serve(async (req) => {
   const notifyCtx: NotifyErrorInput = { onde: "ai-generate", erro: "" };
   let refForNotify: string | null = null;
@@ -2415,9 +2511,9 @@ Deno.serve(async (req) => {
     });
 
     try {
-      // generate_site não exige OpenRouter — a NVIDIA assume texto e imagem
-      // quando a chave falta ou o provedor falha. Demais ações ainda exigem.
-      const apiKey = action === "generate_site"
+      // generate_site e generate_app não exigem OpenRouter — a NVIDIA
+      // assume texto e imagem quando a chave falta ou o provedor falha.
+      const apiKey = action === "generate_site" || action === "generate_app"
         ? await getSecret("OPENROUTER_API_KEY")
         : await requireSecret("OPENROUTER_API_KEY");
       const context = isRecord(body.context) ? body.context : {};
@@ -2427,6 +2523,23 @@ Deno.serve(async (req) => {
         const enhanced = await enhanceImagePrompt(prompt, context);
         await settleAction(db, user.id, requestRef, "completed");
         return json({ conteudo: enhanced, modelo: NVIDIA_TEXT_MODEL, creditosCobrados: reservation.cost });
+      }
+
+      // Estúdio livre: HTML single-file completo, sem vínculo com lead.
+      // businessRef carrega "studio:<projectId>" pra idempotência.
+      if (action === "generate_app") {
+        try {
+          const app = await generateAppHtml(apiKey, prompt, context);
+          await settleAction(db, user.id, requestRef, "completed");
+          return json({
+            conteudo: app.html,
+            modelo: app.modelo,
+            creditosCobrados: reservation.cost,
+          });
+        } catch (err) {
+          await settleAction(db, user.id, requestRef, "refunded");
+          throw err;
+        }
       }
 
       // Site premium: publica linha em `sites` + assets no Storage e devolve

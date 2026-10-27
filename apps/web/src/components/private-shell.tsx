@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleDollarSign, Compass, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, ShieldCheck, Users } from "lucide-react";
+import { CircleDollarSign, Compass, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Brand } from "./brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
@@ -18,7 +18,7 @@ async function doLogout() {
 
 const DEFAULT_T: Messages["shell"] = {
   dashboard: "Painel", seek: "Buscar clientes", leads: "Meus leads",
-  portfolio: "Portfólio", plans: "Planos e créditos", support: "Suporte",
+  portfolio: "Portfólio", studio: "Estúdio", plans: "Planos e créditos", support: "Suporte",
   credits: "Créditos", myAccount: "Minha conta", adminPanel: "Painel admin",
   backToApp: "Voltar ao app", logout: "Sair da conta", adminTag: "Administração",
   navAria: "Plataforma", mobileAria: "Navegação móvel",
@@ -59,6 +59,7 @@ export function PrivateShell({
     { href: "/app", label: t.dashboard, icon: LayoutDashboard, exact: true },
     { href: "/app/buscar", label: t.seek, icon: Compass },
     { href: "/app/leads", label: t.leads, icon: Users },
+    { href: "/app/criar", label: t.studio, icon: Sparkles },
     { href: "/app/portfolio", label: t.portfolio, icon: Images },
     { href: "/app/planos", label: t.plans, icon: CircleDollarSign },
     { href: "/app/suporte", label: t.support, icon: Headset },

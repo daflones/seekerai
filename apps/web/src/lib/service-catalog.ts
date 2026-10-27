@@ -9,7 +9,7 @@ export type ServiceDefinition = {
 };
 
 export const services = [
-  { id: "sites", label: "Criação de sites", category: "Web e tecnologia", opportunity: "Site ausente ou a modernizar", actions: ["generate_site", "generate_image"] },
+  { id: "sites", label: "Criação de sites", category: "Web e tecnologia", opportunity: "Site ausente ou a modernizar", actions: ["generate_site", "generate_image", "generate_app"] },
   { id: "landing_pages", label: "Landing pages", category: "Web e tecnologia", opportunity: "Página de conversão a desenvolver", actions: ["generate_site", "generate_image"] },
   { id: "ecommerce", label: "Lojas virtuais e e-commerce", category: "Web e tecnologia", opportunity: "Venda online a estruturar", actions: ["generate_site", "generate_image"] },
   { id: "automacao", label: "Automação de processos", category: "Web e tecnologia", opportunity: "Atendimento a automatizar", actions: ["generate_site", "generate_image"] },
