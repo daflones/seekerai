@@ -529,7 +529,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               title={`${OUTPUT_LABEL.generate_site} — ${lead.nome}`} loading="lazy" />
             <div className="lead-output-actions">
               {siteSlug
-                ? <a className="button button-glass button-small" href={`/site/${siteSlug}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />{`/site/${siteSlug}`}</a>
+                ? <>
+                  <a className="button button-glass button-small" href={`/site/${siteSlug}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />{`/site/${siteSlug}`}</a>
+                  <a className="button button-glass button-small" href="/app/dominios"><Globe size={14} />Domínio próprio</a>
+                </>
                 : null}
               <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />{t.openSite}</button>
             </div>

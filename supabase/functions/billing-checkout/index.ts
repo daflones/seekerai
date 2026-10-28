@@ -86,6 +86,70 @@ async function createStripePackSession(
   return { id, url };
 }
 
+async function createStripeDomainSession(
+  userId: string,
+  amountCents: number,
+  host: string,
+): Promise<{ id: string; url: string }> {
+  const params = new URLSearchParams({
+    mode: "payment",
+    "line_items[0][price_data][currency]": "brl",
+    "line_items[0][price_data][unit_amount]": String(amountCents),
+    "line_items[0][price_data][product_data][name]": `SeekerAi — Domínio ${host} (1 ano)`.slice(0, 200),
+    "line_items[0][quantity]": "1",
+    client_reference_id: userId,
+    "metadata[user_id]": userId,
+    "metadata[kind]": "domain",
+    "metadata[domain_host]": host,
+    success_url: `${APP_URL}/app/dominios?checkout=dominio`,
+    cancel_url: `${APP_URL}/app/dominios?checkout=cancelado`,
+  });
+  const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await requireSecret("STRIPE_SECRET_KEY")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) {
+    console.error("[stripe] domain checkout falhou:", res.status);
+    throw httpError(502, "Stripe recusou a criação do checkout");
+  }
+  const url = typeof data.url === "string" ? data.url : null;
+  const id = typeof data.id === "string" ? data.id : null;
+  if (!url || !id) throw httpError(502, "Resposta inesperada do Stripe");
+  return { id, url };
+}
+
+async function createMercosulDomainPix(
+  internalRef: string,
+  amountCents: number,
+  host: string,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: amountCents / 100,
+      currency: "BRL",
+      description: `SeekerAi — Domínio ${host} (1 ano)`.slice(0, 200),
+      reference_id: internalRef,
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    console.error("[mercosulpay] domain PIX falhou:", res.status);
+    throw httpError(502, "MercosulPay recusou a criação do PIX");
+  }
+  return isRecord(data.data) ? data.data : data;
+}
+
 async function createMercosulPackPix(internalRef: string): Promise<Record<string, unknown>> {
   const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
@@ -253,6 +317,96 @@ Deno.serve(async (req) => {
       } catch (err) {
         await db.from("payments").update({ status: "failed" })
           .eq("provider", "mercosulpay").eq("provider_ref", internalRef);
+        throw err;
+      }
+    }
+
+    // Domínio próprio — anuidade única, ativação manual em até 48h.
+    if (typeof body.domainHost === "string" && body.domainHost.trim()) {
+      const siteSlug = typeof body.domainSiteSlug === "string" ? body.domainSiteSlug.trim() : "";
+      const host = body.domainHost.trim().toLowerCase().replace(/^www\./, "");
+      if (!siteSlug) throw httpError(400, "Informe o site");
+      if (!/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host)) {
+        throw httpError(400, "Domínio inválido — use o formato exemplo.com.br");
+      }
+      const { data: site } = await db.from("sites")
+        .select("slug,nome,publicado,lead_id,config").eq("slug", siteSlug).maybeSingle();
+      if (!site || !site.publicado) throw httpError(404, "Site não encontrado");
+      let owns = false;
+      if (site.lead_id) {
+        const { data: lead } = await db.from("leads")
+          .select("user_id").eq("id", site.lead_id).maybeSingle();
+        owns = lead?.user_id === user.id;
+      }
+      const cfg = isRecord(site.config) ? site.config : {};
+      if (!owns && cfg.owner === user.id) owns = true;
+      if (!owns) throw httpError(403, "Este site não é seu");
+
+      const { data: live } = await db.from("domains")
+        .select("id").eq("site_slug", siteSlug)
+        .in("status", ["pending_setup", "active"]).limit(1);
+      if (live && live.length > 0) {
+        throw httpError(409, "Este site já tem um domínio em andamento");
+      }
+
+      const { data: priceRow } = await db.from("app_settings")
+        .select("value").eq("key", "domain_price_cents").maybeSingle();
+      const priceCents = Math.min(1_000_000, Math.max(500, Number(priceRow?.value ?? 6999) || 6999));
+
+      // Pedidos não pagos do mesmo site são descartados junto com a cobrança.
+      const { data: stale } = await db.from("domains")
+        .select("id,payment_id").eq("site_slug", siteSlug).eq("status", "pending_payment");
+      for (const d of stale ?? []) {
+        if (d.payment_id) {
+          await db.from("payments")
+            .update({ status: "expired" }).eq("id", d.payment_id).eq("status", "pending");
+        }
+        await db.from("domains").update({ status: "removed" }).eq("id", d.id);
+      }
+
+      const { data: domain, error: domainError } = await db.from("domains").insert({
+        user_id: user.id,
+        site_slug: siteSlug,
+        desired_host: host,
+        status: "pending_payment",
+        price_cents: priceCents,
+      }).select("id").single();
+      if (domainError || !domain) throw httpError(500, "Falha ao registrar o pedido de domínio");
+
+      const internalRef = crypto.randomUUID();
+      const { data: payment, error: payError } = await db.from("payments").insert({
+        user_id: user.id,
+        plan_id: null,
+        provider: method === "card" ? "stripe" : "mercosulpay",
+        provider_ref: internalRef,
+        method,
+        amount_cents: priceCents,
+        status: "pending",
+        metadata: { kind: "domain", domain_id: domain.id, currency: "brl" },
+      }).select("id").single();
+      if (payError || !payment) {
+        throw httpError(500, `Falha ao registrar pagamento: ${payError?.message ?? "erro"}`);
+      }
+      await db.from("domains").update({ payment_id: payment.id }).eq("id", domain.id);
+
+      if (method === "card") {
+        const session = await createStripeDomainSession(user.id, priceCents, host);
+        await db.from("payments")
+          .update({ provider_ref: session.id })
+          .eq("id", payment.id);
+        return json({ provider: "stripe", method, checkoutUrl: session.url, domainId: domain.id });
+      }
+      try {
+        const charge = await createMercosulDomainPix(internalRef, priceCents, host);
+        return json({
+          provider: "mercosulpay", method, reference: internalRef, domainId: domain.id,
+          qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste"]),
+          qrCodeImage: pickDeep(charge, ["qr_code_image", "qrCodeBase64"]),
+          expiresAt: pickDeep(charge, ["expires_at", "expiration", "expiresAt"]),
+        });
+      } catch (err) {
+        await db.from("payments").update({ status: "failed" }).eq("id", payment.id);
+        await db.from("domains").update({ status: "removed" }).eq("id", domain.id);
         throw err;
       }
     }

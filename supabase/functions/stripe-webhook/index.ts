@@ -93,10 +93,20 @@ async function processEvent(
     const subscriptionId = typeof object.subscription === "string" ? object.subscription : null;
     if (!sessionId) return { status: "ignored", reason: "no_session_id" };
 
-    // Pacote avulso de créditos (checkout mode=payment) — sem assinatura.
+    // Domínio próprio (checkout mode=payment) — ativação manual pelo admin.
     const { data: pack } = await db.from("payments")
       .select("id, metadata").eq("provider", "stripe").eq("provider_ref", sessionId)
       .maybeSingle();
+    if (pack && (pack.metadata as Record<string, unknown>)?.kind === "domain") {
+      const { data, error } = await db.rpc("confirm_domain_payment", {
+        p_provider: "stripe",
+        p_provider_ref: sessionId,
+      });
+      if (error) throw httpError(500, `confirm_domain_payment: ${error.message}`);
+      return data as Record<string, unknown>;
+    }
+
+    // Pacote avulso de créditos (checkout mode=payment) — sem assinatura.
     if (pack && (pack.metadata as Record<string, unknown>)?.kind === "credit_pack") {
       const { data, error } = await db.rpc("confirm_credit_pack_payment", {
         p_provider: "stripe",

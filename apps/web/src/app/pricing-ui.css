@@ -101,3 +101,15 @@
   .editor-form fieldset { padding: 16px; }
   .editor-preview { position: static; max-width: 390px; width: 100%; margin-inline: auto; }
 }
+
+/* Domínios próprios — /app/dominios e /admin/dominios */
+.domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 21px; margin-top: 28px; }
+.domain-card h3 { display: flex; align-items: center; gap: 9px; }
+.domain-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11px; color: #b9a0cc; margin-top: 12px; padding: 9px 11px; border-radius: 8px; background: #a573ca10; border: 1px solid #a573ca22; }
+.domain-status-active { color: #8be2a7; border-color: #8be2a733; background: #8be2a70c; }
+.domain-status-pending_setup { color: #f4cf7a; border-color: #f4cf7a33; background: #f4cf7a0c; }
+.domain-status-pending_payment { color: #b9a0cc; }
+.domain-check { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #90729f; margin-top: 10px; }
+.domain-check.is-free { color: #8be2a7; }
+.domain-check.is-taken { color: #ef9f9f; }
+.domain-notifs { margin-bottom: 25px; }

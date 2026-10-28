@@ -79,6 +79,21 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!payment) throw httpError(404, "Pagamento desconhecido");
 
+        // Domínio próprio — confirma pedido; a ativação é manual pelo admin.
+        if (isRecord(payment.metadata) && payment.metadata.kind === "domain") {
+          if (String(data.status ?? "") !== "completed") {
+            await finish(db, deliveryId, `charge_status:${data.status}`);
+            return json({ received: true, result: { status: "ignored" } });
+          }
+          const { data: result, error } = await db.rpc("confirm_domain_payment", {
+            p_provider: "mercosulpay",
+            p_provider_ref: reference,
+          });
+          if (error) throw httpError(500, `confirm_domain_payment: ${error.message}`);
+          await finish(db, deliveryId, null);
+          return json({ received: true, result });
+        }
+
         // Pacote avulso de créditos — soma no saldo, sem assinatura.
         if (isRecord(payment.metadata) && payment.metadata.kind === "credit_pack") {
           if (String(data.status ?? "") !== "completed") {
