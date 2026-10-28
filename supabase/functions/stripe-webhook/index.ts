@@ -53,6 +53,20 @@ async function stripeGet(path: string): Promise<Record<string, unknown>> {
 const epochToIso = (v: unknown): string | null =>
   typeof v === "number" && v > 0 ? new Date(v * 1000).toISOString() : null;
 
+// Meses cobrados por ciclo: metadata period_months (gravada no checkout)
+// ou o intervalo do price (year=12, month=interval_count).
+function subscriptionMonths(sub: Record<string, unknown>): number {
+  const meta = isRecord(sub.metadata) ? Number(sub.metadata.period_months) : NaN;
+  if (Number.isFinite(meta) && meta >= 1) return Math.min(24, Math.round(meta));
+  const items = isRecord(sub.items) && Array.isArray(sub.items.data) ? sub.items.data : [];
+  const first = isRecord(items[0]) ? items[0] : {};
+  const price = isRecord(first.price) ? first.price : isRecord(first.plan) ? first.plan : {};
+  const recurring = isRecord(price.recurring) ? price.recurring : {};
+  const interval = String(recurring.interval ?? "month");
+  const count = Number(recurring.interval_count ?? 1) || 1;
+  return interval === "year" ? 12 * count : Math.min(24, Math.max(1, Math.round(count)));
+}
+
 async function processEvent(
   db: ReturnType<typeof serviceClient>,
   event: Record<string, unknown>,
@@ -80,10 +94,12 @@ async function processEvent(
 
     let periodStart: number | null = null;
     let periodEnd: string | null = null;
+    let months = 1;
     if (subscriptionId) {
       const sub = await stripeGet(`subscriptions/${subscriptionId}`);
       periodStart = typeof sub.current_period_start === "number" ? sub.current_period_start : null;
       periodEnd = epochToIso(sub.current_period_end);
+      months = subscriptionMonths(sub);
     }
     const cycleRef = `stripe:${subscriptionId ?? sessionId}:${periodStart ?? "checkout"}`;
     const { data, error } = await db.rpc("confirm_plan_payment", {
@@ -92,6 +108,7 @@ async function processEvent(
       p_provider_subscription_id: subscriptionId,
       p_period_end: periodEnd,
       p_cycle_ref: cycleRef,
+      p_months: months,
     });
     if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
     return data as Record<string, unknown>;
@@ -108,6 +125,10 @@ async function processEvent(
     const period = isRecord(lines[0]) && isRecord(lines[0].period) ? lines[0].period : {};
     const periodStart = typeof period.start === "number" ? period.start : null;
     const periodEnd = epochToIso(period.end);
+    // Meses do ciclo: metadata da assinatura (gravada no checkout) ou
+    // intervalo do price — garante cota × meses no trimestral/anual.
+    const sub = await stripeGet(`subscriptions/${subscriptionId}`).catch(() => ({}));
+    const months = subscriptionMonths(sub);
 
     const { data, error } = await db.rpc("record_renewal_payment", {
       p_provider: "stripe",
@@ -116,6 +137,7 @@ async function processEvent(
       p_amount_cents: typeof object.amount_paid === "number" ? object.amount_paid : 0,
       p_period_end: periodEnd,
       p_cycle_ref: `stripe:${subscriptionId}:${periodStart ?? invoiceId}`,
+      p_months: months,
     });
     if (error) throw httpError(500, `record_renewal_payment: ${error.message}`);
     return data as Record<string, unknown>;

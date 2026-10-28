@@ -1,6 +1,6 @@
 .pricing-section { position: relative; background: radial-gradient(ellipse at 50% 55%, #6f378325, transparent 70%); }
 .pricing-section .section-heading p { color: #b39ac3; font-size: 14px; }
-.pricing-section .payment-toggle { margin-bottom: 43px; }
+.plan-card .plan-billed-note { display: block; min-height: 12px; margin: -6px 0 8px; font-size: 8px; color: var(--plan-dim); letter-spacing: .02em; }
 .plans-grid { gap: 16px; align-items: stretch; }
 .plan-card { --plan-accent: #d3b5ee; --plan-text: #d3c0df; --plan-dim: #a48bb5; --plan-line: #d6b6ef1c; position: relative; display: flex; flex-direction: column; min-height: 590px; padding: 25px 21px 22px; border-radius: 19px; overflow: hidden; border-color: #b28bc62b; box-shadow: 0 18px 40px #00000015; }
 .plan-theme-cream { --plan-accent: #8255af; --plan-text: #584366; --plan-dim: #8b779d; --plan-line: #9775b52b; background: linear-gradient(150deg, #fffcff, #ede5f4); color: #2d1d3b; border-color: #e6d8ef; }

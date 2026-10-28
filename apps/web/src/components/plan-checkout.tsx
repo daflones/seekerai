@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { CheckCircle2, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
+import { CalendarClock, CheckCircle2, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
 import { callAction } from "@/lib/app-client";
 import { formatMoney, INTL_PACK_CENTS, INTL_PRICES, type Locale } from "@/lib/i18n/shared";
+import { BILLING_PERIODS, periodDef, periodMonthlyCents, periodTotalCents, type BillingPeriod } from "@/lib/plans/periods";
 import type { Messages } from "@/lib/i18n/messages";
 
 interface PlanItem {
@@ -37,13 +38,20 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
   const [error, setError] = useState("");
   const [pix, setPix] = useState<{ plan: string } & PixResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [period, setPeriod] = useState<BillingPeriod>("mensal");
 
   const isIntl = !locale.isBrazil;
   const money = (cents: number) => formatMoney(cents, locale.currency, locale.lang);
+  const def = periodDef(period);
   // Gringo: preços em USD/EUR ($5/$15/$25). Brasil: preço em BRL vindo do banco.
   const priceFor = (plan: PlanItem) =>
-    isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents;
+    periodMonthlyCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
+  const totalFor = (plan: PlanItem) =>
+    periodTotalCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
   const packCents = isIntl ? INTL_PACK_CENTS : 2000;
+  const periodLabel: Record<BillingPeriod, string> = {
+    mensal: t.pMonthly, trimestral: t.pQuarterly, anual: t.pYearly,
+  };
 
   async function checkout(planSlug: string, method: "card" | "pix") {
     if (busy) return;
@@ -52,7 +60,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
     setPix(null);
     const payload = planSlug === "credit-pack"
       ? { creditPack: true, method, currency: locale.currency }
-      : { planSlug, method, currency: locale.currency };
+      : { planSlug, method, currency: locale.currency, period };
     const res = await callAction<{ checkoutUrl?: string } & PixResult>("billing-checkout", payload);
     setBusy(null);
     if (!res.ok) { setError(res.error); return; }
@@ -74,6 +82,13 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
       <CheckCircle2 size={18} /> {t.hasSub}
     </p>}
 
+    <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
+      {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
+        <CalendarClock size={14} />{periodLabel[p.id]}
+        {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
+      </button>)}
+    </div>
+
     <div className="plan-grid">
       {plans.map((plan) => {
         const isCurrent = plan.slug === currentPlanSlug;
@@ -83,6 +98,11 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
           {!isCurrent && plan.featured && <span className="plan-flag">{t.featured}</span>}
           <h3>{plan.name}</h3>
           <p className="plan-price">{isFree ? money(0) : money(priceFor(plan))}{!isFree && <small>{t.perMonth}</small>}</p>
+          {!isFree && def.months > 1 && (
+            <p className="plan-billed-caption">
+              {money(totalFor(plan))} {period === "trimestral" ? t.billedTri : t.billedYear}
+            </p>
+          )}
           {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
           {plan.content.features && <ul className="plan-features">
             {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}

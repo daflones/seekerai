@@ -24,9 +24,17 @@ interface CheckoutBody {
   method?: string;
   creditPack?: boolean;
   currency?: string;
+  period?: string;
 }
 
 type BillingCurrency = "brl" | "usd" | "eur";
+
+// Período de cobrança — mesmos fatores do front (lib/plans/periods.ts).
+const PERIODS: Record<string, { months: number; discount: number; label: string }> = {
+  mensal: { months: 1, discount: 0, label: "mensal" },
+  trimestral: { months: 3, discount: 0.10, label: "trimestral" },
+  anual: { months: 12, discount: 0.20, label: "anual" },
+};
 
 // Preços para fora do Brasil: Essential $5/€5 · Pro $15/€15 · King $25/€25.
 // O número é o mesmo em USD e EUR (conforme regra de negócio).
@@ -107,21 +115,26 @@ async function createStripeSession(
   email: string | null,
   currency: BillingCurrency,
   amountCents: number,
+  months: number,
+  periodLabel: string,
 ): Promise<{ id: string; url: string }> {
   const params = new URLSearchParams({
     mode: "subscription",
     "line_items[0][price_data][currency]": currency,
     "line_items[0][price_data][unit_amount]": String(amountCents),
     "line_items[0][price_data][recurring][interval]": "month",
-    "line_items[0][price_data][product_data][name]": `SeekerAi — ${plan.nome}`,
+    "line_items[0][price_data][recurring][interval_count]": String(months),
+    "line_items[0][price_data][product_data][name]": `SeekerAi — ${plan.nome} · ${periodLabel}`,
     "line_items[0][quantity]": "1",
     client_reference_id: userId,
     "metadata[user_id]": userId,
     "metadata[plan_id]": plan.id,
     "metadata[plan_slug]": plan.slug,
     "metadata[currency]": currency,
+    "metadata[period_months]": String(months),
     "subscription_data[metadata][user_id]": userId,
     "subscription_data[metadata][plan_id]": plan.id,
+    "subscription_data[metadata][period_months]": String(months),
     success_url: `${APP_URL}/app?checkout=sucesso`,
     cancel_url: `${APP_URL}/planos?checkout=cancelado`,
   });
@@ -149,6 +162,8 @@ async function createStripeSession(
 async function createMercosulPix(
   plan: { id: string; slug: string; nome: string; preco_centavos: number },
   internalRef: string,
+  amountCents: number,
+  periodLabel: string,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
@@ -157,9 +172,9 @@ async function createMercosulPix(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      amount: plan.preco_centavos / 100,
+      amount: amountCents / 100,
       currency: "BRL",
-      description: `SeekerAi — ${plan.nome}`.slice(0, 200),
+      description: `SeekerAi — ${plan.nome} · ${periodLabel}`.slice(0, 200),
       reference_id: internalRef,
     }),
     signal: AbortSignal.timeout(20_000),
@@ -242,6 +257,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    const period = PERIODS[typeof body.period === "string" ? body.period : ""]
+      ? body.period!
+      : "mensal";
+    const periodDef = PERIODS[period];
+
     const planSlug = typeof body.planSlug === "string" ? body.planSlug.trim() : "";
     if (!planSlug) throw httpError(400, "Informe planSlug");
     const { data: plan, error: planError } = await db
@@ -264,16 +284,22 @@ Deno.serve(async (req) => {
       throw httpError(409, "Você já possui uma assinatura em andamento");
     }
 
-    // Preço cobrado: BRL usa o preço do banco; USD/EUR usam a tabela internacional.
-    const amountCents = currency === "brl"
+    // Preço cobrado: BRL usa o preço do banco; USD/EUR usam a tabela
+    // internacional. Desconto do período aplica sobre a mensalidade
+    // equivalente; o ciclo cobra o total (equivalente × meses).
+    const baseCents = currency === "brl"
       ? plan.preco_centavos
       : INTL_PRICES[plan.slug];
-    if (!amountCents) {
+    if (!baseCents) {
       throw httpError(409, "Este plano não está disponível nesta região");
     }
+    const monthlyEquiv = Math.round(baseCents * (100 - periodDef.discount * 100) / 100);
+    const amountCents = monthlyEquiv * periodDef.months;
 
     if (method === "card") {
-      const session = await createStripeSession(plan, user.id, null, currency, amountCents);
+      const session = await createStripeSession(
+        plan, user.id, null, currency, amountCents, periodDef.months, periodDef.label,
+      );
       const { error } = await db.from("payments").insert({
         user_id: user.id,
         plan_id: plan.id,
@@ -282,7 +308,7 @@ Deno.serve(async (req) => {
         method: "card",
         amount_cents: amountCents,
         status: "pending",
-        metadata: { currency },
+        metadata: { currency, period, months: periodDef.months },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
       return json({ provider: "stripe", method, checkoutUrl: session.url });
@@ -296,13 +322,14 @@ Deno.serve(async (req) => {
       provider: "mercosulpay",
       provider_ref: internalRef,
       method: "pix",
-      amount_cents: plan.preco_centavos,
+      amount_cents: amountCents,
       status: "pending",
+      metadata: { period, months: periodDef.months },
     });
     if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
     try {
-      const charge = await createMercosulPix(plan, internalRef);
+      const charge = await createMercosulPix(plan, internalRef, amountCents, periodDef.label);
       return json({
         provider: "mercosulpay",
         method,

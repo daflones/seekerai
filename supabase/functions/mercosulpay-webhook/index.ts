@@ -123,13 +123,23 @@ Deno.serve(async (req) => {
           return json({ received: true, result: { status: "review" } });
         }
 
-        const periodEnd = new Date(Date.now() + 32 * 24 * 3600 * 1000).toISOString();
+        // Período comprado no checkout (mensal/trimestral/anual) — define o
+        // vencimento e quantos meses de cota o ciclo concede.
+        const meta = isRecord(payment.metadata) ? payment.metadata : {};
+        const months = Math.min(24, Math.max(1, Number(meta.months ?? 1) || 1));
+        const periodEnd = (() => {
+          const d = new Date();
+          d.setMonth(d.getMonth() + months);
+          d.setDate(d.getDate() + 4); // folga de processamento
+          return d.toISOString();
+        })();
         const { data: result, error } = await db.rpc("confirm_plan_payment", {
           p_provider: "mercosulpay",
           p_provider_ref: reference,
           p_provider_subscription_id: null,
           p_period_end: periodEnd,
           p_cycle_ref: `mercosul:${reference}`,
+          p_months: months,
         });
         if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
         const { data: plan } = await db.from("plans").select("*").eq("id", payment.plan_id).maybeSingle();

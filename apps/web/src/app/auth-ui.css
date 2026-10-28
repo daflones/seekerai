@@ -215,7 +215,9 @@ a.lead-action { text-decoration: none; }
 .lead-notes textarea { width: 100%; min-height: 90px; padding: 12px; border: 1px solid #b387d133; background: var(--panel); color: var(--white); border-radius: 9px; font-size: 13px; font-family: inherit; resize: vertical; margin-bottom: 10px; }
 
 /* ── Planos/checkout ── */
-.plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 32px; }
+.plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 32px; align-items: stretch; }
+.plan-period-toggle { margin: 26px 0 0; }
+.plan-billed-caption { font-size: 10px; color: var(--muted); margin-top: -4px; }
 .plan-card-checkout { position: relative; border: 1px solid #ab7bcd2c; border-radius: 15px; padding: 26px; background: linear-gradient(135deg, #a879d10d, #a879d103); display: flex; flex-direction: column; gap: 10px; }
 .plan-card-checkout.featured { border-color: #a177ff66; box-shadow: 0 0 40px #8648f018; }
 .plan-flag { position: absolute; top: -11px; left: 24px; font-size: 8px; font-weight: 750; letter-spacing: .12em; color: var(--panel); background: linear-gradient(100deg, var(--violet-light), var(--violet)); padding: 5px 12px; border-radius: 999px; }
