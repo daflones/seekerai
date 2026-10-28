@@ -59,3 +59,7 @@ verify_jwt = true
 # Só chamada interna do app (service role conferida no código).
 [functions.welcome-message]
 verify_jwt = false
+
+# Chamada interna do app (x-internal-key), sem JWT de usuário.
+[functions.support-agent]
+verify_jwt = false

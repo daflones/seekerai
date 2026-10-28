@@ -8,7 +8,7 @@ import { dateTag, type Lang } from "@/lib/i18n/shared";
 
 export interface ChatMessage {
   id: string;
-  sender_role: "user" | "admin";
+  sender_role: "user" | "admin" | "ia";
   mensagem: string;
   created_at: string;
 }
@@ -21,6 +21,7 @@ export const TICKET_STATUS_LABEL: Record<string, string> = {
   pendente: "Pendente",
   resolvido: "Resolvido",
   cancelado: "Cancelado",
+  expirado: "Expirado",
 };
 
 export function ticketOpen(status: string) {
@@ -125,8 +126,11 @@ export function TicketChat({
       {loading && <p className="chat-loading"><Loader2 size={16} className="spin" /> {tt.loading}</p>}
       {!loading && messages.length === 0 && <p className="chat-loading">{tt.noMsgs}</p>}
       {messages.map((m) => (
-        <div key={m.id} className={`chat-msg ${m.sender_role === "admin" ? "chat-msg-admin" : "chat-msg-user"}`}>
-          <span className="chat-msg-from">{m.sender_role === "admin" ? "SeekerAi" : tt.you}</span>
+        <div key={m.id} className={`chat-msg ${m.sender_role === "user" ? "chat-msg-user" : "chat-msg-admin"}`}>
+          <span className="chat-msg-from">
+            {m.sender_role === "user" ? tt.you : "SeekerAi"}
+            {m.sender_role === "ia" && <em className="chat-ia-seal">IA</em>}
+          </span>
           <p>{m.mensagem}</p>
           <small>{new Date(m.created_at).toLocaleString(tag, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
         </div>

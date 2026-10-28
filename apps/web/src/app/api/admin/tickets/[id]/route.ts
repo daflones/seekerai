@@ -4,7 +4,7 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 
 const schema = z.object({
-  status: z.enum(["aberto", "em_andamento", "pendente", "resolvido", "cancelado"]),
+  status: z.enum(["aberto", "em_andamento", "pendente", "resolvido", "cancelado", "expirado"]),
 });
 
 // Muda o status do chamado (somente admin).
@@ -31,7 +31,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
 
   const { error } = await session.supabase
     .from("support_tickets")
-    .update({ status: parsed.data.status })
+    .update({ status: parsed.data.status, atendente: "admin" })
     .eq("id", id);
   if (error) return NextResponse.json({ error: "Não foi possível atualizar o chamado." }, { status: 500 });
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });

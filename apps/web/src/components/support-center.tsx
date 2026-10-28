@@ -14,6 +14,7 @@ export interface TicketRow {
   categoria: string;
   prioridade: string;
   status: string;
+  atendente?: string;
   created_at: string;
   cliente?: string;
 }

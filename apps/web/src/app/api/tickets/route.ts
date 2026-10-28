@@ -3,6 +3,7 @@ import { z } from "zod";
 import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
+import { triggerSupportAgent } from "@/lib/support/agent";
 
 const schema = z.object({
   assunto: z.string().trim().min(5, "Descreva o assunto (mín. 5 caracteres).").max(140),
@@ -44,5 +45,6 @@ export async function POST(request: NextRequest) {
     ticket_id: ticket.id, sender_id: session.user.id, sender_role: "user",
     mensagem: parsed.data.mensagem,
   });
+  triggerSupportAgent(ticket.id);
   return NextResponse.json({ ok: true, id: ticket.id }, { headers: { "Cache-Control": "no-store" } });
 }

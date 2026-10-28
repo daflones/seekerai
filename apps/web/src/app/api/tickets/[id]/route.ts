@@ -3,6 +3,7 @@ import { z } from "zod";
 import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
+import { triggerSupportAgent } from "@/lib/support/agent";
 
 const OPEN = ["aberto", "em_andamento", "pendente"];
 const messageSchema = z.object({ mensagem: z.string().trim().min(1).max(4000) });
@@ -19,7 +20,7 @@ async function loadTicket(request: NextRequest, ctx: Params) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: NextResponse.json({ error: "Chamado inválido." }, { status: 400 }) };
   const { data: ticket } = await session.supabase
     .from("support_tickets")
-    .select("id,assunto,categoria,prioridade,status,created_at,user_id")
+    .select("id,assunto,categoria,prioridade,status,created_at,user_id,atendente")
     .eq("id", id).maybeSingle();
   if (!ticket) return { error: NextResponse.json({ error: "Chamado não encontrado." }, { status: 404 }) };
   return { session, ticket };
@@ -67,9 +68,13 @@ export async function POST(request: NextRequest, ctx: Params) {
   }).select("id,sender_role,mensagem,created_at").single();
   if (error) return NextResponse.json({ error: "Não foi possível enviar a mensagem." }, { status: 500 });
 
-  // Resposta do suporte marca o chamado como em andamento.
-  if (isAdmin && ticket.status === "aberto") {
-    await session.supabase.from("support_tickets").update({ status: "em_andamento" }).eq("id", ticket.id);
+  // Resposta humana assume o chamado (a IA para de falar) e marca em andamento.
+  if (isAdmin) {
+    const upd: Record<string, string> = { atendente: "admin" };
+    if (ticket.status === "aberto") upd.status = "em_andamento";
+    await session.supabase.from("support_tickets").update(upd).eq("id", ticket.id);
+  } else if (ticket.atendente === "ia") {
+    triggerSupportAgent(ticket.id);
   }
   return NextResponse.json({ mensagem: data }, { headers: { "Cache-Control": "no-store" } });
 }

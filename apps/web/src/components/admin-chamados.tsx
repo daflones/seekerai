@@ -12,6 +12,7 @@ const FILTROS = [
   ["pendente", "Pendentes"],
   ["resolvido", "Resolvidos"],
   ["cancelado", "Cancelados"],
+  ["expirado", "Expirados"],
 ];
 
 const ACOES: [string, typeof CheckCircle2][] = [
@@ -77,6 +78,7 @@ export function AdminChamados({ tickets: initial }: { tickets: TicketRow[] }) {
               <small>{t.cliente} · {new Date(t.created_at).toLocaleDateString("pt-BR")} · {t.categoria} · prioridade {t.prioridade}</small>
             </div>
             <span className="ticket-open-right">
+              {t.atendente === "ia" && <span className="ticket-ia" title="Atendido pela IA de suporte">IA</span>}
               <span className={`ticket-status ticket-${t.status}`}>{TICKET_STATUS_LABEL[t.status] ?? t.status}</span>
               <MessageCircle size={16} />
             </span>

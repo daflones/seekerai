@@ -9,7 +9,7 @@ export default async function AdminChamadosPage() {
   const { supabase } = await requireSession("/admin/chamados", { admin: true });
   const { data: tickets } = await supabase
     .from("support_tickets")
-    .select("id,assunto,categoria,prioridade,status,created_at,user_id")
+    .select("id,assunto,categoria,prioridade,status,atendente,created_at,user_id")
     .order("updated_at", { ascending: false })
     .limit(200);
 

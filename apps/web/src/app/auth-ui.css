@@ -391,6 +391,9 @@ a.lead-action { text-decoration: none; }
 .ticket-resolvido { background: #6be3cc1c; color: var(--cyan); }
 .ticket-pendente { background: #a879d11c; color: var(--violet-light); }
 .ticket-cancelado { background: #f871711c; color: var(--danger); }
+.ticket-expirado { background: #94a3b81c; color: var(--muted); }
+.ticket-ia { font-size: 9.5px; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: linear-gradient(120deg, #a879d1, #6be3cc); color: var(--panel); }
+.chat-ia-seal { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: .05em; margin-left: 5px; padding: 1px 6px; border-radius: 999px; background: linear-gradient(120deg, #a879d1, #6be3cc); color: var(--panel); vertical-align: middle; }
 .ticket-reply { margin-top: 10px; padding: 10px 12px; border-left: 2px solid var(--violet); font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 .ticket-open { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: none; border: none; padding: 0; text-align: left; cursor: pointer; color: inherit; }
 .ticket-open > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
