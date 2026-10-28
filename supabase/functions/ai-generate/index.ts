@@ -2055,9 +2055,11 @@ async function publishPremiumSite(
   apiKey: string | null,
   leadId: string,
   context: Record<string, unknown>,
+  onStep?: (pct: number, etapa: string) => void,
 ): Promise<{ slug: string; nome: string; lang: string; siteUrl: string; hero: string | null; modelo: string; geradas: number; reais: number; imagemErros: string[]; debug: Record<string, unknown> }> {
   const { data: lead } = await db.from("leads").select("*").eq("id", leadId).maybeSingle();
   if (!lead) throw httpError(404, "Lead não encontrado");
+  onStep?.(15, "Analisando o estabelecimento");
 
   const dados = isRecord(lead.dados) ? lead.dados : {};
   const nome = asString(lead.nome, 150) ?? "estabelecimento";
@@ -2088,6 +2090,7 @@ async function publishPremiumSite(
   }
 
   await ensureSiteBucket(db);
+  onStep?.(30, "Coletando Maps e Instagram");
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   // Scrapes secundários em paralelo — Apify demora e o gateway corta em
@@ -2234,6 +2237,7 @@ async function publishPremiumSite(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
       tipo === "barbearia" ? "barbearia" : paleta, visualRef, leadPais(lead),
     ).slice(0, faltando);
+    onStep?.(55, "Escrevendo copy e gerando imagens");
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.
     await Promise.all(generated.map(async (img, i) => {
@@ -2350,6 +2354,7 @@ async function publishPremiumSite(
   }
 
   // 4) Publica.
+  onStep?.(90, "Publicando o site");
   const { error: siteErr } = await db.from("sites").upsert(
     { slug, tipo, nome, lead_id: leadId, config, publicado: true },
     { onConflict: "slug" },
@@ -2509,6 +2514,16 @@ Deno.serve(async (req) => {
       JSON.stringify({ action, businessRef, service, prompt, context: body.context ?? null }),
     );
     const db = serviceClient();
+    // Progresso vivo pro painel admin — o orquestrador passa jobId/jobTable.
+    const jobId = asString(body.jobId, 40);
+    const jobTable = asString(body.jobTable, 30);
+    const reportJob = async (p: number, etapa: string) => {
+      if (!jobId || (jobTable !== "ai_jobs" && jobTable !== "studio_projects")) return;
+      await db.from(jobTable)
+        .update({ progresso: p, etapa, updated_at: new Date().toISOString() })
+        .eq("id", jobId).eq("status", "running")
+        .then(() => {}, () => {});
+    };
     // Copy dirigida ao estabelecimento (abordagem de vendas) sai no idioma
     // do LEAD — derivado do país — não no idioma da interface do usuário.
     if (action === "sales_reply") {
@@ -2532,6 +2547,7 @@ Deno.serve(async (req) => {
         ? await getSecret("OPENROUTER_API_KEY")
         : await requireSecret("OPENROUTER_API_KEY");
       const context = isRecord(body.context) ? body.context : {};
+      await reportJob(10, "Reservando créditos");
 
       // Só o prompt — a pessoa copia e usa na IA que quiser (grátis).
       if (action === "image_prompt") {
@@ -2544,7 +2560,9 @@ Deno.serve(async (req) => {
       // businessRef carrega "studio:<projectId>" pra idempotência.
       if (action === "generate_app") {
         try {
+          await reportJob(30, "Escrevendo o app com IA");
           const app = await generateAppHtml(apiKey, prompt, context);
+          await reportJob(85, "Montando o HTML");
           await settleAction(db, user.id, requestRef, "completed");
           return json({
             conteudo: app.html,
@@ -2562,7 +2580,10 @@ Deno.serve(async (req) => {
       if (action === "generate_site") {
         let site: Awaited<ReturnType<typeof publishPremiumSite>>;
         try {
-          site = await publishPremiumSite(db, apiKey, businessRef, context);
+          site = await publishPremiumSite(
+            db, apiKey, businessRef, context,
+            (p, e) => { void reportJob(p, e); },
+          );
         } catch (err) {
           await settleAction(db, user.id, requestRef, "refunded");
           throw err;

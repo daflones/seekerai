@@ -613,6 +613,7 @@ Deno.serve(async (req) => {
     const query = asString(body.query, 300)?.trim();
     const service = asString(body.serviceSlug, 60);
     const requestRef = asString(body.requestRef, 150);
+    const jobId = asString(body.jobId, 40);
     const regionCode = (asString(body.regionCode, 2) ?? "BR").toUpperCase();
     if (!query || !service || !requestRef) {
       throw httpError(400, "Informe query, serviceSlug e requestRef");
@@ -620,6 +621,14 @@ Deno.serve(async (req) => {
     notifyCtx.contexto = `busca "${query}" · serviço ${service} · região ${regionCode}`;
 
     const db = serviceClient();
+    // Progresso vivo pro painel admin — best-effort, nunca quebra a busca.
+    const progress = async (p: number, etapa: string) => {
+      if (!jobId) return;
+      await db.from("search_jobs")
+        .update({ progresso: p, etapa, updated_at: new Date().toISOString() })
+        .eq("id", jobId).eq("status", "running")
+        .then(() => {}, () => {});
+    };
     const [{ data: profile }, replay, provider] = await Promise.all([
       db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       getSetting("search_replay", "off"),
@@ -674,6 +683,7 @@ Deno.serve(async (req) => {
         () => Promise<NormalizedPlace[]>,
       ][];
 
+      await progress(12, "Consultando provedores de mapa");
       let resultados: NormalizedPlace[] | null = null;
       let provedor = provider;
       let lastErr: unknown = null;
@@ -700,12 +710,15 @@ Deno.serve(async (req) => {
       // (que também descobre o @ do Instagram no HTML) — depois o scrape
       // batelado dos perfis (seguidores, curtidas, foto) com cap curto pra
       // não deixar a busca refém do actor de IG.
+      await progress(38, `${resultados.length} estabelecimentos encontrados`);
       for (const place of resultados) extractInstagram(place);
       await Promise.all([
         checkWhatsapps(resultados, regionCode),
         scanWebsites(resultados),
       ]);
+      await progress(62, "Verificando WhatsApp e sites");
       await Promise.race([enrichInstagram(resultados), sleep(55_000)]);
+      await progress(80, "Enriquecendo Instagram");
       resultados.sort((a, b) => {
         const score = (p: NormalizedPlace) =>
           (p.telefone ? 4 : 0) + (p.whatsapp === true ? 2 : 0) +
@@ -739,6 +752,7 @@ Deno.serve(async (req) => {
         }
       }
 
+      await progress(92, "Ordenando oportunidades");
       await settleAction(db, user.id, requestRef, "completed");
 
       // Buscas reais feitas por admin ficam salvas para replay (upsert por query).

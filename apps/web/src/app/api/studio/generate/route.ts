@@ -42,6 +42,8 @@ async function runJob(projectId: string, userId: string, token: string, payload:
         lang: "pt",
         prompt: payload.prompt,
         context: { target: payload.target, refs: payload.refs },
+        jobId: projectId,
+        jobTable: "studio_projects",
       }),
       signal: AbortSignal.timeout(EDGE_TIMEOUT_MS),
     });
@@ -58,7 +60,7 @@ async function runJob(projectId: string, userId: string, token: string, payload:
       return;
     }
     await admin.from("studio_projects")
-      .update({ status: "done", html, modelo: typeof data.modelo === "string" ? data.modelo : null, updated_at: new Date().toISOString() })
+      .update({ status: "done", html, modelo: typeof data.modelo === "string" ? data.modelo : null, progresso: 100, etapa: "Concluída", updated_at: new Date().toISOString() })
       .eq("id", projectId);
   } catch {
     await admin.from("studio_projects")

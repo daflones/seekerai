@@ -481,6 +481,36 @@ a.lead-action { text-decoration: none; }
 .adm-tool-out-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #6be3cc1e; font-size: 11.5px; color: var(--cyan); }
 .adm-tool-ms { margin-left: auto; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .adm-tool-out pre { margin: 0; padding: 10px 12px; font-size: 11px; line-height: 1.5; color: var(--white); max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+
+/* ── Monitor de jobs (admin) ── */
+.adm-jobs-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.adm-jobs-live { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.adm-jobs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.adm-job { background: #a879d10a; border: 1px solid #a879d114; border-radius: 12px; padding: 11px 14px 13px; }
+.adm-job-running { border-color: #60a5fa2e; }
+.adm-job-error { border-color: #f8717130; }
+.adm-job-head { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none; padding: 0; text-align: left; cursor: pointer; color: inherit; }
+.adm-job-ico { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; }
+.adm-job-ico-busca { background: #60a5fa14; color: var(--info); }
+.adm-job-ico-ia { background: #a879d118; color: var(--violet-light); }
+.adm-job-ico-estudio { background: #6be3cc14; color: var(--cyan); }
+.adm-job-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.adm-job-main strong { font-size: 13px; color: var(--white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-job-main small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-job-side { display: flex; align-items: center; gap: 10px; flex-shrink: 0; color: var(--muted); }
+.adm-job-side small { font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.adm-job-open { transform: rotate(180deg); }
+.adm-job-track { height: 5px; border-radius: 999px; background: #a879d112; margin-top: 9px; overflow: hidden; }
+.adm-job-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a879d1, #6be3cc); transition: width .8s ease; }
+.adm-job-running .adm-job-fill { animation: adm-job-pulse 1.6s ease-in-out infinite; }
+.adm-job-fill-err { background: var(--danger); }
+@keyframes adm-job-pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+.adm-job-etapa { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; color: var(--muted); }
+.adm-job-error .adm-job-etapa { color: var(--danger); }
+.adm-job-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid #a879d114; display: flex; flex-direction: column; gap: 7px; }
+.adm-job-resumo { font-size: 12px; color: var(--white); }
+.adm-job-itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.adm-job-itens li { font-size: 11.5px; color: var(--muted); padding: 5px 9px; background: #a879d108; border-radius: 7px; }
 .status-btn.status-resolvido.active { border-color: var(--cyan); color: var(--cyan); background: #6be3cc14; }
 .status-btn.status-cancelado.active { border-color: var(--danger); color: var(--danger); background: #f8717114; }
 .status-btn:disabled { cursor: default; }

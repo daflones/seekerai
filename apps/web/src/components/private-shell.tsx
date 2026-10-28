@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleDollarSign, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { Activity, CircleDollarSign, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { Brand } from "./brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
@@ -30,6 +30,7 @@ const ADMIN_NAV = [
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign },
   { href: "/admin/chamados", label: "Chamados", icon: MessageCircle },
+  { href: "/admin/jobs", label: "Jobs", icon: Activity },
   { href: "/admin/dominios", label: "Domínios", icon: Globe },
   { href: "/admin/planos", label: "Cards de plano", icon: PanelsTopLeft },
   { href: "/admin/integracoes", label: "Integrações", icon: ShieldCheck },

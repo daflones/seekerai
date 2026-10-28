@@ -27,7 +27,7 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
         apikey: config!.key,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, jobId }),
       signal: AbortSignal.timeout(240_000),
     });
     const data = (await upstream.json().catch(() => ({}))) as Record<string, unknown>;
@@ -41,7 +41,7 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
       return;
     }
     await admin.from("search_jobs")
-      .update({ status: "done", result: data, updated_at: new Date().toISOString() })
+      .update({ status: "done", result: data, progresso: 100, etapa: "Concluída", updated_at: new Date().toISOString() })
       .eq("id", jobId).eq("user_id", userId);
   } catch {
     await admin.from("search_jobs")

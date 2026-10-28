@@ -361,6 +361,7 @@ export default async function AdminPage() {
           <DistRow label="Jobs na fila agora" value={runningJobs} />
         </ul>
         <div className="dash-links">
+          <Link href="/admin/jobs" className="text-link">Jobs ao vivo <ArrowUpRight size={13} /></Link>
           <Link href="/admin/dominios" className="text-link">Domínios <ArrowUpRight size={13} /></Link>
           <Link href="/admin/usuarios" className="text-link">Usuários <ArrowUpRight size={13} /></Link>
           <Link href="/admin/integracoes" className="text-link">Integrações <ArrowUpRight size={13} /></Link>

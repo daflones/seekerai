@@ -47,6 +47,8 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
         lang: payload.lang ?? "pt",
         prompt: payload.prompt,
         context: payload.context ?? {},
+        jobId,
+        jobTable: "ai_jobs",
       }),
       signal: AbortSignal.timeout(EDGE_TIMEOUT_MS),
     });
@@ -85,7 +87,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
       await admin.from("leads").update({ dados: { ...dados, siteSlug: slug } }).eq("id", leadId);
     }
     await admin.from("ai_jobs")
-      .update({ status: "done", result: { modelo: data.modelo ?? null, siteSlug, siteUrl }, updated_at: new Date().toISOString() })
+      .update({ status: "done", result: { modelo: data.modelo ?? null, siteSlug, siteUrl }, progresso: 100, etapa: "Concluída", updated_at: new Date().toISOString() })
       .eq("id", jobId);
   } catch {
     await admin.from("ai_jobs")
