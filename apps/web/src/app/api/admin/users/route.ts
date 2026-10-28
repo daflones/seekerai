@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     } else {
       const { data: created, error } = await admin.from("subscriptions").insert({
         user_id: userId, plan_id: plan.id, provider: "admin", status: "active",
-        current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+        current_period_end: (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString(); })(),
       }).select("id").single();
       if (error || !created) return NextResponse.json({ error: "Falha ao criar a assinatura." }, { status: 500 });
       subId = created.id;

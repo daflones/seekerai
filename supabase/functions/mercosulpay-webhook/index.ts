@@ -145,7 +145,6 @@ Deno.serve(async (req) => {
         const periodEnd = (() => {
           const d = new Date();
           d.setMonth(d.getMonth() + months);
-          d.setDate(d.getDate() + 4); // folga de processamento
           return d.toISOString();
         })();
         const { data: result, error } = await db.rpc("confirm_plan_payment", {
