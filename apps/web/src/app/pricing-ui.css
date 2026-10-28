@@ -113,3 +113,47 @@
 .domain-check.is-free { color: #8be2a7; }
 .domain-check.is-taken { color: #ef9f9f; }
 .domain-notifs { margin-bottom: 25px; }
+
+/* Minhas criações — /app/criacoes */
+.cre-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-top: 26px; }
+.cre-filters { display: flex; flex-wrap: wrap; gap: 7px; }
+.cre-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; border-radius: 999px; border: 1px solid #a573ca33; background: #ffffff07; color: #b9a0cc; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .18s; font-family: inherit; }
+.cre-chip:hover { border-color: #a573ca66; color: #e9ddf2; }
+.cre-chip.on { background: #a573ca22; border-color: #a573ca88; color: #f2e8fa; }
+.cre-tools { display: flex; flex-wrap: wrap; gap: 9px; }
+.cre-search, .cre-leads { padding: 9px 13px; border-radius: 10px; border: 1px solid #a573ca33; background: #160c1e; color: #efe7f5; font-size: 12px; font-family: inherit; min-width: 190px; }
+.cre-search:focus, .cre-leads:focus { outline: none; border-color: #a573ca88; }
+.cre-leads { min-width: 150px; max-width: 220px; cursor: pointer; }
+.cre-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-top: 22px; }
+.cre-card { display: flex; flex-direction: column; gap: 9px; padding: 15px; border-radius: 14px; border: 1px solid #a573ca26; background: #ffffff05; }
+.cre-thumb { display: block; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background: #0e0716; }
+.cre-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s; }
+.cre-thumb:hover img { transform: scale(1.04); }
+.cre-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cre-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.cre-b-site { color: #8fd0ff; background: #8fd0ff14; border: 1px solid #8fd0ff30; }
+.cre-b-app { color: #c9a6f2; background: #a573ca1c; border: 1px solid #a573ca44; }
+.cre-b-image { color: #f2b879; background: #f2b87914; border: 1px solid #f2b87930; }
+.cre-b-text { color: #8be2a7; background: #8be2a712; border: 1px solid #8be2a72e; }
+.cre-date { font-size: 10px; color: #8a7097; }
+.cre-title { font-size: 14px; font-weight: 700; color: #f3ecfa; margin: 0; word-break: break-word; }
+.cre-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11px; }
+.cre-lead { color: #9d86ad; text-decoration: none; }
+a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
+.cre-status { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; }
+.cre-s-run { color: #f4cf7a; }
+.cre-s-err { color: #ef9f9f; }
+.cre-text { margin: 0; padding: 10px 11px; border-radius: 9px; background: #0e071699; border: 1px solid #a573ca1e; font-size: 11px; line-height: 1.55; color: #cdbfda; white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; font-family: inherit; }
+.cre-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: auto; padding-top: 4px; }
+.cre-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; border: 1px solid #a573ca3a; background: #a573ca14; color: #e9ddf2; font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all .18s; font-family: inherit; }
+.cre-btn:hover:not(:disabled) { background: #a573ca2b; border-color: #a573ca66; }
+.cre-btn:disabled { opacity: .4; cursor: not-allowed; }
+.cre-pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 26px; }
+.cre-page-info { font-size: 11px; color: #9d86ad; }
+.spin { animation: cre-spin 1s linear infinite; }
+@keyframes cre-spin { to { transform: rotate(360deg); } }
+@media (max-width: 700px) {
+  .cre-toolbar { flex-direction: column; align-items: stretch; }
+  .cre-tools { flex-direction: column; }
+  .cre-search, .cre-leads { width: 100%; max-width: none; }
+}

@@ -67,6 +67,19 @@ export function StudioStudio({ t }: { t: T }) {
 
   useEffect(() => {
     void refreshHistory();
+    const openId = new URLSearchParams(window.location.search).get("p");
+    if (openId) {
+      void (async () => {
+        try {
+          const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${openId}`);
+          if (!p) return;
+          setProject(p);
+          if (p.status === "running") { setRunning(true); startPoll(p.id); }
+          else if (p.status === "error") setError(p.erro ?? t.failed);
+          else setPreview(p.target);
+        } catch { /* ignora — histórico continua disponível */ }
+      })();
+    }
     const close = (e: MouseEvent) => {
       if (popRef.current && !popRef.current.contains(e.target as Node)) setAttachOpen(false);
     };
