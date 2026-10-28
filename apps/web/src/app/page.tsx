@@ -124,12 +124,10 @@ export default async function Home() {
                   className={`cta-plan${plan.featured ? " is-featured" : ""}`}>
                   <strong>{plan.name}</strong>
                   <span className="cta-plan-price">
-                    {plan.slug === "gratis"
-                      ? formatMoney(0, loc.currency, loc.lang)
-                      : loc.isBrazil
-                        ? <>R$ {formatPlanPrice(plan.priceCents)}</>
-                        : formatMoney(INTL_PRICES[plan.slug] ?? plan.priceCents, loc.currency, loc.lang)}
-                    <small>{plan.slug === "gratis" ? t.pricing.freeSuffix : t.pricing.perMonth}</small>
+                    {loc.isBrazil
+                      ? <>R$ {formatPlanPrice(plan.priceCents)}</>
+                      : formatMoney(INTL_PRICES[plan.slug] ?? plan.priceCents, loc.currency, loc.lang)}
+                    <small>{t.pricing.perMonth}</small>
                   </span>
                   <em>{plan.content.cta} <ArrowUpRight size={13} /></em>
                 </Link>

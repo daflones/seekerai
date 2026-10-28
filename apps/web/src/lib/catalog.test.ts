@@ -13,8 +13,8 @@ describe("catálogo de demonstração", () => {
   it("mantém fallback determinístico para entradas desconhecidas", () => {
     expect(makeDemoLeads("desconhecido", "desconhecido")[0].issue).toBe("Sem site próprio");
   });
-  it("mantém os quatro planos e slugs únicos", () => {
-    expect(previewPlanCards).toHaveLength(4);
-    expect(new Set(previewPlanCards.map((plan) => plan.slug)).size).toBe(4);
+  it("mantém os três planos pagos e slugs únicos", () => {
+    expect(previewPlanCards).toHaveLength(3);
+    expect(new Set(previewPlanCards.map((plan) => plan.slug)).size).toBe(3);
   });
 });

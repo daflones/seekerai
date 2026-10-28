@@ -20,6 +20,9 @@ export async function publicPlanCards(): Promise<{ plans: PlanCard[]; source: Pl
     if (error || !data) return { plans: [], source: "unavailable" };
     const plans: PlanCard[] = [];
     for (const row of data) {
+      // Sem plano grátis: mesmo que a flag seja reativada no admin,
+      // o card não volta pra landing nem pro checkout.
+      if (row.slug === "gratis") continue;
       const slug = planSlug.safeParse(row.slug);
       const content = cardContentSchema.safeParse(row.card_content);
       if (!slug.success || !content.success || !Number.isSafeInteger(row.preco_centavos) || row.preco_centavos < 0) {

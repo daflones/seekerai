@@ -16,10 +16,7 @@ export default async function PlanosPage() {
     supabase.from("subscriptions").select("id,status,plan_id,plans:plan_id(slug)")
       .eq("user_id", user.id).in("status", ["pending", "active", "past_due"]).limit(1),
   ]);
-  const activePlanSlug = (subscriptions?.[0]?.plans as { slug?: string } | null)?.slug ?? null;
-  const currentPlanSlug = activePlanSlug
-    ?? (plans as { priceCents: number; slug: string }[]).find((p) => p.priceCents === 0)?.slug
-    ?? null;
+  const currentPlanSlug = (subscriptions?.[0]?.plans as { slug?: string } | null)?.slug ?? null;
 
   return <>
     <span className="eyebrow">{t.eyebrow}</span>

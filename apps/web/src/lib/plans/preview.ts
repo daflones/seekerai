@@ -6,20 +6,6 @@ function feature(id: string, text: string, icon: "check" | "bot" | "sparkles" | 
 
 export const previewPlanCards: PlanCard[] = [
   {
-    id: null, slug: "gratis", name: "Grátis", priceCents: 0, order: 0, featured: false, visible: true, revision: 0,
-    content: {
-      badge: "SEU PRIMEIRO PASSO", theme: "cream", buttonStyle: "outline", cta: "Começar grátis",
-      description: "Conheça o radar. Encontre o seu próximo ponto de partida.",
-      features: [
-        feature("radar", "Conheça o radar de negócios"),
-        feature("oportunidades", "Sinais de oportunidade por serviço"),
-        feature("abordagens", "Abordagens para iniciar conversas"),
-        feature("portfolio", "Portfólio com até 3 trabalhos", "globe"),
-        feature("sem-cartao", "Sem cartão de crédito"),
-      ],
-    },
-  },
-  {
     id: null, slug: "essencial", name: "Essencial", priceCents: 2490, order: 1, featured: false, visible: true, revision: 0,
     content: {
       badge: "PARA CRIAR CONSTÂNCIA", theme: "teal", buttonStyle: "solid", cta: "Escolher Essencial",

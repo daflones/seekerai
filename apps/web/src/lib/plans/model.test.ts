@@ -3,11 +3,11 @@ import { cardContentSchema, formatPlanPrice, marketingTextAllowed } from "./mode
 import { previewPlanCards } from "./preview";
 
 describe("cards de planos", () => {
-  it("oferece quatro prévias válidas e destaca agente nos planos pagos", () => {
-    expect(previewPlanCards).toHaveLength(4);
+  it("oferece três prévias válidas e destaca agente nos planos pagos", () => {
+    expect(previewPlanCards).toHaveLength(3);
     for (const plan of previewPlanCards) {
       expect(cardContentSchema.safeParse(plan.content).success).toBe(true);
-      if (plan.slug !== "gratis") expect(plan.content.features.some((item) => item.icon === "bot" && item.highlight)).toBe(true);
+      expect(plan.content.features.some((item) => item.icon === "bot" && item.highlight)).toBe(true);
     }
   });
   it("mantém créditos fora do marketing sem bloquear cartão de crédito", () => {
