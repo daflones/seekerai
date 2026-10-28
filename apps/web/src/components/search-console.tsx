@@ -124,7 +124,7 @@ export function SearchConsole({
     return init;
   }
 
-  function applyDone(data: SearchResponse, jobId: string | null) {
+  function applyDone(data: SearchResponse) {
     const list = data.resultados ?? [];
     const m = { provedor: data.provedor, replay: data.replay, creditos: data.creditosCobrados };
     stopPolling();
@@ -136,7 +136,9 @@ export function SearchConsole({
     setSaved(savedFromResults(list));
     setSelected(new Set());
     setPage(1);
-    store({ jobId, results: list, meta: m });
+    // Limpa o jobId: com resultados na tela, voltar à página não
+    // retoma polling dum job encerrado (apagaria os resultados).
+    store({ jobId: null, results: list, meta: m });
     router.refresh(); // atualiza o chip de créditos
   }
 
@@ -158,7 +160,7 @@ export function SearchConsole({
           if (elapsed >= SLOW_MS) setSlow(true);
           if (elapsed >= DEAD_MS) { cancelSearch(true); return; }
           if (job.status === "done" && job.result) {
-            applyDone(job.result, jobId);
+            applyDone(job.result);
           } else if (job.status === "error") {
             stopPolling();
             setBusy(false);
@@ -225,9 +227,12 @@ export function SearchConsole({
       restored = JSON.parse(sessionStorage.getItem(STORE_KEY) ?? "null") as StoredState | null;
     } catch { /* ignora */ }
     if (restored?.results) {
+      // Resultados em mãos: só restaura — não retoma job antigo.
       setResults(restored.results);
       setMeta(restored.meta);
       setSaved(savedFromResults(restored.results));
+      if (restored.jobId) store({ jobId: null, results: restored.results, meta: restored.meta });
+      return stopPolling;
     }
     if (restored?.jobId) {
       pollJob(restored.jobId);
@@ -416,10 +421,6 @@ export function SearchConsole({
         <Link href="/app/planos" className="text-link">{t.lockedLink} <ExternalLink size={12} /></Link>
       </div>
     </div>}
-
-    {busy && <p className="seek-meta seek-running" role="status">
-      <Loader2 size={13} className="spin" /> {t.running}
-    </p>}
 
     {busy && slow && <div className="seek-slow" role="status">
       <div className="seek-slow-text">
