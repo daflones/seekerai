@@ -5,6 +5,7 @@ import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { refundCreditAction } from "@/lib/billing/refund";
 
 // Estúdio: prompt livre → app/site HTML completo via edge ai-generate
 // (action generate_app). Geração detached com polling — sair da página
@@ -22,7 +23,7 @@ const bodySchema = z.object({
 const EDGE_TIMEOUT_MS = 300_000;
 const STALE_MS = 8 * 60_000;
 
-async function runJob(projectId: string, token: string, payload: z.infer<typeof bodySchema>) {
+async function runJob(projectId: string, userId: string, token: string, payload: z.infer<typeof bodySchema>) {
   const admin = createSupabaseAdminClient();
   const config = supabasePublicConfig();
   try {
@@ -53,6 +54,7 @@ async function runJob(projectId: string, token: string, payload: z.infer<typeof 
       await admin.from("studio_projects")
         .update({ status: "error", erro, updated_at: new Date().toISOString() })
         .eq("id", projectId);
+      await refundCreditAction(admin, userId, `studio-${projectId}`);
       return;
     }
     await admin.from("studio_projects")
@@ -63,6 +65,7 @@ async function runJob(projectId: string, token: string, payload: z.infer<typeof 
       .update({ status: "error", erro: "A geração demorou demais ou o serviço está indisponível.", updated_at: new Date().toISOString() })
       .eq("id", projectId)
       .then(() => {}, () => {});
+    await refundCreditAction(admin, userId, `studio-${projectId}`);
   }
 }
 
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Não foi possível iniciar a geração." }, { status: 400 });
   }
 
-  void runJob(project.id, token, parsed.data);
+  void runJob(project.id, session.user.id, token, parsed.data);
   return NextResponse.json({ projectId: project.id }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -138,6 +141,7 @@ export async function GET(request: NextRequest) {
     await admin.from("studio_projects")
       .update({ status: "error", erro, updated_at: new Date().toISOString() })
       .eq("id", data.id).eq("status", "running");
+    await refundCreditAction(admin, session.user.id, `studio-${data.id}`);
     return NextResponse.json({ project: { ...data, status: "error", erro } },
       { headers: { "Cache-Control": "no-store" } });
   }

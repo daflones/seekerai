@@ -5,6 +5,7 @@ import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { refundCreditAction } from "@/lib/billing/refund";
 
 // Geração pesada (site completo) roda detached: a edge pode demorar minutos
 // quando o provedor principal falha e o fallback gratuito assume. O cliente
@@ -57,6 +58,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
       await admin.from("ai_jobs")
         .update({ status: "error", erro, updated_at: new Date().toISOString() })
         .eq("id", jobId);
+      await refundCreditAction(admin, userId, payload.requestRef);
       return;
     }
     // Grava o output direto no lead — se o usuário já saiu, o site está lá quando voltar.
@@ -90,6 +92,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
       .update({ status: "error", erro: "A geração demorou demais ou o serviço está indisponível.", updated_at: new Date().toISOString() })
       .eq("id", jobId)
       .then(() => {}, () => {});
+    await refundCreditAction(admin, userId, payload.requestRef);
   }
 }
 
@@ -101,7 +104,7 @@ export async function GET(request: NextRequest) {
   const leadId = request.nextUrl.searchParams.get("leadId");
   if (!leadId) return NextResponse.json({ error: "Parâmetro inválido." }, { status: 400 });
   const { data } = await session.supabase.from("ai_jobs")
-    .select("id,status,lead_id,result,erro,created_at")
+    .select("id,status,lead_id,result,erro,created_at,request_ref")
     .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (data?.status === "running" && Date.now() - new Date(data.created_at).getTime() > STALE_MS) {
     const admin = createSupabaseAdminClient();
@@ -109,6 +112,7 @@ export async function GET(request: NextRequest) {
     await admin.from("ai_jobs")
       .update({ status: "error", erro, updated_at: new Date().toISOString() })
       .eq("id", data.id).eq("status", "running");
+    await refundCreditAction(admin, session.user.id, data.request_ref);
     return NextResponse.json({ job: { ...data, status: "error", erro } },
       { headers: { "Cache-Control": "no-store" } });
   }
@@ -161,7 +165,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: job, error } = await admin.from("ai_jobs")
-    .insert({ user_id: session.user.id, lead_id: parsed.data.leadId, tipo: parsed.data.tipo })
+    .insert({ user_id: session.user.id, lead_id: parsed.data.leadId, tipo: parsed.data.tipo, request_ref: parsed.data.requestRef })
     .select("id").single();
   if (error || !job) {
     return NextResponse.json({ error: "Não foi possível iniciar a geração." }, { status: 400 });

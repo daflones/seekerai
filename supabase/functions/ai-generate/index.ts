@@ -2692,6 +2692,11 @@ Deno.serve(async (req) => {
         creditosCobrados: reservation.cost,
       });
     } catch (err) {
+      // Qualquer falha após a reserva devolve os créditos — só segura
+      // cobrança quando o conteúdo já foi liquidado com sucesso.
+      try {
+        await settleAction(db, user.id, requestRef, "refunded");
+      } catch { /* já liquidado — preserva o outcome original */ }
       if (err instanceof HttpError) throw err;
       console.error("[ai-generate] erro:", err instanceof Error ? err.message : err);
       throw httpError(502, "Provedor de IA indisponível no momento");

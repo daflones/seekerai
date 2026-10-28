@@ -5,6 +5,7 @@ import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { refundCreditAction } from "@/lib/billing/refund";
 
 // Jobs de busca: a chamada à edge roda no servidor em background,
 // então trocar de aba ou sair da página não cancela o radar.
@@ -36,6 +37,7 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
       await admin.from("search_jobs")
         .update({ status: "error", erro, updated_at: new Date().toISOString() })
         .eq("id", jobId).eq("user_id", userId);
+      await refundCreditAction(admin, userId, payload.requestRef);
       return;
     }
     await admin.from("search_jobs")
@@ -46,6 +48,7 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
       .update({ status: "error", erro: "Serviço indisponível no momento.", updated_at: new Date().toISOString() })
       .eq("id", jobId).eq("user_id", userId)
       .then(() => {}, () => {});
+    await refundCreditAction(admin, userId, payload.requestRef);
   }
 }
 
@@ -69,6 +72,8 @@ export async function GET(request: NextRequest) {
       await admin.from("search_jobs")
         .update({ status: "error", erro, updated_at: new Date().toISOString() })
         .eq("id", data.id).eq("status", "running");
+      const ref = (data.payload as { requestRef?: string } | null)?.requestRef;
+      await refundCreditAction(admin, session.user.id, ref);
       return NextResponse.json({ job: { ...data, status: "error", erro } },
         { headers: { "Cache-Control": "no-store" } });
     }
@@ -128,7 +133,7 @@ export async function POST(request: NextRequest) {
   // "Running" velho é órfão — expira e deixa a nova busca passar.
   const admin = createSupabaseAdminClient();
   const { data: running } = await admin.from("search_jobs")
-    .select("id,created_at").eq("user_id", session.user.id).eq("status", "running")
+    .select("id,created_at,payload").eq("user_id", session.user.id).eq("status", "running")
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (running && !stale({ status: "running", created_at: running.created_at })) {
     return NextResponse.json({ jobId: running.id, resumed: true });
@@ -137,6 +142,8 @@ export async function POST(request: NextRequest) {
     await admin.from("search_jobs")
       .update({ status: "error", erro: "A busca demorou demais e expirou.", updated_at: new Date().toISOString() })
       .eq("id", running.id).eq("status", "running");
+    const ref = (running.payload as { requestRef?: string } | null)?.requestRef;
+    await refundCreditAction(admin, session.user.id, ref);
   }
 
   const { data: job, error } = await admin.from("search_jobs")

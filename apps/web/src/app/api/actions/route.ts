@@ -4,6 +4,8 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { refundCreditAction } from "@/lib/billing/refund";
 
 // Proxy autenticado para as edge functions que exigem o JWT do usuário.
 // O token nunca chega ao cliente: o servidor repassa a sessão validada.
@@ -91,7 +93,15 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify(parsed.data.payload),
     signal: AbortSignal.timeout(150_000),
   }).catch(() => null);
+  // Edge sem resposta ou falhou: se ela morreu antes de liquidar a reserva,
+  // devolve os créditos aqui (a RPC só age em operações 'reserved').
+  const requestRef = typeof parsed.data.payload.requestRef === "string"
+    ? parsed.data.payload.requestRef : null;
+  const chargeable = parsed.data.funcao === "ai-generate" || parsed.data.funcao === "places-search";
   if (!upstream) {
+    if (chargeable) {
+      await refundCreditAction(createSupabaseAdminClient(), session.user.id, requestRef);
+    }
     return NextResponse.json({ error: "Serviço indisponível no momento." }, { status: 502 });
   }
 
@@ -99,6 +109,9 @@ export async function POST(request: NextRequest) {
   let data: unknown = null;
   try { data = JSON.parse(text); } catch { /* repassa como erro genérico abaixo */ }
   if (!upstream.ok) {
+    if (chargeable) {
+      await refundCreditAction(createSupabaseAdminClient(), session.user.id, requestRef);
+    }
     const obj = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
     const raw = obj?.error ?? obj?.erro;
     const message = typeof raw === "string" && raw ? raw : "A ação não pôde ser concluída.";
