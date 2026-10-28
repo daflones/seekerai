@@ -90,6 +90,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
         }
         sendWelcomeWhatsapp(data.user.id, { nome: input.name, telefone: input.phone, email: input.email });
       }
+      // Com confirmação de e-mail desligada, o signUp já devolve sessão
+      // (cookies gravados pelo client SSR) — entra direto no app.
+      if (data.session) return reply({ redirect: next });
       return reply({ message: "Se o cadastro puder ser concluído, você receberá um e-mail de confirmação. Confira também a pasta de spam." });
     }
 
