@@ -8,6 +8,7 @@ import type { LeadRow } from "@/lib/app-client";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { serviceName } from "@/lib/catalog-i18n";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Lead", robots: { index: false } };
@@ -28,6 +29,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const service = ((services ?? []) as { slug: string; nome: string; enabled_actions: string[] | null }[])
     .find((s) => s.slug === (lead as { service_slug: string }).service_slug);
 
+  const slug = (lead as { dados?: { siteSlug?: string } }).dados?.siteSlug ?? null;
+  // sites tem RLS "só publicado" — o estado de ativação vem do service role.
+  let siteState: { active: boolean; motivo: string | null } | null = null;
+  if (slug) {
+    const admin = createSupabaseAdminClient();
+    const { data: site } = await admin.from("sites")
+      .select("publicado,desativado_motivo").eq("slug", slug).maybeSingle();
+    if (site) siteState = { active: Boolean(site.publicado), motivo: site.desativado_motivo ?? null };
+  }
+
   return <>
     <Link className="text-link lead-back" href="/app/leads"><ArrowLeft size={14} />{t.leadsPage.title}</Link>
     <LeadWorkspace
@@ -35,7 +46,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       outputs={outputs ?? []}
       serviceName={service ? serviceName(service.slug, service.nome, loc.lang) : lead.service_slug}
       enabledActions={service?.enabled_actions ?? []}
-      siteSlug={((lead as { dados?: { siteSlug?: string } }).dados?.siteSlug) ?? null}
+      siteSlug={slug}
+      siteActive={siteState?.active ?? null}
+      siteOffMotivo={siteState?.motivo ?? null}
       senderName={((profile as { nome?: string } | null)?.nome) ?? null}
       currency={loc.currency}
       lang={loc.lang}

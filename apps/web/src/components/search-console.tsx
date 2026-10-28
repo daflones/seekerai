@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   BookmarkPlus, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   AlarmClock, Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
-  Search, SlidersHorizontal, Star, Users, XCircle,
+  Search, SlidersHorizontal, Sparkles, Star, Users, XCircle,
 } from "lucide-react";
 import { fmtCompact, placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { formatPotential, potentialEstimate } from "@/lib/catalog";
@@ -413,14 +413,27 @@ export function SearchConsole({
       {freeSearchesLeft === 1 ? t.freeLast : `${freeSearchesLeft} ${t.freeLeft}`}
     </p>}
 
-    {!canSearch && <div className="seek-locked" role="note">
-      <Lock size={18} />
-      <div>
-        <strong>{t.lockedT}</strong>
-        <p>{t.lockedP}</p>
-        <Link href="/app/planos" className="text-link">{t.lockedLink} <ExternalLink size={12} /></Link>
+    {!canSearch && <>
+      <div className="seek-locked" role="note">
+        <Lock size={18} />
+        <div>
+          <strong>{t.lockedT}</strong>
+          <p>{t.lockedP}</p>
+          <Link href="/app/planos" className="text-link">{t.lockedLink} <ExternalLink size={12} /></Link>
+        </div>
       </div>
-    </div>}
+      <div className="seek-tut">
+        <p className="seek-tut-title">{t.tutT}</p>
+        <ol>
+          <li><span className="seek-tut-num">1</span><span>{t.tutS1}</span></li>
+          <li><span className="seek-tut-num">2</span><span>{t.tutS2}</span></li>
+          <li><span className="seek-tut-num">3</span><span>{t.tutS3}</span></li>
+        </ol>
+        <Link href="/app/planos" className="button button-primary button-small">
+          <Sparkles size={14} />{t.tutCta}
+        </Link>
+      </div>
+    </>}
 
     {busy && slow && <div className="seek-slow" role="status">
       <div className="seek-slow-text">

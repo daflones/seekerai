@@ -157,3 +157,19 @@ a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
   .cre-tools { flex-direction: column; }
   .cre-search, .cre-leads { width: 100%; max-width: none; }
 }
+
+/* Site do lead — trial de 7 dias e desativação */
+.lead-site-trial { display: block; margin-top: 8px; font-size: 10px; color: #8a7097; }
+.lead-site-off { display: flex; align-items: center; gap: 12px; padding: 13px 15px; border-radius: 12px; border: 1px dashed #a573ca44; background: #a573ca0c; color: #b9a0cc; }
+.lead-site-off-text { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.lead-site-off-text strong { font-size: 12px; color: #e9ddf2; }
+.lead-site-off-text small { font-size: 11px; line-height: 1.5; }
+.lead-site-power { color: #ef9f9f !important; }
+
+/* Tutorial de primeiro uso — radar sem assinatura */
+.seek-tut { margin-top: 16px; padding: 18px 20px; border-radius: 14px; border: 1px solid #a573ca33; background: linear-gradient(135deg, #a573ca12, #5b3d7a0d); }
+.seek-tut-title { font-size: 13px; font-weight: 700; color: #f2e8fa; margin-bottom: 12px; }
+.seek-tut ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.seek-tut li { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #cdbfda; line-height: 1.5; }
+.seek-tut-num { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #a573ca30; color: #e9d5ff; font-size: 10px; font-weight: 800; }
+.seek-tut .button { margin-top: 14px; display: inline-flex; }

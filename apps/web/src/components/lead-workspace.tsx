@@ -6,7 +6,7 @@ import Image from "next/image";
 import {
   Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
   Lock, MapPin, MessageSquareText, Phone, Sparkles, Star, Trash2, Globe, Users,
-  MessageCircle, FileText, MonitorSmartphone,
+  MessageCircle, FileText, MonitorSmartphone, Power,
 } from "lucide-react";
 import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { promptFor } from "@/lib/ai-prompts";
@@ -27,12 +27,14 @@ const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
   novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
 };
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, senderName = null, currency = "brl", lang = "pt", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, senderName = null, currency = "brl", lang = "pt", t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
   enabledActions: string[];
   siteSlug?: string | null;
+  siteActive?: boolean | null;
+  siteOffMotivo?: string | null;
   senderName?: string | null;
   currency?: Currency;
   lang?: Lang;
@@ -59,6 +61,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [siteOn, setSiteOn] = useState(siteActive !== false);
+  const [offMotivo, setOffMotivo] = useState(siteOffMotivo);
+  const [siteToggleBusy, setSiteToggleBusy] = useState(false);
   const [wonOpen, setWonOpen] = useState(false);
   const [wonValue, setWonValue] = useState("");
   const wonPending = useRef<LeadRow["status"] | null>(null);
@@ -333,6 +338,27 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     setNotice(t.copied);
   }
 
+  async function toggleSite() {
+    if (!siteSlug || siteToggleBusy) return;
+    setSiteToggleBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/sites/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: siteSlug, active: !siteOn }),
+      });
+      if (!res.ok) throw new Error();
+      const next = !siteOn;
+      setSiteOn(next);
+      setOffMotivo(next ? null : "manual");
+    } catch {
+      setError(t.siteToggleErr);
+    } finally {
+      setSiteToggleBusy(false);
+    }
+  }
+
   return <>
     <header className="lead-head">
       {placeImageSrc(lead.imagem) && <div className="lead-photo" style={{ backgroundImage: `url(${placeImageSrc(lead.imagem)})` }} role="img" aria-label={lead.nome} />}
@@ -416,19 +442,38 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
             <div><strong>{t.step1}</strong><small>{t.step1Hint}</small></div>
           </div>
           {hasSite && siteHref ? <div className="lead-site-done">
-            <a className="lead-site-frame" href={siteHref} target="_blank" rel="noopener noreferrer">
-              <iframe src={siteHref} title={`${t.openSite} — ${lead.nome}`} loading="lazy" tabIndex={-1} />
-              <span className="lead-site-open"><ExternalLink size={15} />{t.openSite}</span>
-            </a>
-            <div className="lead-output-actions">
-              <button type="button" className="button button-glass button-small"
-                onClick={() => void copy(siteAbsoluteUrl())}>
-                <Copy size={14} />{t.copyLink}
-              </button>
-              <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
-                <ExternalLink size={14} />{`/site/${siteSlug}`}
+            {siteOn ? <>
+              <a className="lead-site-frame" href={siteHref} target="_blank" rel="noopener noreferrer">
+                <iframe src={siteHref} title={`${t.openSite} — ${lead.nome}`} loading="lazy" tabIndex={-1} />
+                <span className="lead-site-open"><ExternalLink size={15} />{t.openSite}</span>
               </a>
-            </div>
+              <div className="lead-output-actions">
+                <button type="button" className="button button-glass button-small"
+                  onClick={() => void copy(siteAbsoluteUrl())}>
+                  <Copy size={14} />{t.copyLink}
+                </button>
+                <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={14} />{`/site/${siteSlug}`}
+                </a>
+                <button type="button" className="button button-glass button-small lead-site-power"
+                  disabled={siteToggleBusy} onClick={() => void toggleSite()}>
+                  {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
+                  {t.deactivateSite}
+                </button>
+              </div>
+              <small className="lead-site-trial">{t.siteTrial}</small>
+            </> : <div className="lead-site-off" role="status">
+              <Power size={16} />
+              <div className="lead-site-off-text">
+                <strong>{t.siteOff}</strong>
+                <small>{offMotivo === "expired" ? t.siteOffExpired : t.siteOffManual}</small>
+              </div>
+              <button type="button" className="button button-glass button-small"
+                disabled={siteToggleBusy} onClick={() => void toggleSite()}>
+                {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
+                {t.reactivateSite}
+              </button>
+            </div>}
           </div> : <div className="lead-step-body">
             <button type="button" className="button button-primary button-small" disabled={isBusy("generate_site")}
               onClick={() => void generateSite()}>

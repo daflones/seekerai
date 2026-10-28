@@ -109,8 +109,26 @@ export interface SiteRow {
 export async function loadSite(slug: string): Promise<SiteRow | null> {
   const admin = createSupabaseAdminClient();
   const { data } = await admin.from("sites")
-    .select("slug,tipo,nome,lead_id,config,publicado")
+    .select("slug,tipo,nome,lead_id,config,publicado,created_at,sem_expiracao")
     .eq("slug", slug).eq("publicado", true).maybeSingle();
   if (!data) return null;
+
+  // Trial de 7 dias do site de lead: expira na leitura quando o lead não
+  // fechou — garante desativação mesmo sem cron rodando.
+  const stale = Date.now() - new Date(data.created_at as string).getTime() > 7 * 86_400_000;
+  if (data.lead_id && stale && !data.sem_expiracao) {
+    const { data: lead } = await admin.from("leads")
+      .select("status").eq("id", data.lead_id).maybeSingle();
+    if (lead?.status !== "ganho") {
+      await admin.from("sites")
+        .update({
+          publicado: false,
+          desativado_em: new Date().toISOString(),
+          desativado_motivo: "expired",
+        })
+        .eq("slug", slug).eq("publicado", true);
+      return null;
+    }
+  }
   return { ...data, config: data.config as SiteConfig };
 }
