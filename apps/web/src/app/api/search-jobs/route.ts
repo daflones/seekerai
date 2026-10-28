@@ -90,22 +90,16 @@ export async function POST(request: NextRequest) {
   if (!profile?.consentimento_em || !profile.onboarding_concluido) {
     return NextResponse.json({ error: "Conclua seu cadastro antes." }, { status: 403 });
   }
-  // Busca real: 2 grátis no plano gratuito; depois exige assinatura ativa.
+  // Busca real exige assinatura ativa — plano grátis não busca.
   // Admin burla (replay/testes).
   if (profile.role !== "admin") {
     const { data: sub } = await session.supabase.from("subscriptions").select("status")
       .eq("user_id", session.user.id).eq("status", "active").maybeSingle();
     if (!sub) {
-      const { count } = await session.supabase.from("credit_operations")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", session.user.id).eq("action", "search")
-        .in("status", ["reserved", "completed"]);
-      if ((count ?? 0) >= 2) {
-        return NextResponse.json(
-          { error: "Suas 2 buscas gratuitas acabaram. Assine um plano para continuar usando o radar." },
-          { status: 403 },
-        );
-      }
+      return NextResponse.json(
+        { error: "Assine um plano para usar o radar de oportunidades." },
+        { status: 403 },
+      );
     }
   }
 
