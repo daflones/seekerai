@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Compass, CreditCard, Headset, LockKeyhole, Settings2, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { authReady } from "@/lib/auth/config";
+import { AdminCreditos } from "@/components/admin-creditos";
 
 const ACTION_LABELS: Record<string, string> = {
   search: "Busca",
@@ -22,6 +23,7 @@ export default async function AdminPage() {
     { count: leadsCount },
     { data: ops },
     { count: ticketsAbertos },
+    { data: plansData },
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("credit_settings").select("welcome_credits").single(),
@@ -30,6 +32,7 @@ export default async function AdminPage() {
     supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("credit_operations").select("action,cost,status").eq("status", "completed").limit(5000),
     supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "aberto"),
+    supabase.from("plans").select("id,slug,nome,creditos_mensais").eq("ativo", true).order("ordem"),
   ]);
 
   const ativas = subs?.length ?? 0;
@@ -89,15 +92,11 @@ export default async function AdminPage() {
       </section>
       <section className="dash-panel">
         <h2><Settings2 size={16} /> Regras de créditos</h2>
-        <p className="dash-hint">Bônus de cadastro: <strong>{settings?.welcome_credits ?? "—"} créditos</strong></p>
-        <ul className="dash-usage">
-          {rules?.map((rule) => (
-            <li key={rule.action}>
-              <span>{ACTION_LABELS[rule.action] ?? rule.action}</span>
-              <strong>{rule.enabled ? (rule.cost === 0 ? "grátis" : `${rule.cost} cr`) : "desabilitada"}</strong>
-            </li>
-          ))}
-        </ul>
+        <AdminCreditos
+          plans={plansData ?? []}
+          rules={rules ?? []}
+          welcome={settings?.welcome_credits ?? 0}
+        />
       </section>
     </div>
 

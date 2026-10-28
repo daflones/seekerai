@@ -15,6 +15,8 @@ const OUTPUT_LABELS: Record<string, string> = {
 };
 const money = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateTag = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+const periodLabel = (months: number) =>
+  months === 1 ? "mensal" : months === 3 ? "trimestral" : months === 12 ? "anual" : `${months} meses`;
 
 export function AdminUsers({ users, plans }: {
   users: AdminUserRow[];
@@ -81,7 +83,9 @@ export function AdminUsers({ users, plans }: {
                   <small>{u.email || u.id}</small>
                 </span>
                 <span className={`admin-user-plan${u.subStatus === "active" ? " is-active" : ""}`}>
-                  {u.subStatus === "active" ? <><Crown size={12} /> {u.planNome}</> : "Gratuito"}
+                  {u.subStatus === "active"
+                    ? <><Crown size={12} /> {u.planNome}{u.billingMonths ? ` · ${periodLabel(u.billingMonths)}` : ""}</>
+                    : "Gratuito"}
                 </span>
                 <span className="admin-user-saldo"><Coins size={12} /> {u.saldo} cr</span>
                 <span className="admin-user-meta">{u.leadsTotal} leads · {u.outputsTotal} criações</span>
@@ -98,7 +102,7 @@ export function AdminUsers({ users, plans }: {
                         <div><dt>ID</dt><dd className="mono">{u.id.slice(0, 8)}…</dd></div>
                         <div><dt>Role</dt><dd>{u.role}</dd></div>
                         <div><dt>Onboarding</dt><dd>{u.onboarding ? "Concluído" : "Pendente"}</dd></div>
-                        <div><dt>Assinatura</dt><dd>{u.subStatus ?? "nenhuma"}{u.periodEnd ? ` · até ${dateTag(u.periodEnd)}` : ""}</dd></div>
+                        <div><dt>Assinatura</dt><dd>{u.subStatus ?? "nenhuma"}{u.subStatus ? ` ${u.planNome ?? ""}${u.billingMonths ? ` · ${periodLabel(u.billingMonths)}` : ""}` : ""}{u.periodEnd ? ` · até ${dateTag(u.periodEnd)}` : ""}</dd></div>
                         <div><dt>Fechado em vendas</dt><dd>{money(u.valorFechado)}</dd></div>
                       </dl>
                     </section>

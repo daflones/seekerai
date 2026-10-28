@@ -296,6 +296,14 @@ Deno.serve(async (req) => {
     const monthlyEquiv = Math.round(baseCents * (100 - periodDef.discount * 100) / 100);
     const amountCents = monthlyEquiv * periodDef.months;
 
+    // Checkouts de plano abandonados: se o usuário gerar um novo, os antigos
+    // são cancelados para que um PIX/cartão pago depois não ative dois ciclos.
+    await db.from("payments")
+      .update({ status: "expired" })
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .not("plan_id", "is", null);
+
     if (method === "card") {
       const session = await createStripeSession(
         plan, user.id, null, currency, amountCents, periodDef.months, periodDef.label,
