@@ -67,6 +67,20 @@ function subscriptionMonths(sub: Record<string, unknown>): number {
   return interval === "year" ? 12 * count : Math.min(24, Math.max(1, Math.round(count)));
 }
 
+// Nas APIs recentes do Stripe, current_period_start/end saíram do objeto
+// subscription para items.data[0]. Lê os dois lugares.
+function subscriptionPeriod(sub: Record<string, unknown>): { start: number | null; end: string | null } {
+  const items = isRecord(sub.items) && Array.isArray(sub.items.data) ? sub.items.data : [];
+  const first = isRecord(items[0]) ? items[0] : {};
+  const start = typeof sub.current_period_start === "number" ? sub.current_period_start
+    : typeof first.current_period_start === "number" ? first.current_period_start
+    : null;
+  const endValue = typeof sub.current_period_end === "number" ? sub.current_period_end
+    : typeof first.current_period_end === "number" ? first.current_period_end
+    : null;
+  return { start, end: epochToIso(endValue) };
+}
+
 async function processEvent(
   db: ReturnType<typeof serviceClient>,
   event: Record<string, unknown>,
@@ -97,9 +111,15 @@ async function processEvent(
     let months = 1;
     if (subscriptionId) {
       const sub = await stripeGet(`subscriptions/${subscriptionId}`);
-      periodStart = typeof sub.current_period_start === "number" ? sub.current_period_start : null;
-      periodEnd = epochToIso(sub.current_period_end);
+      const period = subscriptionPeriod(sub);
+      periodStart = period.start;
+      periodEnd = period.end;
       months = subscriptionMonths(sub);
+      if (!periodEnd) {
+        const fallback = new Date();
+        fallback.setMonth(fallback.getMonth() + months);
+        periodEnd = fallback.toISOString();
+      }
     }
     const cycleRef = `stripe:${subscriptionId ?? sessionId}:${periodStart ?? "checkout"}`;
     const { data, error } = await db.rpc("confirm_plan_payment", {
