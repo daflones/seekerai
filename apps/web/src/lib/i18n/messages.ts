@@ -331,6 +331,8 @@ const pt = {
     noAccount: "Ainda não tem conta?", createAccount: "Criar minha conta",
     hasAccount: "Já tem conta?", signIn: "Entrar",
     hidePass: "Ocultar senha", showPass: "Mostrar senha",
+    google: "Continuar com Google", orDivider: "ou",
+    oauthErr: "Não foi possível entrar com Google. Tente novamente.",
   },
   welcome: {
     hi: "Bem-vindo ao SeekerAi", sub: "Duas perguntas rápidas pra deixar o SeekerAi com a sua cara — responda se quiser.",
@@ -799,6 +801,8 @@ export const messages: Record<Lang, Messages> = {
       noAccount: "No account yet?", createAccount: "Create my account",
       hasAccount: "Already have an account?", signIn: "Sign in",
       hidePass: "Hide password", showPass: "Show password",
+      google: "Continue with Google", orDivider: "or",
+      oauthErr: "Couldn't sign in with Google. Try again.",
     },
     welcome: {
       hi: "Welcome to SeekerAi", sub: "Two quick questions to make SeekerAi yours — answer if you like.",
@@ -1264,6 +1268,8 @@ export const messages: Record<Lang, Messages> = {
       noAccount: "¿Aún no tienes cuenta?", createAccount: "Crear mi cuenta",
       hasAccount: "¿Ya tienes cuenta?", signIn: "Entrar",
       hidePass: "Ocultar contraseña", showPass: "Mostrar contraseña",
+      google: "Continuar con Google", orDivider: "o",
+      oauthErr: "No se pudo entrar con Google. Inténtalo de nuevo.",
     },
     welcome: {
       hi: "Bienvenido a SeekerAi", sub: "Dos preguntas rápidas para adaptar SeekerAi a ti — responde si quieres.",
@@ -1729,6 +1735,8 @@ export const messages: Record<Lang, Messages> = {
       noAccount: "Pas encore de compte ?", createAccount: "Créer mon compte",
       hasAccount: "Déjà un compte ?", signIn: "Se connecter",
       hidePass: "Masquer le mot de passe", showPass: "Afficher le mot de passe",
+      google: "Continuer avec Google", orDivider: "ou",
+      oauthErr: "Impossible de se connecter avec Google. Réessayez.",
     },
     welcome: {
       hi: "Bienvenue sur SeekerAi", sub: "Deux questions rapides pour personnaliser SeekerAi — répondez si vous voulez.",
@@ -2193,6 +2201,8 @@ export const messages: Record<Lang, Messages> = {
       noAccount: "Noch kein Konto?", createAccount: "Konto erstellen",
       hasAccount: "Schon ein Konto?", signIn: "Anmelden",
       hidePass: "Passwort verbergen", showPass: "Passwort zeigen",
+      google: "Weiter mit Google", orDivider: "oder",
+      oauthErr: "Anmeldung mit Google fehlgeschlagen. Erneut versuchen.",
     },
     welcome: {
       hi: "Willkommen bei SeekerAi", sub: "Zwei kurze Fragen, damit SeekerAi zu dir passt — antworte, wenn du magst.",
@@ -2657,6 +2667,8 @@ export const messages: Record<Lang, Messages> = {
       noAccount: "Non hai ancora un account?", createAccount: "Crea il mio account",
       hasAccount: "Hai già un account?", signIn: "Accedi",
       hidePass: "Nascondi password", showPass: "Mostra password",
+      google: "Continua con Google", orDivider: "o",
+      oauthErr: "Accesso con Google non riuscito. Riprova.",
     },
     welcome: {
       hi: "Benvenuto su SeekerAi", sub: "Due domande veloci per personalizzare SeekerAi — rispondi se vuoi.",

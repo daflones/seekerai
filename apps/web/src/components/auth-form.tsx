@@ -10,6 +10,15 @@ import { getMessages, type Messages } from "@/lib/i18n/messages";
 export type AuthMode = "login" | "signup" | "recover" | "password" | "onboarding";
 type Fields = { email: string; password: string; confirmPassword: string; name: string; phone: string; terms: boolean; marketing: boolean };
 
+function GoogleMark() {
+  return <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.1h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.2-2.1 3.7-5.1 3.7-8.6z" />
+    <path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-5.9-2.1-6.8-5.1l-3.9 3C3.4 21.3 7.4 24 12 24z" />
+    <path fill="#FBBC05" d="M5.2 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3l-4-3.1C.4 8.1 0 10 0 12s.4 3.9 1.2 5.4l4-3.1z" />
+    <path fill="#EA4335" d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.4 0 3.4 2.7 1.2 6.6l4 3.1C6.1 6.8 8.8 4.7 12 4.7z" />
+  </svg>;
+}
+
 export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
   mode: AuthMode; available: boolean; siteKey: string; next?: string; plan?: string; email?: string;
   t?: Messages["auth"];
@@ -56,7 +65,16 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
 
   if (message) return <div className="auth-success" role="status"><CheckCircle2 size={30} /><h3>{tt.emailStep}</h3><p>{message}</p><Link href="/login" className="button button-primary">{tt.backLogin} <ArrowUpRight size={16} /></Link></div>;
 
+  const oauthTarget = mode === "signup" && plan ? `/app?plano=${encodeURIComponent(plan)}` : (next || "/app");
+  const googleHref = `/api/auth/google?next=${encodeURIComponent(oauthTarget)}`;
+
   return <form className="auth-form" onSubmit={handleSubmit(submit)} aria-busy={isSubmitting}>
+    {(mode === "login" || mode === "signup") && <>
+      <a className="google-btn" href={googleHref}>
+        <GoogleMark /> <span>{tt.google}</span>
+      </a>
+      <div className="auth-divider" role="separator"><span>{tt.orDivider}</span></div>
+    </>}
     {mode === "onboarding" && email && <p className="auth-account-email">{tt.account}: {email}</p>}
     {profileMode && <>
       <label htmlFor="auth-name">{tt.name}</label>
