@@ -1,4 +1,8 @@
 // Notificações pro dono via WhatsApp (Evolution API).
+// DESLIGADO: a Evolution só é usada pra verificar números de WhatsApp
+// dos estabelecimentos (whatsapp-check / places-search). Nenhuma
+// mensagem sai pra usuários nem pro dono. Pra reativar, remova os
+// early-returns marcados abaixo.
 // Dois fluxos:
 //   notifyError — erro de plataforma; uma IA barata analisa e define
 //                 urgência + escreve a mensagem.
@@ -12,6 +16,10 @@ import { getSecret } from "./secrets.ts";
 // LID do número do dono — contas LID-migradas não recebem envio pro
 // JID @s.whatsapp.net pela Evolution 2.3.7 (resolve quando atualizar o server).
 const ADMIN_NUMBER_FALLBACK = "29421146759233@lid";
+
+// DESLIGADO: Evolution só verifica números dos estabelecimentos.
+// Volte pra true pra reativar boas-vindas e avisos pro dono.
+const WHATSAPP_SENDS_ENABLED = false;
 
 export interface NotifyUser {
   id?: string | null;
@@ -41,6 +49,7 @@ export interface NotifySaleInput {
 
 /** Envia texto pra qualquer número E.164 via Evolution. Silencioso em falha. */
 export async function sendWhatsAppTo(number: string, text: string): Promise<void> {
+  if (!WHATSAPP_SENDS_ENABLED) return;
   try {
     const base = (await getSecret("EVOLUTION_API_URL"))?.replace(/\/+$/, "");
     const key = await getSecret("EVOLUTION_API_KEY");
@@ -178,6 +187,7 @@ function fmtUser(u?: NotifyUser | null): string {
 
 /** Erro de plataforma → WhatsApp com análise de urgência por IA. */
 export async function notifyError(input: NotifyErrorInput): Promise<void> {
+  if (!WHATSAPP_SENDS_ENABLED) return;
   try {
     const quando = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
     const negocio = input.negocio
@@ -203,6 +213,7 @@ export async function notifyError(input: NotifyErrorInput): Promise<void> {
 
 /** Evento de negócio (assinatura, recarga, revisão) → WhatsApp com detalhes. */
 export async function notifySale(input: NotifySaleInput): Promise<void> {
+  if (!WHATSAPP_SENDS_ENABLED) return;
   try {
     const quando = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
     const valor = input.valorReais != null
