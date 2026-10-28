@@ -14,6 +14,7 @@ import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { callingCodeFor, toE164 } from "@/lib/phone";
 import { LeadAssistant } from "./lead-assistant";
+import { isCreditsError, OutOfCredits } from "./out-of-credits";
 
 interface OutputRow {
   id: string;
@@ -430,7 +431,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       </button>
     </section>
 
-    {error && <p role="alert" className="auth-error">{error}</p>}
+    {error && (isCreditsError(error)
+      ? <OutOfCredits lang={lang} />
+      : <p role="alert" className="auth-error">{error}</p>)}
     {notice && <p role="status" className="editor-saved"><Sparkles size={14} />{notice}</p>}
 
     <section className="lead-journey">

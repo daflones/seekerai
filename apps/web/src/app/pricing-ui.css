@@ -173,3 +173,17 @@ a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
 .seek-tut li { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #cdbfda; line-height: 1.5; }
 .seek-tut-num { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #a573ca30; color: #e9d5ff; font-size: 10px; font-weight: 800; }
 .seek-tut .button { margin-top: 14px; display: inline-flex; }
+
+/* Recarga de créditos — /app/planos#creditos */
+.pack-section { margin-top: 30px; }
+.pack-section-title { font-size: 15px; font-weight: 700; color: #f2e8fa; margin: 0 0 4px; }
+.pack-section-sub { font-size: 12px; color: #9d86ad; margin: 0 0 16px; }
+.pack-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.pack-grid .credit-pack h3 { font-size: 22px; font-weight: 800; color: #e9d5ff; margin: 0; }
+
+/* Aviso "créditos acabaram" */
+.no-credits { display: flex; align-items: flex-start; gap: 13px; margin-top: 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid #f2b87944; background: #f2b87910; color: #f2b879; }
+.no-credits-body { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.no-credits-body strong { font-size: 13px; color: #fbe3c2; }
+.no-credits-body p { margin: 0; font-size: 12px; color: #cdbfda; line-height: 1.5; }
+.no-credits-body .button { margin-top: 6px; }

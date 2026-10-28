@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { CalendarClock, CheckCircle2, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
 import { callAction } from "@/lib/app-client";
-import { formatMoney, INTL_PACK_CENTS, INTL_PRICES, type Locale } from "@/lib/i18n/shared";
+import { CREDIT_PACKS, formatMoney, INTL_PRICES, type CreditPack, type Locale } from "@/lib/i18n/shared";
 import { BILLING_PERIODS, periodDef, periodMonthlyCents, periodTotalCents, type BillingPeriod } from "@/lib/plans/periods";
 import type { Messages } from "@/lib/i18n/messages";
 
@@ -36,7 +36,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [pix, setPix] = useState<{ plan: string } & PixResult | null>(null);
+  const [pix, setPix] = useState<{ plan: string; pack?: CreditPack } & PixResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [period, setPeriod] = useState<BillingPeriod>("mensal");
 
@@ -48,18 +48,18 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
     periodMonthlyCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
   const totalFor = (plan: PlanItem) =>
     periodTotalCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
-  const packCents = isIntl ? INTL_PACK_CENTS : 2000;
+  const packCents = (pack: CreditPack) => isIntl ? pack.intlCents : pack.brlCents;
   const periodLabel: Record<BillingPeriod, string> = {
     mensal: t.pMonthly, trimestral: t.pQuarterly, anual: t.pYearly,
   };
 
-  async function checkout(planSlug: string, method: "card" | "pix") {
+  async function checkout(planSlug: string, method: "card" | "pix", pack?: CreditPack) {
     if (busy) return;
     setBusy(`${planSlug}:${method}`);
     setError("");
     setPix(null);
-    const payload = planSlug === "credit-pack"
-      ? { creditPack: true, method, currency: locale.currency }
+    const payload = pack
+      ? { creditPack: true, packId: pack.id, method, currency: locale.currency }
       : { planSlug, method, currency: locale.currency, period };
     const res = await callAction<{ checkoutUrl?: string } & PixResult>("billing-checkout", payload);
     setBusy(null);
@@ -68,7 +68,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
       window.location.href = res.data.checkoutUrl;
       return;
     }
-    setPix({ plan: planSlug, ...res.data });
+    setPix({ plan: planSlug, pack, ...res.data });
   }
 
   async function copyPix(code: string) {
@@ -127,23 +127,28 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
       })}
     </div>
 
-    {hasSubscription && <article className="plan-card-checkout credit-pack">
-      <h3>{t.packTitle}</h3>
-      <p className="plan-price">{money(packCents)}</p>
-      <p className="plan-tagline">+50 {t.packSub}</p>
-      <div className="plan-actions">
-        <button type="button" className="button button-primary button-small" disabled={busy !== null}
-          onClick={() => void checkout("credit-pack", "card")}>
-          {busy === "credit-pack:card" ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-          {t.card}
-        </button>
-        {!isIntl && <button type="button" className="button button-glass button-small" disabled={busy !== null}
-          onClick={() => void checkout("credit-pack", "pix")}>
-          {busy === "credit-pack:pix" ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
-          PIX
-        </button>}
+    {hasSubscription && <section id="creditos" className="pack-section">
+      <h3 className="pack-section-title">{t.packTitle}</h3>
+      <p className="pack-section-sub">{t.packSub}</p>
+      <div className="pack-grid">
+        {CREDIT_PACKS.map((pack) => <article key={pack.id} className="plan-card-checkout credit-pack">
+          <h3>+{pack.credits}</h3>
+          <p className="plan-price">{money(packCents(pack))}</p>
+          <div className="plan-actions">
+            <button type="button" className="button button-primary button-small" disabled={busy !== null}
+              onClick={() => void checkout(pack.id, "card", pack)}>
+              {busy === `${pack.id}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
+              {t.card}
+            </button>
+            {!isIntl && <button type="button" className="button button-glass button-small" disabled={busy !== null}
+              onClick={() => void checkout(pack.id, "pix", pack)}>
+              {busy === `${pack.id}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
+              PIX
+            </button>}
+          </div>
+        </article>)}
       </div>
-    </article>}
+    </section>}
 
     {error && <p role="alert" className="auth-error">{error}</p>}
 
@@ -151,8 +156,8 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
       onClick={() => setPix(null)}>
       <section className="pix-panel pix-modal" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="pix-close" aria-label="×" onClick={() => setPix(null)}>×</button>
-        <h2><QrCode size={18} /> {t.pixPay} {pix.plan === "credit-pack" ? "+50" : plans.find((p) => p.slug === pix.plan)?.name}</h2>
-        <p className="plan-price pix-price">{money(pix.plan === "credit-pack" ? packCents : priceFor(plans.find((p) => p.slug === pix.plan)!))}{pix.plan !== "credit-pack" && <small>{t.perMonth}</small>}</p>
+        <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : plans.find((p) => p.slug === pix.plan)?.name}</h2>
+        <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : priceFor(plans.find((p) => p.slug === pix.plan)!))}{!pix.pack && <small>{t.perMonth}</small>}</p>
         {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code PIX" width={210} height={210} unoptimized />}
         {pix.qrCode && <div className="pix-code">
           <code>{pix.qrCode}</code>

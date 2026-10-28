@@ -17,6 +17,6 @@ export default async function CriarPage() {
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.title}<span className="gradient-text">{t.dot}</span></h1>
     <p className="private-intro">{t.intro}</p>
-    <StudioStudio t={t} />
+    <StudioStudio t={t} lang={loc.lang} />
   </>;
 }

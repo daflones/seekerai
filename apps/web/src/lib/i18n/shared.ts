@@ -50,7 +50,13 @@ export const INTL_PRICES: Record<string, number> = {
   pro: 1500,
   king: 2500,
 };
-export const INTL_PACK_CENTS = 400; // pacote +50 créditos = $4 / €4
+// Pacotes avulsos de créditos — os mesmos ids/valores da edge billing-checkout.
+export interface CreditPack { id: string; credits: number; brlCents: number; intlCents: number }
+export const CREDIT_PACKS: CreditPack[] = [
+  { id: "pack50", credits: 50, brlCents: 2099, intlCents: 499 },
+  { id: "pack150", credits: 150, brlCents: 3999, intlCents: 999 },
+  { id: "pack250", credits: 250, brlCents: 5999, intlCents: 1499 },
+];
 
 export function formatMoney(cents: number, currency: Currency, lang: Lang = "pt"): string {
   const locale = { pt: "pt-BR", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", it: "it-IT" }[lang];

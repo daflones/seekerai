@@ -23,6 +23,7 @@ interface CheckoutBody {
   planSlug?: string;
   method?: string;
   creditPack?: boolean;
+  packId?: string;
   currency?: string;
   period?: string;
 }
@@ -44,24 +45,31 @@ const INTL_PRICES: Record<string, number> = {
   king: 2500,
 };
 
-// Pacote avulso: +50 créditos por R$20 no BR, $4/€4 fora (soma no saldo — não é assinatura).
-const CREDIT_PACK = { credits: 50, amountCents: 2000, intlCents: 400, label: "SeekerAi — +50 créditos" };
+// Pacotes avulsos de créditos — somam no saldo (não é assinatura).
+// Os mesmos ids/valores do front (lib/i18n/shared.ts CREDIT_PACKS).
+const CREDIT_PACKS: Record<string, { credits: number; amountCents: number; intlCents: number }> = {
+  pack50: { credits: 50, amountCents: 2099, intlCents: 499 },
+  pack150: { credits: 150, amountCents: 3999, intlCents: 999 },
+  pack250: { credits: 250, amountCents: 5999, intlCents: 1499 },
+};
 
 async function createStripePackSession(
   userId: string,
   email: string | null,
   currency: BillingCurrency,
+  pack: { credits: number; amountCents: number; intlCents: number },
 ): Promise<{ id: string; url: string }> {
-  const amountCents = currency === "brl" ? CREDIT_PACK.amountCents : CREDIT_PACK.intlCents;
+  const amountCents = currency === "brl" ? pack.amountCents : pack.intlCents;
   const params = new URLSearchParams({
     mode: "payment",
     "line_items[0][price_data][currency]": currency,
     "line_items[0][price_data][unit_amount]": String(amountCents),
-    "line_items[0][price_data][product_data][name]": CREDIT_PACK.label,
+    "line_items[0][price_data][product_data][name]": `SeekerAi — +${pack.credits} créditos`,
     "line_items[0][quantity]": "1",
     client_reference_id: userId,
     "metadata[user_id]": userId,
     "metadata[kind]": "credit_pack",
+    "metadata[credits]": String(pack.credits),
     "metadata[currency]": currency,
     success_url: `${APP_URL}/app?checkout=creditos`,
     cancel_url: `${APP_URL}/app/planos?checkout=cancelado`,
@@ -150,7 +158,10 @@ async function createMercosulDomainPix(
   return isRecord(data.data) ? data.data : data;
 }
 
-async function createMercosulPackPix(internalRef: string): Promise<Record<string, unknown>> {
+async function createMercosulPackPix(
+  internalRef: string,
+  pack: { credits: number; amountCents: number; intlCents: number },
+): Promise<Record<string, unknown>> {
   const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
     headers: {
@@ -158,9 +169,9 @@ async function createMercosulPackPix(internalRef: string): Promise<Record<string
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      amount: CREDIT_PACK.amountCents / 100,
+      amount: pack.amountCents / 100,
       currency: "BRL",
-      description: CREDIT_PACK.label,
+      description: `SeekerAi — +${pack.credits} créditos`,
       reference_id: internalRef,
     }),
     signal: AbortSignal.timeout(20_000),
@@ -285,6 +296,8 @@ Deno.serve(async (req) => {
         .select("id").eq("user_id", user.id)
         .in("status", ["active", "past_due"]).limit(1).maybeSingle();
       if (!sub) throw httpError(403, "Pacote de créditos disponível só para assinantes");
+      const pack = CREDIT_PACKS[typeof body.packId === "string" ? body.packId : "pack50"]
+        ?? CREDIT_PACKS.pack50;
       const internalRef = crypto.randomUUID();
       const { error } = await db.from("payments").insert({
         user_id: user.id,
@@ -292,22 +305,22 @@ Deno.serve(async (req) => {
         provider: method === "card" ? "stripe" : "mercosulpay",
         provider_ref: internalRef,
         method,
-        amount_cents: currency === "brl" ? CREDIT_PACK.amountCents : CREDIT_PACK.intlCents,
+        amount_cents: currency === "brl" ? pack.amountCents : pack.intlCents,
         status: "pending",
-        metadata: { kind: "credit_pack", credits: CREDIT_PACK.credits, currency },
+        metadata: { kind: "credit_pack", credits: pack.credits, currency },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
       if (method === "card") {
         // provider_ref do Stripe precisa ser o id da sessão — o webhook casa por ele.
-        const session = await createStripePackSession(user.id, null, currency);
+        const session = await createStripePackSession(user.id, null, currency, pack);
         await db.from("payments")
           .update({ provider_ref: session.id })
           .eq("provider", "stripe").eq("provider_ref", internalRef);
         return json({ provider: "stripe", method, checkoutUrl: session.url });
       }
       try {
-        const charge = await createMercosulPackPix(internalRef);
+        const charge = await createMercosulPackPix(internalRef, pack);
         return json({
           provider: "mercosulpay", method, reference: internalRef,
           qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste"]),

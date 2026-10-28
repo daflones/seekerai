@@ -9,6 +9,7 @@ import {
   Search, SlidersHorizontal, Sparkles, Star, Users, XCircle,
 } from "lucide-react";
 import { fmtCompact, placeImageSrc, type PlaceResult } from "@/lib/app-client";
+import { isCreditsError, OutOfCredits } from "./out-of-credits";
 import { formatPotential, potentialEstimate } from "@/lib/catalog";
 import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/lib/catalog-i18n";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
@@ -469,7 +470,9 @@ export function SearchConsole({
       </div>
     </div>}
 
-    {error && <p role="alert" className="auth-error">{error}</p>}
+    {error && (isCreditsError(error)
+      ? <OutOfCredits lang={locale.lang} />
+      : <p role="alert" className="auth-error">{error}</p>)}
 
     {meta && results !== null && !busy && <p className="seek-meta">
       {results.length} {results.length === 1 ? t.foundOne : t.found}

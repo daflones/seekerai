@@ -6,6 +6,7 @@ import {
   Loader2, Monitor, Plus, RotateCcw, Smartphone, Globe, X,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
+import { isCreditsError, OutOfCredits } from "./out-of-credits";
 
 type T = Messages["studio"];
 type Target = "web" | "mobile";
@@ -36,7 +37,7 @@ function guessName(prompt: string): string {
   return clean.length > 60 ? `${clean.slice(0, 57)}…` : clean;
 }
 
-export function StudioStudio({ t }: { t: T }) {
+export function StudioStudio({ t, lang = "pt" }: { t: T; lang?: string }) {
   const [target, setTarget] = useState<Target>("web");
   const [prompt, setPrompt] = useState("");
   const [refs, setRefs] = useState<Ref[]>([]);
@@ -261,7 +262,9 @@ export function StudioStudio({ t }: { t: T }) {
       </div>
       {uploading && <p className="st-note"><Loader2 size={13} className="spin" /> {t.uploading}</p>}
       {running && <p className="st-note"><Loader2 size={13} className="spin" /> {t.runningStatus}</p>}
-      {error && <p className="st-err" role="alert">{error}</p>}
+      {error && (isCreditsError(error)
+        ? <OutOfCredits lang={lang} />
+        : <p className="st-err" role="alert">{error}</p>)}
     </div>
 
     {/* Resultado */}

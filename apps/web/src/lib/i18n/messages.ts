@@ -144,6 +144,11 @@ const pt = {
     backToApp: "Voltar ao app", logout: "Sair da conta", adminTag: "Administração",
     navAria: "Plataforma", mobileAria: "Navegação móvel",
   },
+  common: {
+    noCreditsT: "Seus créditos acabaram",
+    noCreditsP: "Compre uma recarga pra continuar agora ou aguarde a renovação do seu plano.",
+    noCreditsCta: "Comprar créditos",
+  },
   dash: {
     eyebrow: "SEU RADAR DE VENDAS", welcome: "Bem-vindo", welcomeFallback: "vamos começar",
     intro: "Encontre estabelecimentos que precisam do que você vende, salve os leads e deixe a IA preparar a abordagem.",
@@ -642,6 +647,11 @@ export const messages: Record<Lang, Messages> = {
       backToApp: "Back to app", logout: "Sign out", adminTag: "Administration",
       navAria: "Platform", mobileAria: "Mobile navigation",
     },
+    common: {
+      noCreditsT: "You're out of credits",
+      noCreditsP: "Buy a top-up to keep going now or wait for your plan to renew.",
+      noCreditsCta: "Buy credits",
+    },
     dash: {
       eyebrow: "YOUR SALES RADAR", welcome: "Welcome", welcomeFallback: "let's get started",
       intro: "Find businesses that need what you sell, save leads and let AI prepare the outreach.",
@@ -1134,6 +1144,11 @@ export const messages: Record<Lang, Messages> = {
       credits: "Créditos", myAccount: "Mi cuenta", adminPanel: "Panel admin",
       backToApp: "Volver a la app", logout: "Cerrar sesión", adminTag: "Administración",
       navAria: "Plataforma", mobileAria: "Navegación móvil",
+    },
+    common: {
+      noCreditsT: "Se acabaron tus créditos",
+      noCreditsP: "Compra una recarga para seguir ahora o espera la renovación de tu plan.",
+      noCreditsCta: "Comprar créditos",
     },
     dash: {
       eyebrow: "TU RADAR DE VENTAS", welcome: "Bienvenido", welcomeFallback: "empecemos",
@@ -1628,6 +1643,11 @@ export const messages: Record<Lang, Messages> = {
       backToApp: "Retour à l'app", logout: "Se déconnecter", adminTag: "Administration",
       navAria: "Plateforme", mobileAria: "Navigation mobile",
     },
+    common: {
+      noCreditsT: "Vos crédits sont épuisés",
+      noCreditsP: "Achetez une recharge pour continuer maintenant ou attendez le renouvellement de votre offre.",
+      noCreditsCta: "Acheter des crédits",
+    },
     dash: {
       eyebrow: "VOTRE RADAR COMMERCIAL", welcome: "Bienvenue", welcomeFallback: "commençons",
       intro: "Trouvez des établissements qui ont besoin de ce que vous vendez, enregistrez les leads et laissez l'IA préparer l'approche.",
@@ -2120,6 +2140,11 @@ export const messages: Record<Lang, Messages> = {
       backToApp: "Zurück zur App", logout: "Abmelden", adminTag: "Verwaltung",
       navAria: "Plattform", mobileAria: "Mobile Navigation",
     },
+    common: {
+      noCreditsT: "Ihre Credits sind aufgebraucht",
+      noCreditsP: "Kaufen Sie ein Aufladepaket, um sofort weiterzumachen, oder warten Sie auf die Tarifverlängerung.",
+      noCreditsCta: "Credits kaufen",
+    },
     dash: {
       eyebrow: "DEIN VERTRIEBS-RADAR", welcome: "Willkommen", welcomeFallback: "leg los",
       intro: "Finde Betriebe, die brauchen, was du verkaufst, speichere die Leads und lass die KI die Ansprache vorbereiten.",
@@ -2611,6 +2636,11 @@ export const messages: Record<Lang, Messages> = {
       credits: "Crediti", myAccount: "Il mio account", adminPanel: "Pannello admin",
       backToApp: "Torna all'app", logout: "Esci", adminTag: "Amministrazione",
       navAria: "Piattaforma", mobileAria: "Navigazione mobile",
+    },
+    common: {
+      noCreditsT: "I tuoi crediti sono finiti",
+      noCreditsP: "Compra una ricarica per continuare subito o attendi il rinnovo del piano.",
+      noCreditsCta: "Compra crediti",
     },
     dash: {
       eyebrow: "IL TUO RADAR DI VENDITA", welcome: "Benvenuto", welcomeFallback: "iniziamo",
