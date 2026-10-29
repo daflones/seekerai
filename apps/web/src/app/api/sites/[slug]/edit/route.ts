@@ -4,7 +4,7 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { EDITOR_HEADER, editorToken, loadEditableSite } from "@/lib/site-editor";
+import { EDITOR_HEADER, editorToken, loadEditableSite, siteEditorAllowed } from "@/lib/site-editor";
 
 // Editor visual de sites: GET devolve o documento HTML pra editar,
 // POST salva a versão editada em config.html (tipo "custom" — o /site
@@ -58,6 +58,9 @@ export async function GET(
   const { slug } = await params;
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
+  if (!siteEditorAllowed(session.user.email, session.profile?.role === "admin")) {
+    return NextResponse.json({ error: "O editor de sites chega em breve pra todos." }, { status: 403 });
+  }
 
   const site = await loadEditableSite(slug, session.user.id, session.profile?.role === "admin");
   if (!site) return NextResponse.json({ error: "Site não encontrado." }, { status: 404 });
@@ -93,6 +96,9 @@ export async function POST(
   }
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
+  if (!siteEditorAllowed(session.user.email, session.profile?.role === "admin")) {
+    return NextResponse.json({ error: "O editor de sites chega em breve pra todos." }, { status: 403 });
+  }
 
   const parsed = saveSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Documento inválido." }, { status: 400 });
@@ -150,6 +156,9 @@ export async function DELETE(
   }
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
+  if (!siteEditorAllowed(session.user.email, session.profile?.role === "admin")) {
+    return NextResponse.json({ error: "O editor de sites chega em breve pra todos." }, { status: 403 });
+  }
 
   const site = await loadEditableSite(slug, session.user.id, session.profile?.role === "admin");
   if (!site) return NextResponse.json({ error: "Site não encontrado." }, { status: 404 });

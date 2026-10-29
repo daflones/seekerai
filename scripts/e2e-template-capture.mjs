@@ -30,6 +30,8 @@ try {
   })).json();
   userId = user?.id;
   ok("usuário", Boolean(userId));
+  // Beta fechado do editor: o usuário precisa ser admin pra acessar.
+  await rest(`profiles?id=eq.${userId}`, { method: "PATCH", body: JSON.stringify({ role: "admin" }) });
 
   const src = (await (await rest(`sites?slug=eq.${SRC_SLUG}&select=config`)).json())?.[0];
   ok("site fonte existe", Boolean(src?.config), SRC_SLUG);

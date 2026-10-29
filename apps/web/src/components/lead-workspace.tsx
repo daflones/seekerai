@@ -28,7 +28,7 @@ const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
   novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
 };
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, senderName = null, currency = "brl", lang = "pt", trial = false, dailyActive = true, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, senderName = null, currency = "brl", lang = "pt", trial = false, dailyActive = true, canEditSite = false, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
@@ -41,6 +41,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   lang?: Lang;
   trial?: boolean;
   dailyActive?: boolean;
+  canEditSite?: boolean;
   t?: Messages["lead"];
   statusLabels?: Record<string, string>;
 }) {
@@ -459,9 +460,15 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
                 <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
                   <ExternalLink size={14} />{`/site/${siteSlug}`}
                 </a>
-                <a className="button button-glass button-small" href={`/app/sites/${siteSlug}/editar`}>
-                  <Pencil size={14} />{t.editSite}
-                </a>
+                {canEditSite ? (
+                  <a className="button button-glass button-small" href={`/app/sites/${siteSlug}/editar`}>
+                    <Pencil size={14} />{t.editSite}
+                  </a>
+                ) : (
+                  <span className="button button-glass button-small lead-site-soon" title={t.editSiteSoon}>
+                    <Pencil size={14} />{t.editSite} <em>({t.soon})</em>
+                  </span>
+                )}
                 <button type="button" className="button button-glass button-small lead-site-power"
                   disabled={siteToggleBusy} onClick={() => void toggleSite()}>
                   {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}

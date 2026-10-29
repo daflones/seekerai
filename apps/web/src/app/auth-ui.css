@@ -956,4 +956,12 @@ a.lead-action { text-decoration: none; }
 .site-editor .gjs-editor-cont ::-webkit-scrollbar-track { background: transparent; }
 .site-editor .button-icon { padding: 7px 9px; }
 
+/* Beta fechado — editor "em breve" */
+.lead-site-soon { opacity: .5; cursor: default; }
+.lead-site-soon em { font-style: normal; font-size: 10px; color: var(--muted); }
+.site-soon { min-height: 60dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; }
+.site-soon-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--panel); background: linear-gradient(100deg, var(--violet-light), var(--violet)); padding: 7px 16px; border-radius: 999px; }
+.site-soon h1 { margin: 0; font-size: 24px; }
+.site-soon p { margin: 0; max-width: 46ch; color: var(--muted); font-size: 14px; line-height: 1.7; }
+
 @media (max-width: 900px) { .site-editor-hint { display: none; } .site-editor { margin: -30px -18px -70px; height: calc(100dvh - 56px); } }

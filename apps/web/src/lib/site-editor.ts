@@ -13,6 +13,13 @@ export function editorToken(): string {
     .slice(0, 32);
 }
 
+// Beta fechado do editor visual: só admin e a conta de teste acessam.
+// Os demais veem o botão como "(em breve)" e a API nega com 403.
+const SITE_EDITOR_BETA_EMAIL = "chokitowww@gmail.com";
+export function siteEditorAllowed(email: string | null | undefined, isAdmin: boolean): boolean {
+  return isAdmin || (email ?? "").toLowerCase() === SITE_EDITOR_BETA_EMAIL;
+}
+
 export interface EditableSite {
   slug: string;
   nome: string;

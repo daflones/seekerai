@@ -59,17 +59,27 @@ const api = (path, cookie, opts = {}) =>
 const users = [];
 const cleanup = [];
 try {
-  /* ---------- 1. Dois usuários ---------- */
-  for (const tag of ["dono", "intruso"]) {
-    const email = `devin-edit-${tag}-${TS}@seekerai.digital`;
+  /* ---------- 1. Usuários: admin (dono), beta-email (intruso), comum (bloqueado) ---------- */
+  const BETA_EMAIL = "chokitowww@gmail.com";
+  const mkUser = async (email) => {
     const created = await (await fetch(`${SUPA}/auth/v1/admin/users`, {
       method: "POST", headers: svc,
-      body: JSON.stringify({ email, password: `E2e!${TS}`, email_confirm: true, user_metadata: { nome: `E2E ${tag}` } }),
+      body: JSON.stringify({ email, password: `E2e!${TS}`, email_confirm: true, user_metadata: { nome: "E2E" } }),
     })).json();
-    users.push({ id: created.id, email });
-  }
-  const [dono, intruso] = users;
-  ok("usuários criados", Boolean(dono?.id && intruso?.id));
+    return { id: created?.id, email };
+  };
+  const dono = await mkUser(`devin-edit-dono-${TS}@seekerai.digital`);
+  const bloqueado = await mkUser(`devin-edit-bloq-${TS}@seekerai.digital`);
+  users.push(dono, bloqueado);
+  // Intruso usa o e-mail beta real (não-admin): se a conta já existir,
+  // só reusa pra sessão — e não apaga no cleanup.
+  const list = await (await fetch(`${SUPA}/auth/v1/admin/users?per_page=500`, { headers: svc })).json();
+  const existing = (list.users ?? []).find((x) => x.email === BETA_EMAIL);
+  const intruso = existing ? { id: existing.id, email: BETA_EMAIL, keep: true } : await mkUser(BETA_EMAIL);
+  if (!existing) users.push(intruso);
+  // Dono vira admin pra passar no beta fechado (intruso passa pelo e-mail).
+  await rest(`profiles?id=eq.${dono.id}`, { method: "PATCH", body: JSON.stringify({ role: "admin" }) });
+  ok("usuários criados", Boolean(dono?.id && intruso?.id && bloqueado?.id));
 
   /* ---------- 2. Site custom do dono ---------- */
   await rest("sites", {
@@ -103,6 +113,7 @@ try {
   /* ---------- 4. Sessões ---------- */
   const cookieDono = await sessionCookie(dono.email);
   const cookieIntruso = await sessionCookie(intruso.email);
+  const cookieBloq = await sessionCookie(bloqueado.email);
   ok("sessão do dono via /auth/confirm", Boolean(cookieDono));
   ok("sessão do intruso", Boolean(cookieIntruso));
 
@@ -112,11 +123,17 @@ try {
   ok("GET dono → 200 + doc", get1.ok && get1Body.doc?.includes(`ANTES-EDICAO-${TS}`),
     `status ${get1.status} · edited ${get1Body.edited} · canRestore ${get1Body.canRestore}`);
 
-  /* ---------- 6. GET sem sessão → 401 / outro usuário → 404 ---------- */
+  /* ---------- 6. GET sem sessão → 401 / comum → 403 / beta não-dono → 404 ---------- */
   const noAuth = await api(`/api/sites/${SLUG}/edit`, null);
   ok("GET sem sessão → 401", noAuth.status === 401, `status ${noAuth.status}`);
+  const bloq = await api(`/api/sites/${SLUG}/edit`, cookieBloq);
+  ok("GET usuário comum → 403 em breve", bloq.status === 403, `status ${bloq.status}`);
+  const bloqPost = await api(`/api/sites/${SLUG}/edit`, cookieBloq, {
+    method: "POST", body: JSON.stringify({ doc: HTML_AFTER }),
+  });
+  ok("POST usuário comum → 403 em breve", bloqPost.status === 403, `status ${bloqPost.status}`);
   const invade = await api(`/api/sites/${SLUG}/edit`, cookieIntruso);
-  ok("GET intruso → 404", invade.status === 404, `status ${invade.status}`);
+  ok("GET intruso beta → 404", invade.status === 404, `status ${invade.status}`);
 
   /* ---------- 7. POST salva edição ---------- */
   const post = await api(`/api/sites/${SLUG}/edit`, cookieDono, {
@@ -129,7 +146,7 @@ try {
   const postInvasor = await api(`/api/sites/${SLUG}/edit`, cookieIntruso, {
     method: "POST", body: JSON.stringify({ doc: HTML_AFTER }),
   });
-  ok("POST intruso → 404", postInvasor.status === 404, `status ${postInvasor.status}`);
+  ok("POST intruso beta → 404", postInvasor.status === 404, `status ${postInvasor.status}`);
 
   /* ---------- 9. /site público serve o editado ---------- */
   await new Promise((r) => setTimeout(r, 400));
@@ -161,7 +178,7 @@ try {
 } finally {
   for (const [table, q] of cleanup) await rest(`${table}?${q}`, { method: "DELETE" }).catch(() => null);
   for (const u of users) {
-    if (!u?.id) continue;
+    if (!u?.id || u.keep) continue;
     await rest(`lead_outputs?user_id=eq.${u.id}`, { method: "DELETE" }).catch(() => null);
     await rest(`profiles?id=eq.${u.id}`, { method: "DELETE" }).catch(() => null);
     await fetch(`${SUPA}/auth/v1/admin/users/${u.id}`, { method: "DELETE", headers: svc }).catch(() => null);

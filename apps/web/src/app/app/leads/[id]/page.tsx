@@ -9,13 +9,14 @@ import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { serviceName } from "@/lib/catalog-i18n";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { siteEditorAllowed } from "@/lib/site-editor";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Lead", robots: { index: false } };
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [{ supabase, user }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
+  const [{ supabase, user, profile: sessionProfile }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang);
   const [{ data: lead }, { data: outputs }, { data: services }, { data: profile }, { data: subs }, { data: daily }] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
@@ -56,6 +57,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       lang={loc.lang}
       trial={!(subs ?? []).length}
       dailyActive={(daily as { ativo?: boolean } | null)?.ativo !== false}
+      canEditSite={siteEditorAllowed(user.email, sessionProfile?.role === "admin")}
       t={t.lead}
       statusLabels={t.leadsPage.status}
     />
