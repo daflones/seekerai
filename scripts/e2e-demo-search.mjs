@@ -41,6 +41,8 @@ ok("whatsapp mascarado", !l0.whatsapp || l0.whatsapp.includes("••••"));
 ok("instagram mascarado", !l0.instagram || /^@.••••$/.test(l0.instagram));
 ok("sem URL de site exposta", !("site" in l0) && !("mapsUrl" in l0) && !("telefone" in l0) && !("ig" in l0));
 ok("site exemplo presente", typeof sample.data?.site?.slug === "string" && sample.data.site.slug.length > 2);
+ok("leads com foto real", (sample.data?.leads ?? []).some((l) => typeof l.foto === "string" && l.foto.length > 10));
+ok("foto sem chave exposta", (sample.data?.leads ?? []).every((l) => !l.foto || (!l.foto.includes("key=") && !l.foto.includes("places/") || l.foto.startsWith("/api/demo/foto?"))));
 
 // 2. Validação de entrada
 const bad = await call("POST", { query: "x", regionCode: "BR" });

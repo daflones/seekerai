@@ -16,7 +16,7 @@ import { FancySelect } from "./fancy-select";
 interface DemoResult {
   nome: string | null; cidade: string | null; bairro: string | null; uf: string | null;
   categoria: string | null; avaliacao: number | null; totalAvaliacoes: number | null;
-  semSite: boolean; siteEstado: string | null;
+  semSite: boolean; siteEstado: string | null; foto: string | null;
   whatsapp: string | null; instagram: string | null; score: number;
 }
 interface DemoSite { slug: string; nome: string }
@@ -190,7 +190,14 @@ export function ProductDemo({ full = false, loc, t }: {
               const key = leadKey(lead, i);
               return (
                 <article className="lead-card" key={key}>
-                  <div className="lead-top"><div className={`business-avatar ${COLORS[i % 3]}`}>{initials(lead.nome)}</div><button className={`bookmark-button${saved.includes(key) ? " is-saved" : ""}`} aria-label={`${saved.includes(key) ? tt.removeAria : tt.saveAria} ${lead.nome}`} onClick={() => setSaved(saved.includes(key) ? saved.filter((id) => id !== key) : [...saved, key])}><Bookmark size={16} fill={saved.includes(key) ? "currentColor" : "none"} /></button></div>
+                  {lead.foto && (
+                    <div className={`lead-photo ${COLORS[i % 3]}`} data-initials={initials(lead.nome)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={lead.foto} alt="" loading="lazy" onError={(e) => { const w = e.currentTarget.parentElement; if (w) w.classList.add("is-broken"); e.currentTarget.remove(); }} />
+                    </div>
+                  )}
+                  <div className="lead-top">
+                    {!lead.foto && <div className={`business-avatar ${COLORS[i % 3]}`}>{initials(lead.nome)}</div>}<button className={`bookmark-button${saved.includes(key) ? " is-saved" : ""}`} aria-label={`${saved.includes(key) ? tt.removeAria : tt.saveAria} ${lead.nome}`} onClick={() => setSaved(saved.includes(key) ? saved.filter((id) => id !== key) : [...saved, key])}><Bookmark size={16} fill={saved.includes(key) ? "currentColor" : "none"} /></button></div>
                   <h4>{lead.nome}</h4><p className="lead-location">{lead.categoria ?? query.niche} <span>·</span> {[lead.bairro, lead.cidade].filter(Boolean).join(", ") || city.split(",")[0]}</p>
                   <div className="lead-rating"><Star size={11} fill="currentColor" /> {rating(lead)} <span>{tt.rating}</span></div>
                   <div className="opportunity"><span><i /> {tt.strong}</span><strong>{lead.score}<small>/100</small></strong></div>

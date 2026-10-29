@@ -163,6 +163,12 @@ select option { background: var(--panel); color: var(--white); }
 .lead-domain { display: flex; align-items: center; gap: 6px; margin-block: -4px 10px; font-size: 8px; color: var(--violet-light); }
 .lead-domain > strong { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lead-domain > em { font-style: normal; font-size: 6.5px; color: var(--muted); border: 1px solid color-mix(in srgb, var(--violet-light) 20%, transparent); border-radius: 4px; padding: 1px 5px; white-space: nowrap; margin-left: auto; }
+.lead-photo { position: relative; height: 92px; border-radius: 7px; overflow: hidden; margin-bottom: 11px; }
+.lead-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lead-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--ink) 55%, transparent)); }
+.lead-photo.is-broken { height: 33px; width: 33px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; font-family: var(--font-heading); }
+.lead-photo.is-broken::before { content: attr(data-initials); }
+.lead-photo.is-broken::after { display: none; }
 .demo-upsell { text-align: center; }
 .demo-upsell .dialog-actions { justify-content: center; margin-top: 18px; }
 .pricing-cta { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-block: 10px 20px; }
@@ -182,7 +188,7 @@ select option { background: var(--panel); color: var(--white); }
 .violet { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet-light); border: 1px solid color-mix(in srgb, var(--violet) 16%, transparent); }
 .cyan { background: color-mix(in srgb, var(--cyan) 12%, transparent); color: var(--cyan); border: 1px solid color-mix(in srgb, var(--cyan) 15%, transparent); }
 .amber { background: color-mix(in srgb, var(--amber) 13%, transparent); color: var(--amber); border: 1px solid color-mix(in srgb, var(--amber) 15%, transparent); }
-.bookmark-button { padding: 4px; display: flex; color: var(--muted); background: transparent; }
+.bookmark-button { padding: 4px; display: flex; color: var(--muted); background: transparent; margin-left: auto; }
 .bookmark-button.is-saved { color: var(--violet-light); }
 .lead-card h4 { font-size: 12px; letter-spacing: -.025em; }
 .lead-location { font-size: 8px; color: var(--muted); margin-top: 6px; }

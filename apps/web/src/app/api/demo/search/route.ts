@@ -4,6 +4,7 @@ import { z } from "zod";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { supabasePublicConfig } from "@/lib/auth/config";
+import { signPhotoRef } from "@/lib/demo-photo";
 
 // Demo da landing/explorar: busca REAL com contatos mascarados.
 // 3 buscas por visitante (cookie HMAC), cache por query pra não chamar
@@ -67,7 +68,7 @@ interface RawPlace {
   nome: string | null; cidade: string | null; bairro: string | null; uf: string | null;
   categoria: string | null; avaliacao: number | null; totalAvaliacoes: number | null;
   site: string | null; telefone: string | null; whatsapp: boolean | null;
-  instagram: string | null; siteCheck?: { estado?: string } | null;
+  instagram: string | null; imagem: string | null; siteCheck?: { estado?: string } | null;
 }
 
 // Nome, bairro e avaliação ficam de verdade (prova social). Tudo que é
@@ -81,10 +82,16 @@ function sanitize(p: RawPlace) {
     (!p.site ? 28 : estado === "fora" ? 24 : estado === "desatualizado" ? 18 : estado === "ok" ? 8 : 0) +
     Math.min(15, (p.avaliacao ?? 0) * 3) + Math.min(8, (p.totalAvaliacoes ?? 0) / 40),
   )));
+  // Foto real do estabelecimento: referências gphoto: saem assinadas
+  // pelo proxy da demo; URLs diretas (Apify/Serper) vão como estão.
+  const gref = p.imagem?.startsWith("gphoto:") ? p.imagem.slice(7) : null;
+  const foto = gref
+    ? `/api/demo/foto?ref=${encodeURIComponent(gref)}&sig=${signPhotoRef(gref)}`
+    : (p.imagem && /^https:\/\//.test(p.imagem) ? p.imagem : null);
   return {
     nome: p.nome, cidade: p.cidade, bairro: p.bairro, uf: p.uf,
     categoria: p.categoria, avaliacao: p.avaliacao, totalAvaliacoes: p.totalAvaliacoes,
-    semSite: !p.site, siteEstado: estado,
+    semSite: !p.site, siteEstado: estado, foto,
     whatsapp: Boolean(p.whatsapp || p.telefone)
       ? (digits.length >= 8 ? `${digits.slice(0, 4)} ••••-••••` : "••••-••••") : null,
     instagram: ig ? `@${ig.slice(0, 1)}••••` : null,
