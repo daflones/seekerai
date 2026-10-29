@@ -48,7 +48,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.places-search]
-verify_jwt = true
+# A função valida o JWT via requireUser (auth.getUser). O gateway fica
+# aberto pra rota /api/demo/search chamar com x-seeker-demo (token
+# derivado do service key) — sem usuário, sem crédito, saída limitada.
+verify_jwt = false
 
 [functions.ai-generate]
 verify_jwt = true

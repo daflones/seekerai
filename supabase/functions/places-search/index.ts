@@ -606,7 +606,15 @@ Deno.serve(async (req) => {
   const notifyCtx: NotifyErrorInput = { onde: "places-search", erro: "" };
   try {
     requirePost(req);
-    const user = await requireUser(req);
+    // Modo demo (landing/explorar): header interno derivado do service
+    // key — sem usuário, sem cobrança, resultados limitados e sem
+    // enriquecimento pesado. A rota /api/demo/search sanitiza a saída.
+    const isDemo = req.headers.get("x-seeker-demo") ===
+      (await sha256Hex(`seeker-demo:${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`))
+        .slice(0, 32);
+    const user = isDemo
+      ? { id: "demo", email: null }
+      : await requireUser(req);
     notifyCtx.usuario = { id: user.id, email: asString((user as Record<string, unknown>).email) };
     const body = await readJson<SearchBody>(req);
 
@@ -615,7 +623,7 @@ Deno.serve(async (req) => {
     const requestRef = asString(body.requestRef, 150);
     const jobId = asString(body.jobId, 40);
     const regionCode = (asString(body.regionCode, 2) ?? "BR").toUpperCase();
-    if (!query || !service || !requestRef) {
+    if (!query || (!isDemo && (!service || !requestRef))) {
       throw httpError(400, "Informe query, serviceSlug e requestRef");
     }
     notifyCtx.contexto = `busca "${query}" · serviço ${service} · região ${regionCode}`;
@@ -630,7 +638,9 @@ Deno.serve(async (req) => {
         .then(() => {}, () => {});
     };
     const [{ data: profile }, replay, provider] = await Promise.all([
-      db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+      isDemo
+        ? Promise.resolve({ data: null })
+        : db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
       getSetting("search_replay", "off"),
       getSetting("search_provider", "google_places"),
     ]);
@@ -662,7 +672,7 @@ Deno.serve(async (req) => {
     const inputHash = await sha256Hex(
       JSON.stringify({ query, regionCode, service, provider }),
     );
-    const reservation = await reserveAction(db, {
+    const reservation = isDemo ? { cost: 0 } : await reserveAction(db, {
       userId: user.id,
       action: "search",
       businessRef: null,
@@ -711,13 +721,18 @@ Deno.serve(async (req) => {
       // batelado dos perfis (seguidores, curtidas, foto) com cap curto pra
       // não deixar a busca refém do actor de IG.
       await progress(38, `${resultados.length} estabelecimentos encontrados`);
+      // Demo: corta cedo — enriquecer ~15 é rápido; contatos saem
+      // mascarados na rota, então o enriquecimento de IG não roda.
+      if (isDemo) resultados = resultados.slice(0, 15);
       for (const place of resultados) extractInstagram(place);
       await Promise.all([
         checkWhatsapps(resultados, regionCode),
         scanWebsites(resultados),
       ]);
       await progress(62, "Verificando WhatsApp e sites");
-      await Promise.race([enrichInstagram(resultados), sleep(55_000)]);
+      if (!isDemo) {
+        await Promise.race([enrichInstagram(resultados), sleep(55_000)]);
+      }
       await progress(80, "Enriquecendo Instagram");
       resultados.sort((a, b) => {
         const score = (p: NormalizedPlace) =>
@@ -731,7 +746,7 @@ Deno.serve(async (req) => {
       // Resultados que já são lead salvo: match por place_id → "Ver lead"
       // e badge de site gerado, evitando salvar duplicado.
       const placeIds = resultados.map((p) => p.id).filter((x): x is string => Boolean(x));
-      if (placeIds.length) {
+      if (!isDemo && placeIds.length) {
         const { data: existentes } = await db.from("leads")
           .select("id,place_id").eq("user_id", user.id).in("place_id", placeIds);
         const byPlace = new Map(
@@ -753,7 +768,7 @@ Deno.serve(async (req) => {
       }
 
       await progress(92, "Ordenando oportunidades");
-      await settleAction(db, user.id, requestRef, "completed");
+      if (!isDemo) await settleAction(db, user.id, requestRef ?? "", "completed");
 
       // Buscas reais feitas por admin ficam salvas para replay (upsert por query).
       if (isAdmin && resultados.length > 0) {
@@ -766,9 +781,14 @@ Deno.serve(async (req) => {
         }, { onConflict: "query_norm" });
       }
 
-      return json({ resultados, provedor, creditosCobrados: reservation.cost });
+      return json({
+        resultados: isDemo ? resultados.slice(0, 12) : resultados,
+        provedor,
+        demo: isDemo || undefined,
+        creditosCobrados: reservation.cost,
+      });
     } catch (err) {
-      await settleAction(db, user.id, requestRef, "refunded");
+      if (!isDemo) await settleAction(db, user.id, requestRef ?? "", "refunded");
       throw err;
     }
   } catch (err) {
