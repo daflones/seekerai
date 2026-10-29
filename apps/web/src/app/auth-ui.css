@@ -469,6 +469,8 @@ a.lead-action { text-decoration: none; }
 .adm-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .adm-feed-row { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--muted); padding: 7px 10px; background: #a879d108; border: 1px solid #a879d110; border-radius: 8px; }
 .adm-feed-row small { margin-left: auto; font-size: 10px; white-space: nowrap; }
+.adm-feed-row > span small { margin-left: 0; white-space: normal; }
+.fin-follow-mail { color: var(--muted); opacity: .8; font-size: 10px; }
 .adm-tag { font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
 .adm-tag-paid { background: #6be3cc1c; color: var(--cyan); }
 .adm-tag-pending { background: #f59e0b1c; color: var(--warn); }

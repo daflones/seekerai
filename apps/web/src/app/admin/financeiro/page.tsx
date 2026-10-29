@@ -4,6 +4,7 @@ import {
   Target, TrendingUp, UserSearch, Wallet, CalendarClock,
 } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AdminFinanceiro } from "@/components/admin-financeiro";
 import { AdminDiscount } from "@/components/admin-discount";
 
@@ -161,6 +162,19 @@ export default async function AdminFinanceiroPage() {
     return rows.length ? Math.round((ok / rows.length) * 100) : 0;
   })();
 
+  // Última conversão por usuário: qualquer pagamento "paid" dele.
+  const lastPaidAt = new Map<string, string>();
+  for (const p of pays) {
+    if (p.user_id && p.status === "paid" && !lastPaidAt.has(p.user_id)) {
+      lastPaidAt.set(p.user_id, p.created_at);
+    }
+  }
+  // Última atividade de pagamento por usuário (qualquer status) — pays já vem desc.
+  const lastAnyAt = new Map<string, string>();
+  for (const p of pays) {
+    if (p.user_id && !lastAnyAt.has(p.user_id)) lastAnyAt.set(p.user_id, p.created_at);
+  }
+
   // Distribuições (valores pagos)
   const byKind = Object.entries(paid.reduce<Record<string, number>>((acc, p) => {
     acc[kindOf(p)] = (acc[kindOf(p)] ?? 0) + p.amount_cents;
@@ -213,10 +227,16 @@ export default async function AdminFinanceiroPage() {
   lastPayments.forEach((p) => p.user_id && nameIds.add(p.user_id));
   followUps.forEach((f) => nameIds.add(f.uid));
   (subs ?? []).forEach((s) => s.user_id && nameIds.add(s.user_id));
-  const { data: profs } = nameIds.size
-    ? await supabase.from("profiles").select("id,nome,email").in("id", [...nameIds])
-    : { data: [] as { id: string; nome: string | null; email: string | null }[] };
-  const userName = new Map((profs ?? []).map((u) => [u.id, u.nome || u.email || "—"]));
+  const [{ data: profs }, authUsers] = await Promise.all([
+    nameIds.size
+      ? supabase.from("profiles").select("id,nome").in("id", [...nameIds])
+      : Promise.resolve({ data: [] as { id: string; nome: string | null }[] }),
+    nameIds.size
+      ? createSupabaseAdminClient().auth.admin.listUsers({ perPage: 1000 })
+      : Promise.resolve({ data: { users: [] as { id: string; email?: string }[] } }),
+  ]);
+  const emailById = new Map((authUsers.data?.users ?? []).map((u) => [u.id, u.email ?? ""]));
+  const userName = new Map((profs ?? []).map((u) => [u.id, u.nome || emailById.get(u.id) || "—"]));
 
   const subsRows = (subs ?? [])
     .map((s) => ({
@@ -324,16 +344,37 @@ export default async function AdminFinanceiroPage() {
 
       <section className="dash-panel">
         <h2><UserSearch size={16} /> Tentou e não concluiu · 14d</h2>
-        <p className="dash-hint">Gente com intenção de compra travada — follow-up direto fecha venda.</p>
+        <p className="dash-hint">Gente com intenção de compra travada — follow-up direto fecha venda.
+          Pendente = QR aberto · Expirado = trocou de cobrança ou QR venceu · Falhou = erro ao gerar.</p>
         {followUps.length === 0
           ? <p className="dash-empty">Nenhuma tentativa pendente/expirada.</p>
           : <ul className="adm-feed">
               {followUps.map(({ uid, rows }) => {
                 const last = rows[0];
+                const meta = (last.metadata ?? {}) as Record<string, unknown>;
+                const periodo = typeof meta.period === "string" ? meta.period : null;
+                const oQue = `${KIND_LABEL[kindOf(last)] ?? kindOf(last)}${periodo ? ` ${periodo}` : ""}`;
+                const converted = (lastPaidAt.get(uid) ?? "") > last.created_at;
+                const hasNewer = (lastAnyAt.get(uid) ?? "") > last.created_at;
+                const motivo = converted
+                  ? "✅ pagou depois — não é lead frio"
+                  : last.status === "pending"
+                    ? "QR gerado, ainda aguardando pagamento"
+                    : last.status === "expired"
+                      ? (hasNewer ? "trocou de cobrança — gerou outra em seguida" : "cobrança expirou sem pagar")
+                      : "falha ao gerar a cobrança";
+                const email = emailById.get(uid);
                 return (
                   <li key={uid} className="adm-feed-row">
-                    <span className={`adm-tag adm-tag-${last.status}`}>{last.status}</span>
-                    <span><strong>{userName.get(uid) ?? "—"}</strong> · {rows.length} tentativa{rows.length > 1 ? "s" : ""} · {brl(last.amount_cents)} via {last.method ?? "?"}</span>
+                    <span className={`adm-tag adm-tag-${converted ? "paid" : last.status}`}>{converted ? "paid" : last.status}</span>
+                    <span>
+                      <strong>{userName.get(uid) ?? "—"}</strong>
+                      {email && email !== userName.get(uid) ? <small className="fin-follow-mail"> {email}</small> : null}
+                      <br />
+                      <small>
+                        {rows.length} tentativa{rows.length > 1 ? "s" : ""} · última: {oQue} · {brl(last.amount_cents)} via {last.method ?? "?"} — <em>{motivo}</em>
+                      </small>
+                    </span>
                     <small title={last.created_at}>{fmtHora(last.created_at)}</small>
                   </li>
                 );
