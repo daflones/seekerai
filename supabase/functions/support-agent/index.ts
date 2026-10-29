@@ -43,7 +43,7 @@ O QUE É O SEEKERAI:
 - Estúdio: gera apps/sites web ou mobile do zero por descrição (menu "Estúdio"), pode publicar em /site/<slug>.
 - "Minhas criações" (menu lateral): tudo que a pessoa gerou — sites, apps, imagens, textos — com filtros e busca.
 - Portfólio: página profissional do próprio usuário.
-- Domínio próprio: R$69,99/ano por site, PIX ou cartão; após o pagamento, a equipe cadastra e ativa em até 48h. O site continua no ar em /site/<slug> mesmo sem domínio próprio. Vender/comprar domínio é upsell que o usuário pode repassar ao cliente.
+- Domínio próprio: preço anual na TABELA VIVA, PIX ou cartão; após o pagamento, a equipe cadastra e ativa em até 48h. O site continua no ar em /site/<slug> mesmo sem domínio próprio. Vender/comprar domínio é upsell que o usuário pode repassar ao cliente.
 - Site do lead: fica no ar por 7 dias; se o lead não fechar nesse prazo, ele desativa sozinho — dá pra reativar no workspace do lead ou desativar antes. Marcar o lead como "ganho" mantém o site no ar.
 - Suporte: este chat (menu "Suporte") — chamados por assunto/categoria.
 
@@ -53,12 +53,22 @@ COMO O USUÁRIO GANHA DINHEIRO (pergunta frequente — NUNCA recuse):
 - Referências de mercado que ele pode praticar (é ele quem define o preço): site simples R$300–1.500, gestão/manutenção mensal R$100–400, pacotes com social media etc.
 - "E o dinheiro que eu ganhar?" / "como recebo?" → explique o fluxo acima: ele cobra do cliente como quiser e fica com 100%.
 
-PLANOS E CRÉDITOS (preços BR):
-- Essencial R$10,99/mês → 50 créditos/mês; Pro R$19,99/mês → 125 créditos/mês; King R$39,99/mês → 250 créditos/mês.
+PLANOS E CRÉDITOS — os valores REAIS e ATUAIS vêm no bloco "TABELA VIVA"
+no contexto da conversa. NUNCA cite preço, cota de créditos, desconto ou
+custo de ação de memória: use SEMPRE os números da TABELA VIVA. Se ela
+não estiver disponível ou estiver incompleta, diga que confirma os valores
+e escale.
+
+REGRAS COMERCIAIS:
 - Períodos: trimestral -10%, anual -20% (cota do ciclo inteiro liberada na hora).
-- Custo por ação: busca 4cr, site do lead 5cr, app Estúdio 10cr, imagem 2cr, estratégia 3cr. Mensagem de abordagem, prompt e verificação de WhatsApp: grátis.
-- Recarga (só assinantes, em Planos e créditos → Pacote de créditos): +50 por R$20,99 · +150 por R$39,99 · +250 por R$59,99. Soma no saldo, não expira na renovação.
+- Primeira compra: desconto configurado pelo admin aparece na TABELA VIVA;
+  só vale se o cliente nunca teve pagamento confirmado.
+- Recarga (só assinantes, em Planos e créditos → Pacote de créditos): soma
+  no saldo e não expira na renovação.
 - Sem assinatura: não dá pra buscar nem gerar — aparece o tutorial pra assinar.
+- Editar site criado, criar app no Estúdio e domínio personalizado: recursos
+  dos planos Pro e King (o editor em si não gasta créditos). Essencial edita
+  só gerando uma versão nova pela IA (custo de geração).
 - Crédito de ação com FALHA é estornado automaticamente (saldo volta sozinho).
 - Pagamento da assinatura/domínio/recarga: PIX (MercosulPay, QR na hora) ou cartão (Stripe). Plano só ativa após confirmação do pagamento.
 
@@ -69,7 +79,8 @@ DÚVIDAS COMUNS:
 - "Como pago o SeekerAi?" → PIX ou cartão em Planos e créditos.
 - "Como recebo do meu cliente?" → o SeekerAi não intermedia: ele cobra direto do cliente (PIX etc.) e fica com 100%.
 - "Meu domínio não funciona" → após pagar, a ativação é manual em até 48h; o DNS precisa apontar pro servidor; se passou de 48h, escalate.
-- "Quanto custa X?" → use a tabela de créditos acima.
+- "Quanto custa X?" → use a TABELA VIVA no contexto.
+- "Atualizar/editar o site criado" → ajustes manuais: editor visual (Pro/King, sem custo); nova versão pela IA: custo de geração da TABELA VIVA.
 
 DADOS DO CLIENTE: no contexto você recebe dados reais do cliente (plano, saldo, leads, sites). USE-OS pra personalizar ("você tem X sites publicados", "seu saldo é Y créditos") e pra orientar o próximo passo — mas cite só o que for relevante pra pergunta, nunca despeje a lista toda. Esses dados são do próprio cliente, pode citar livremente; o que é proibido é expor dados de outros usuários ou internals.`;
 
@@ -219,7 +230,8 @@ Deno.serve(async (req) => {
     }
 
     const uid = ticket.user_id as string;
-    const [profileRes, subRes, walletRes, leadsRes, outputsRes, studioRes, domainsRes, paymentRes] =
+    const [profileRes, subRes, walletRes, leadsRes, outputsRes, studioRes, domainsRes, paymentRes,
+      plansRes, rulesRes, settingsRes, paidRes] =
       await Promise.all([
         db.from("profiles").select("nome,created_at").eq("id", uid).maybeSingle(),
         db.from("subscriptions")
@@ -234,6 +246,15 @@ Deno.serve(async (req) => {
           .eq("user_id", uid).in("status", ["pending_payment", "pending_setup", "active"]).limit(5),
         db.from("payments").select("status,created_at")
           .eq("user_id", uid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        // Tabela viva: preços/custos/descontos configurados no banco —
+        // a IA nunca deve citar valor de memória.
+        db.from("plans").select("slug,nome,preco_centavos,creditos_mensais")
+          .eq("ativo", true).order("ordem"),
+        db.from("credit_action_rules").select("action,cost").eq("enabled", true),
+        db.from("app_settings").select("key,value")
+          .in("key", ["first_purchase_discount_pct", "domain_price_cents"]),
+        db.from("payments").select("id", { count: "exact", head: true })
+          .eq("user_id", uid).eq("status", "paid"),
       ]);
 
     const nome = (profileRes.data?.nome as string | undefined)?.split(" ")[0] ?? "cliente";
@@ -255,12 +276,44 @@ Deno.serve(async (req) => {
       `projetos do Estúdio: ${studioRes.count ?? 0} | domínios: ${domains} | ` +
       `último pagamento: ${lastPay}.`;
 
+    // TABELA VIVA — preços e custos lidos do banco nesta chamada.
+    const brl = (cents: unknown) =>
+      typeof cents === "number" ? `R$${(cents / 100).toFixed(2).replace(".", ",")}` : "?";
+    const plansLine = (plansRes.data ?? [])
+      .map((p) => `${p.nome} ${brl(p.preco_centavos)}/mês → ${p.creditos_mensais} créditos/mês`)
+      .join(" | ") || "indisponível";
+    const ACTION_LABEL: Record<string, string> = {
+      search: "busca no radar", generate_site: "site do lead", generate_app: "app do Estúdio",
+      generate_image: "imagem", image_prompt: "prompt de imagem", deep_strategy: "estratégia",
+      sales_reply: "mensagem de abordagem", whatsapp_check: "verificação de WhatsApp",
+      lead_assist: "assistente do lead",
+    };
+    const rulesLine = (rulesRes.data ?? [])
+      .map((r) => `${ACTION_LABEL[r.action as string] ?? r.action} ${r.cost === 0 ? "grátis" : `${r.cost}cr`}`)
+      .join(" · ") || "indisponível";
+    const setting = (k: string) =>
+      (settingsRes.data ?? []).find((s) => s.key === k)?.value;
+    const discountPct = typeof setting("first_purchase_discount_pct") === "number"
+      ? setting("first_purchase_discount_pct") as number : 0;
+    const domainCents = setting("domain_price_cents");
+    const eligibleDiscount = (paidRes.count ?? 0) === 0;
+    const liveTable =
+      `TABELA VIVA (valores reais configurados agora — cite exatamente estes números):\n` +
+      `PLANOS: ${plansLine}. Períodos: trimestral -10% · anual -20%.\n` +
+      (discountPct > 0
+        ? `DESCONTO DE PRIMEIRA COMPRA: ${discountPct}% no primeiro pagamento — ` +
+          `este cliente ${eligibleDiscount ? "É elegível (nunca pagou)" : "NÃO é elegível (já pagou antes)"}.\n`
+        : "") +
+      `CUSTOS POR AÇÃO: ${rulesLine}.\n` +
+      `RECARGA (só assinante): +50 por R$39,97 · +150 por R$89,97 · +250 por R$129,97.\n` +
+      `DOMÍNIO PERSONALIZADO: ${brl(domainCents)}/ano — recurso dos planos Pro e King, junto com editor de site e apps do Estúdio.`;
+
     const convo = list.slice(-30).map((m) => ({
       role: m.sender_role === "user" ? "user" : "assistant",
       content: m.mensagem.slice(0, 4000),
     }));
     const context =
-      `Chamado #${ticketId.slice(0, 8)} — assunto: "${ticket.assunto}".\n${customer}\n` +
+      `Chamado #${ticketId.slice(0, 8)} — assunto: "${ticket.assunto}".\n${customer}\n${liveTable}\n` +
       `Responda a ÚLTIMA mensagem do cliente considerando o histórico.`;
 
     const raw = await llm(SYSTEM, [
