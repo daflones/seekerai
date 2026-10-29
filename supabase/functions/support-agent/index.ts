@@ -15,6 +15,9 @@ import { getSecret } from "../_shared/secrets.ts";
 
 const OPEN = new Set(["aberto", "em_andamento", "pendente"]);
 const MAX_IA_MESSAGES = 14;
+const SECRET_RE = /api[_-]?key|secret|service[_-]?role|bearer\s+[a-z0-9]|env\(|process\.env|supabase\.co\/rest|password|senha\s+(do|da)\s+(banco|admin)/i;
+const FALLBACK_CLOSE = "Encerrando seu atendimento por inatividade. Foi um prazer ajudar — quando precisar de novo, é só abrir um novo chamado. Estamos por aqui!";
+const SUMMARY_SYSTEM = `Você encerra um atendimento de suporte do SeekerAi porque o cliente ficou inativo. Com base no histórico, escreva UMA mensagem curta em pt-BR (até ~70 palavras) que: agradece o contato, resume em uma frase o que foi tratado/orientado, avisa que o chamado será encerrado por inatividade e convida a abrir um novo chamado quando precisar. Tom cordial e profissional, sem promessas e sem emojis. Saída OBRIGATÓRIA em JSON: {"action":"resolve","message":"texto"} — só o campo message importa.`;
 const OR_MODEL = optionalEnv("SUPPORT_AGENT_MODEL") ?? "openai/gpt-4o-mini";
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 const NVIDIA_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
@@ -145,6 +148,7 @@ Deno.serve(async (req) => {
     const body = await readJson<Record<string, unknown>>(req);
     const ticketId = typeof body.ticketId === "string" ? body.ticketId : "";
     if (!/^[0-9a-f-]{36}$/i.test(ticketId)) throw httpError(400, "ticketId inválido");
+    const expireMode = body.action === "expire";
 
     const db = serviceClient();
     const { data: ticket } = await db.from("support_tickets")
@@ -159,8 +163,43 @@ Deno.serve(async (req) => {
       .eq("ticket_id", ticketId).order("created_at", { ascending: true }).limit(60);
     const list = (msgs ?? []) as MsgRow[];
     const last = list[list.length - 1];
+    if (!last) return json({ skipped: true });
+
+    // Modo expiração: chamado parado — a IA resume o atendimento e
+    // encerra cordialmente (evita chamado aberto/conversa infinita).
+    if (expireMode) {
+      if (last.sender_role === "user") return json({ skipped: true, reason: "user-waiting" });
+      const transcript = list.slice(-20)
+        .map((m) => `${m.sender_role === "user" ? "Cliente" : "Atendente"}: ${m.mensagem.slice(0, 800)}`)
+        .join("\n");
+      const rawSum = await llm(SUMMARY_SYSTEM, [{ role: "user", content: transcript }]);
+      const parsed = rawSum ? parseDecision(rawSum) : null;
+      const message = parsed?.message && !SECRET_RE.test(parsed.message)
+        ? parsed.message
+        : FALLBACK_CLOSE;
+      // Re-checa corrida: ninguém falou enquanto gerávamos o resumo.
+      const { data: newest } = await db.from("ticket_messages")
+        .select("id,sender_role").eq("ticket_id", ticketId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (!newest || newest.id !== last.id || newest.sender_role === "user") {
+        return json({ skipped: true, reason: "stale" });
+      }
+      const { data: fresh } = await db.from("support_tickets")
+        .select("atendente,status").eq("id", ticketId).maybeSingle();
+      if (!fresh || fresh.atendente !== "ia" || !OPEN.has(fresh.status)) {
+        return json({ skipped: true, reason: "taken" });
+      }
+      await db.from("ticket_messages").insert({
+        ticket_id: ticketId, sender_role: "ia", mensagem: message,
+      });
+      await db.from("support_tickets")
+        .update({ status: "expirado", updated_at: new Date().toISOString() })
+        .eq("id", ticketId);
+      return json({ action: "expired" });
+    }
+
     // Só responde quando a última palavra é do cliente — evita loop e corrida.
-    if (!last || last.sender_role !== "user") return json({ skipped: true });
+    if (last.sender_role !== "user") return json({ skipped: true });
 
     const iaCount = list.filter((m) => m.sender_role === "ia").length;
     const escalate = async (note: string) => {
@@ -236,7 +275,7 @@ Deno.serve(async (req) => {
     }
 
     // Defesa extra: nunca deixar a IA despejar segredos/internals na resposta.
-    if (/api[_-]?key|secret|service[_-]?role|bearer\s+[a-z0-9]|env\(|process\.env|supabase\.co\/rest|password|senha\s+(do|da)\s+(banco|admin)/i.test(decision.message)) {
+    if (SECRET_RE.test(decision.message)) {
       return await escalate(
         "Vou passar seu caso pro nosso time humano — eles assumem daqui e te retornam por este mesmo chat.",
       );
