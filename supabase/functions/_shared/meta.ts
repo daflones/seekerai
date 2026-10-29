@@ -63,14 +63,11 @@ export async function sendMetaCapi(ev: CapiEvent): Promise<void> {
   } catch { /* tracking nunca derruba request */ }
 }
 
-/** Compra confirmada (qualquer método) → evento Purchase no Pixel.
- *  Recebe a linha do payments — email, valor e cookies fb do metadata. */
-export async function trackPurchase(payment: {
-  id: string;
-  user_id: string;
-  amount_cents: number;
-  metadata: unknown;
-}): Promise<void> {
+async function trackPayment(
+  payment: { id: string; user_id: string; amount_cents: number; metadata: unknown },
+  eventName: string,
+  eventIdSuffix = "",
+): Promise<void> {
   const meta = isRecord(payment.metadata) ? payment.metadata : {};
   const fb = isRecord(meta.fb) ? meta.fb : {};
   let email: string | null = null;
@@ -80,8 +77,8 @@ export async function trackPurchase(payment: {
     email = typeof data?.email === "string" ? data.email : null;
   } catch { email = null; }
   await sendMetaCapi({
-    eventName: "Purchase",
-    eventId: payment.id,
+    eventName,
+    eventId: `${payment.id}${eventIdSuffix}`,
     email,
     valueReais: payment.amount_cents / 100,
     currency: typeof meta.currency === "string" ? meta.currency : "BRL",
@@ -89,4 +86,27 @@ export async function trackPurchase(payment: {
     fbc: typeof fb.fbc === "string" ? fb.fbc : null,
     url: "https://seekerai.digital/app/planos",
   });
+}
+
+/** Compra confirmada (qualquer método) → evento Purchase no Pixel.
+ *  Recebe a linha do payments — email, valor e cookies fb do metadata. */
+export async function trackPurchase(payment: {
+  id: string;
+  user_id: string;
+  amount_cents: number;
+  metadata: unknown;
+}): Promise<void> {
+  await trackPayment(payment, "Purchase");
+}
+
+/** Assinatura de plano confirmada → Purchase + Subscribe (otimização
+ *  de campanha pra conversão de assinatura). */
+export async function trackPlanSignup(payment: {
+  id: string;
+  user_id: string;
+  amount_cents: number;
+  metadata: unknown;
+}): Promise<void> {
+  await trackPayment(payment, "Purchase");
+  await trackPayment(payment, "Subscribe", "-sub");
 }

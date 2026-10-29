@@ -21,7 +21,7 @@ import {
 } from "../_shared/common.ts";
 import { requireSecret } from "../_shared/secrets.ts";
 import { notifyError, notifySale, notifyUserOf } from "../_shared/notify.ts";
-import { trackPurchase } from "../_shared/meta.ts";
+import { trackPlanSignup, trackPurchase } from "../_shared/meta.ts";
 
 const TOLERANCE_SECONDS = 300;
 const UUID_RE = /^[-0-9a-f]{36}$/i;
@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
           p_months: months,
         });
         if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
-        await trackPurchase(payment);
+        await trackPlanSignup(payment);
         const { data: plan } = await db.from("plans").select("*").eq("id", payment.plan_id).maybeSingle();
         const planNome = isRecord(plan)
           ? String(plan.nome ?? plan.name ?? "plano")

@@ -13,7 +13,7 @@ import {
   timingSafeEqual,
 } from "../_shared/common.ts";
 import { requireSecret } from "../_shared/secrets.ts";
-import { trackPurchase } from "../_shared/meta.ts";
+import { trackPlanSignup, trackPurchase } from "../_shared/meta.ts";
 
 const SIGNATURE_TOLERANCE_SECONDS = 300;
 
@@ -144,7 +144,7 @@ async function processEvent(
       p_months: months,
     });
     if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
-    if (pack) await trackPurchase(pack);
+    if (pack) await trackPlanSignup(pack);
     return data as Record<string, unknown>;
   }
 
@@ -174,6 +174,11 @@ async function processEvent(
       p_months: months,
     });
     if (error) throw httpError(500, `record_renewal_payment: ${error.message}`);
+    // Renovação também é receita — Purchase alimenta o ROAS da campanha.
+    const { data: renewal } = await db.from("payments")
+      .select("id, user_id, amount_cents, metadata")
+      .eq("provider", "stripe").eq("provider_ref", invoiceId).maybeSingle();
+    if (renewal) await trackPurchase(renewal);
     return data as Record<string, unknown>;
   }
 
