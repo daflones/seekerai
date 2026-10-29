@@ -157,7 +157,7 @@ export default async function AdminPage() {
     supabase.from("leads").select("status").limit(10000),
     supabase.from("credit_operations").select("action,cost,status,created_at").gte("created_at", since60).limit(20000),
     supabase.from("support_tickets").select("status,atendente").limit(500),
-    supabase.from("payments").select("status,provider,method,amount_cents,metadata,created_at").gte("created_at", since60).limit(3000),
+    supabase.from("payments").select("status,provider,method,amount_cents,metadata,created_at,user_id").gte("created_at", since60).limit(3000),
     supabase.from("search_jobs").select("status,created_at").limit(2000),
     supabase.from("ai_jobs").select("status,created_at").limit(2000),
     supabase.from("sites").select("slug", { count: "exact", head: true }).eq("publicado", true),
@@ -243,6 +243,13 @@ export default async function AdminPage() {
   const lastPayments = [...(payments60 ?? [])]
     .sort((a, b) => (b.created_at as string).localeCompare(a.created_at as string))
     .slice(0, 8);
+
+  // Quem tentou pagar — join manual com profiles (pagamentos podem vir de qualquer user).
+  const payUserIds = [...new Set(lastPayments.map((p) => p.user_id).filter(Boolean))] as string[];
+  const { data: payProfiles } = payUserIds.length
+    ? await supabase.from("profiles").select("id,nome,email").in("id", payUserIds)
+    : { data: [] as { id: string; nome: string | null; email: string | null }[] };
+  const payUser = new Map((payProfiles ?? []).map((u) => [u.id, u]));
 
   return <>
     <span className="eyebrow">CONTROLE TOTAL</span>
@@ -381,7 +388,7 @@ export default async function AdminPage() {
                 <li key={i} className="adm-feed-row">
                   <span className={`adm-tag adm-tag-${p.status}`}>{p.status}</span>
                   <span className="adm-mono">{brl(p.amount_cents ?? 0)}</span>
-                  <span>{p.method ?? "?"} · {p.provider ?? "?"} · {(p.metadata as Record<string, unknown> | null)?.kind as string ?? "plan"}</span>
+                  <span title={payUser.get(p.user_id)?.email ?? ""}><strong>{payUser.get(p.user_id)?.nome || "—"}</strong> · {p.method ?? "?"} · {p.provider ?? "?"} · {(p.metadata as Record<string, unknown> | null)?.kind as string ?? "plan"}</span>
                   <small>{fmtHora(p.created_at)}</small>
                 </li>
               ))}
