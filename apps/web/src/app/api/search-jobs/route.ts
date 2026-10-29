@@ -103,16 +103,11 @@ export async function POST(request: NextRequest) {
     const { data: sub } = await session.supabase.from("subscriptions").select("status")
       .eq("user_id", session.user.id).eq("status", "active").maybeSingle();
     if (!sub) {
-      // Tenta renovar a cota diária antes de barrar por saldo.
-      const { data: daily } = await session.supabase.rpc("claim_daily_credits");
-      const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
       const { data: wallet } = await session.supabase.from("credit_wallets")
         .select("saldo").eq("user_id", session.user.id).maybeSingle();
       if (!wallet || wallet.saldo <= 0) {
         return NextResponse.json(
-          { error: dailyActive
-              ? "Créditos insuficientes — seus créditos grátis de hoje acabaram e voltam amanhã. Assine um plano para continuar agora."
-              : "Créditos insuficientes — seu período grátis de 7 dias acabou. Assine um plano para continuar usando o radar." },
+          { error: "Créditos insuficientes — assine um plano para usar o radar." },
           { status: 403 },
         );
       }

@@ -1,7 +1,6 @@
-// Teste E2E do pacote de boas-vindas em PRODUÇÃO.
-// Novo usuário deve nascer com 13 créditos: 1 busca (4) + 1 site (5)
-// + 1 mensagem (1) + 1 estratégia (3). Depois disso, tudo bloqueia com
-// "Créditos insuficientes" (a UI mostra o upsell "Gostou? Assine!").
+// Teste E2E do paywall em PRODUÇÃO.
+// Novo usuário nasce SEM créditos: qualquer ação na edge devolve 402
+// "Créditos insuficientes" e a UI mostra o upsell (modal tutorial).
 // Uso: node scripts/e2e-trial.mjs
 import { readFileSync } from "node:fs";
 
@@ -14,8 +13,8 @@ const SUPA = env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
 const TS = Date.now();
-const EMAIL = `devin-trial-${TS}@seekerai.digital`;
-const PASS = `Trial!${TS}x`;
+const EMAIL = `devin-paywall-${TS}@seekerai.digital`;
+const PASS = `Wall!${TS}x`;
 
 const svc = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" };
 const results = [];
@@ -35,16 +34,16 @@ const saldo = async () =>
   (await (await rest(`credit_wallets?user_id=eq.${userId}&select=saldo`)).json())?.[0]?.saldo;
 
 let userId = null;
-const cleanup = [];
+let jwt = null;
 try {
-  /* 1. Usuário novo nasce com 13 créditos */
+  /* 1. Conta nova nasce ZERADA — sem bônus de entrada */
   const created = await (await fetch(`${SUPA}/auth/v1/admin/users`, {
     method: "POST", headers: svc,
-    body: JSON.stringify({ email: EMAIL, password: PASS, email_confirm: true, user_metadata: { nome: "E2E Trial" } }),
+    body: JSON.stringify({ email: EMAIL, password: PASS, email_confirm: true, user_metadata: { nome: "E2E Paywall" } }),
   })).json();
   userId = created.id;
   if (!userId) throw new Error("sem usuário");
-  ok("conta nova nasce com 13 créditos", (await saldo()) === 13, `saldo ${await saldo()}`);
+  ok("conta nova nasce com saldo 0", (await saldo()) === 0, `saldo ${await saldo()}`);
 
   const link = await (await fetch(`${SUPA}/auth/v1/admin/generate_link`, {
     method: "POST", headers: svc,
@@ -54,75 +53,49 @@ try {
     method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" },
     body: JSON.stringify({ type: "magiclink", token_hash: link.hashed_token }),
   })).json();
-  const jwt = verify.access_token;
+  jwt = verify.access_token;
   ok("login", Boolean(jwt));
 
-  /* 2. Busca grátis funciona (4 cr) */
+  /* 2. Nada pinga de graça — nem welcome nem cota diária */
+  const ledger = await (await rest(`credit_ledger?user_id=eq.${userId}&select=ref,delta`)).json();
+  ok("sem nenhum crédito grátis no ledger", (ledger ?? []).length === 0, JSON.stringify(ledger));
+
+  /* 3. claim existe mas diz que não renova nada */
+  const claimR = await fetch(`${SUPA}/rest/v1/rpc/claim_daily_credits`, {
+    method: "POST",
+    headers: { apikey: ANON, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const claim = await claimR.json();
+  ok("claim devolve ativo:false e saldo 0", claim.ativo === false && claim.saldo === 0, JSON.stringify(claim));
+
+  /* 4. Busca na edge → 402 (paywall) */
   const search = await edge("places-search", {
     query: "barbearia em Osasco SP", serviceSlug: "sites",
     requestRef: `e2e-${TS}-s`, regionCode: "BR",
   }, jwt);
-  ok("1 busca permitida no trial", search.ok, `status ${search.status} · saldo ${await saldo()} (esperado 9)`);
+  const searchBody = await search.json().catch(() => ({}));
+  ok("busca bloqueia sem plano (402)", search.status === 402 && /insuficiente/i.test(searchBody.erro ?? ""),
+    `status ${search.status} · ${searchBody.erro}`);
 
-  /* 3. Lead pro lead-workspace */
-  const leadIns = await rest("leads", {
-    method: "POST",
-    body: JSON.stringify({
-      user_id: userId, service_slug: "sites", place_id: `e2e-${TS}`,
-      nome: "Barbearia Trial E2E", cidade: "Osasco", uf: "SP",
-      endereco: "Centro, Osasco - SP", telefone: "11999990000",
-      avaliacao: 4.6, categoria: "Barbearia", status: "novo", dados: {},
-    }),
-  });
-  const lead = (await leadIns.json().catch(() => null))?.[0];
-  if (lead?.id) cleanup.push(["leads", `id=eq.${lead.id}`]);
-
-  const ctx = { nome: lead.nome, categoria: lead.categoria, cidade: lead.cidade, uf: lead.uf, telefone: lead.telefone };
-
-  /* 4. Mensagem de abordagem (1 cr) */
-  const msg = await edge("ai-generate", {
-    action: "sales_reply", serviceSlug: "sites", businessRef: lead.id,
+  /* 5. Ação de IA também → 402 */
+  const ai = await edge("ai-generate", {
+    action: "sales_reply", serviceSlug: "sites", businessRef: `e2e-${TS}`,
     requestRef: `e2e-${TS}-m`, lang: "pt",
-    prompt: "Escreva a mensagem de abordagem pro estabelecimento", context: ctx,
+    prompt: "mensagem de abordagem", context: {},
   }, jwt);
-  const msgBody = await msg.json().catch(() => ({}));
-  ok("1 mensagem de abordagem", msg.ok && Boolean(msgBody.conteudo), `status ${msg.status} · saldo ${await saldo()} (esperado 8)`);
+  const aiBody = await ai.json().catch(() => ({}));
+  ok("geração de IA bloqueia sem plano (402)", ai.status === 402 && /insuficiente/i.test(aiBody.erro ?? ""),
+    `status ${ai.status} · ${aiBody.erro}`);
 
-  /* 5. Estratégia (3 cr) */
-  const strat = await edge("ai-generate", {
-    action: "deep_strategy", serviceSlug: "sites", businessRef: lead.id,
-    requestRef: `e2e-${TS}-e`, lang: "pt",
-    prompt: "Monte a estratégia de venda pro estabelecimento", context: ctx,
-  }, jwt);
-  const stratBody = await strat.json().catch(() => ({}));
-  ok("1 estratégia", strat.ok && Boolean(stratBody.conteudo), `status ${strat.status} · saldo ${await saldo()} (esperado 5)`);
-
-  /* 6. Site (5 cr) — job no servidor; a reserva acontece já na chamada */
-  const site = await edge("ai-generate", {
-    action: "generate_site", serviceSlug: "sites", businessRef: lead.id,
-    requestRef: `e2e-${TS}-w`, lang: "pt",
-    prompt: "Crie o site de apresentação do estabelecimento", context: ctx,
-  }, jwt);
-  const siteBody = await site.json().catch(() => ({}));
-  const siteSlug = siteBody.siteSlug ?? null;
-  if (siteSlug) cleanup.push(["sites", `slug=eq.${siteSlug}`]);
-  ok("1 criação de site", site.ok && Boolean(siteSlug), `status ${site.status} · saldo ${await saldo()} (esperado 0)`);
-
-  /* 7. Acabou o trial → bloqueio com erro de créditos */
-  const after = await edge("places-search", {
-    query: "padaria em Osasco SP", serviceSlug: "sites",
-    requestRef: `e2e-${TS}-s2`, regionCode: "BR",
-  }, jwt);
-  const afterBody = await after.json().catch(() => ({}));
-  ok("trial zerado bloqueia novas ações",
-    after.status === 402 && /insuficiente/i.test(afterBody.erro ?? ""),
-    `status ${after.status} · ${afterBody.erro}`);
+  /* 6. Saldo continua 0 — nada foi cobrado nem creditado */
+  ok("saldo segue 0 depois das tentativas", (await saldo()) === 0, `saldo ${await saldo()}`);
 } catch (err) {
   ok("fluxo", false, String(err));
 } finally {
-  for (const [table, q] of cleanup) await rest(`${table}?${q}`, { method: "DELETE" }).catch(() => null);
   if (userId) {
     await rest(`lead_outputs?user_id=eq.${userId}`, { method: "DELETE" }).catch(() => null);
+    await rest(`leads?user_id=eq.${userId}`, { method: "DELETE" }).catch(() => null);
     await rest(`payments?user_id=eq.${userId}`, { method: "DELETE" }).catch(() => null);
     await rest(`credit_operations?user_id=eq.${userId}`, { method: "DELETE" }).catch(() => null);
     await rest(`credit_ledger?user_id=eq.${userId}`, { method: "DELETE" }).catch(() => null);
