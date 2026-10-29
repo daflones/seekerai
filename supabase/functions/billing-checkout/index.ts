@@ -188,6 +188,38 @@ async function createMercosulPackPix(
   return isRecord(data.data) ? data.data : data;
 }
 
+// Cupom do desconto de primeira compra — "once" desconta só a primeira
+// fatura; a renovação já sai pelo preço cheio da assinatura.
+async function ensureStripeCoupon(pct: number): Promise<string> {
+  const key = await requireSecret("STRIPE_SECRET_KEY");
+  const id = `first-purchase-${pct}`;
+  const headers = { Authorization: `Bearer ${key}` };
+  const res = await fetch(`https://api.stripe.com/v1/coupons/${encodeURIComponent(id)}`, { headers });
+  if (res.ok) {
+    const c = (await res.json()) as Record<string, unknown>;
+    if (c.percent_off === pct && c.duration === "once") return id;
+    // Config divergente — recria com os parâmetros certos.
+    await fetch(`https://api.stripe.com/v1/coupons/${encodeURIComponent(id)}`, {
+      method: "DELETE", headers,
+    }).catch(() => {});
+  }
+  const create = await fetch("https://api.stripe.com/v1/coupons", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      id,
+      name: `Primeira compra -${pct}%`,
+      percent_off: String(pct),
+      duration: "once",
+    }).toString(),
+  });
+  if (!create.ok) {
+    console.error("[stripe] coupon falhou:", create.status);
+    throw httpError(502, "Stripe recusou a criação do cupom");
+  }
+  return id;
+}
+
 async function createStripeSession(
   plan: { id: string; slug: string; nome: string; preco_centavos: number },
   userId: string,
@@ -196,6 +228,7 @@ async function createStripeSession(
   amountCents: number,
   months: number,
   periodLabel: string,
+  couponId?: string,
 ): Promise<{ id: string; url: string }> {
   const params = new URLSearchParams({
     mode: "subscription",
@@ -215,8 +248,9 @@ async function createStripeSession(
     "subscription_data[metadata][plan_id]": plan.id,
     "subscription_data[metadata][period_months]": String(months),
     success_url: `${APP_URL}/app?checkout=sucesso`,
-    cancel_url: `${APP_URL}/app/planos?checkout=cancelado`,
+    cancel_url: `${APP_URL}/app?checkout=cancelado`,
   });
+  if (couponId) params.set("discounts[0][coupon]", couponId);
   if (email) params.set("customer_email", email);
 
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -475,6 +509,26 @@ Deno.serve(async (req) => {
     const monthlyEquiv = Math.round(baseCents * (100 - periodDef.discount * 100) / 100);
     const amountCents = monthlyEquiv * periodDef.months;
 
+    // Desconto de primeira compra (admin > financeiro). Só vale para quem
+    // nunca teve pagamento confirmado — no Stripe entra como cupom "once"
+    // (a renovação cobra o valor cheio); no PIX a cobrança já nasce com
+    // o preço final descontado.
+    const { data: discRow } = await db.from("app_settings")
+      .select("value").eq("key", "first_purchase_discount_pct").maybeSingle();
+    const settingPct = Math.min(90, Math.max(0, Math.trunc(Number(discRow?.value ?? 0)) || 0));
+    let discountPct = 0;
+    if (settingPct > 0) {
+      const { data: prevPaid } = await db.from("payments")
+        .select("id").eq("user_id", user.id).eq("status", "paid").limit(1);
+      if (!prevPaid || prevPaid.length === 0) discountPct = settingPct;
+    }
+    const chargedCents = discountPct > 0
+      ? Math.max(100, Math.round(amountCents * (100 - discountPct) / 100))
+      : amountCents;
+    const discMeta = discountPct > 0
+      ? { discount_pct: discountPct, full_amount_cents: amountCents }
+      : {};
+
     // Checkouts de plano abandonados: se o usuário gerar um novo, os antigos
     // são cancelados para que um PIX/cartão pago depois não ative dois ciclos.
     await db.from("payments")
@@ -484,8 +538,9 @@ Deno.serve(async (req) => {
       .not("plan_id", "is", null);
 
     if (method === "card") {
+      const couponId = discountPct > 0 ? await ensureStripeCoupon(discountPct) : undefined;
       const session = await createStripeSession(
-        plan, user.id, null, currency, amountCents, periodDef.months, periodDef.label,
+        plan, user.id, null, currency, amountCents, periodDef.months, periodDef.label, couponId,
       );
       const { error } = await db.from("payments").insert({
         user_id: user.id,
@@ -493,9 +548,9 @@ Deno.serve(async (req) => {
         provider: "stripe",
         provider_ref: session.id,
         method: "card",
-        amount_cents: amountCents,
+        amount_cents: chargedCents,
         status: "pending",
-        metadata: { currency, period, months: periodDef.months, ...fbMeta },
+        metadata: { currency, period, months: periodDef.months, ...discMeta, ...fbMeta },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
       return json({ provider: "stripe", method, checkoutUrl: session.url });
@@ -509,14 +564,14 @@ Deno.serve(async (req) => {
       provider: "mercosulpay",
       provider_ref: internalRef,
       method: "pix",
-      amount_cents: amountCents,
+      amount_cents: chargedCents,
       status: "pending",
-      metadata: { period, months: periodDef.months, ...fbMeta },
+      metadata: { period, months: periodDef.months, ...discMeta, ...fbMeta },
     });
     if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
     try {
-      const charge = await createMercosulPix(plan, internalRef, amountCents, periodDef.label);
+      const charge = await createMercosulPix(plan, internalRef, chargedCents, periodDef.label);
       return json({
         provider: "mercosulpay",
         method,

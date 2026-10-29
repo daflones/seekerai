@@ -28,10 +28,11 @@ interface PixResult {
   error?: string;
 }
 
-export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, t }: {
+export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t }: {
   plans: PlanItem[];
   hasSubscription: boolean;
   currentPlanSlug: string | null;
+  discountPct?: number;
   locale: Locale;
   t: Messages["plansPage"];
 }) {
@@ -58,6 +59,9 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
   const totalFor = (plan: PlanItem) =>
     periodTotalCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
   const packCents = (pack: CreditPack) => isIntl ? pack.intlCents : pack.brlCents;
+  // Desconto de primeira compra — mesmo arredondamento da edge.
+  const disc = (cents: number) =>
+    discountPct > 0 ? Math.max(100, Math.round(cents * (100 - discountPct) / 100)) : cents;
   const periodLabel: Record<BillingPeriod, string> = {
     mensal: t.pMonthly, trimestral: t.pQuarterly, anual: t.pYearly,
   };
@@ -70,7 +74,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
     const payload = pack
       ? { creditPack: true, packId: pack.id, method, currency: locale.currency, ...metaCookies() }
       : { planSlug, method, currency: locale.currency, period, ...metaCookies() };
-    const valueCents = pack ? packCents(pack) : totalFor(plans.find((p) => p.slug === planSlug)!);
+    const valueCents = pack ? packCents(pack) : disc(totalFor(plans.find((p) => p.slug === planSlug)!));
     trackMeta("InitiateCheckout", {
       value: valueCents / 100,
       currency: locale.currency.toUpperCase(),
@@ -113,10 +117,15 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
           {isCurrent && <span className="plan-flag plan-flag-current">{t.current}</span>}
           {!isCurrent && plan.featured && <span className="plan-flag">{t.featured}</span>}
           <h3>{plan.name}</h3>
-          <p className="plan-price">{isFree ? money(0) : money(priceFor(plan))}{!isFree && <small>{t.perMonth}</small>}</p>
+          <p className="plan-price">
+            {!isFree && discountPct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}
+            {isFree ? money(0) : money(disc(priceFor(plan)))}
+            {!isFree && <small>{t.perMonth}</small>}
+          </p>
+          {!isFree && discountPct > 0 && <span className="plan-off-tag">-{discountPct}% {t.firstBuy}</span>}
           {!isFree && def.months > 1 && (
             <p className="plan-billed-caption">
-              {money(totalFor(plan))} {period === "trimestral" ? t.billedTri : t.billedYear}
+              {money(disc(totalFor(plan)))} {period === "trimestral" ? t.billedTri : t.billedYear}
             </p>
           )}
           {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}

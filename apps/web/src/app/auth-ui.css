@@ -227,6 +227,8 @@ a.lead-action { text-decoration: none; }
 .plan-card-checkout h3 { font-size: 19px; color: var(--white); }
 .plan-price { font-size: 30px; font-weight: 750; color: var(--fg2); }
 .plan-price small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.plan-price-was { font-size: 15px; font-weight: 500; color: var(--muted); margin-right: 6px; }
+.plan-off-tag { display: inline-flex; width: fit-content; font-size: 10px; font-weight: 750; letter-spacing: .07em; color: var(--ok); background: #6fe3b314; border: 1px solid #6fe3b333; padding: 4px 10px; border-radius: 999px; margin-top: -6px; }
 .plan-tagline { color: var(--muted); font-size: 12px; line-height: 1.8; }
 .plan-features { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 8px; }
 .plan-features li { color: var(--muted); font-size: 11px; line-height: 1.7; padding-left: 17px; position: relative; }

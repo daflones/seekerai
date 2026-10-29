@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { AdminFinanceiro } from "@/components/admin-financeiro";
+import { AdminDiscount } from "@/components/admin-discount";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Financeiro", robots: { index: false } };
@@ -104,6 +105,7 @@ export default async function AdminFinanceiroPage() {
     { data: payments },
     { data: subs },
     { data: plansData },
+    { data: discSetting },
   ] = await Promise.all([
     supabase.from("payments")
       .select("id,user_id,plan_id,status,provider,method,amount_cents,metadata,created_at")
@@ -112,7 +114,9 @@ export default async function AdminFinanceiroPage() {
       .select("status,billing_months,current_period_end,provider,user_id, plans(slug,nome,preco_centavos)")
       .eq("status", "active"),
     supabase.from("plans").select("id,slug,nome,preco_centavos").eq("ativo", true),
+    supabase.from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle(),
   ]);
+  const discountPct = Math.min(90, Math.max(0, Math.trunc(Number(discSetting?.value ?? 0)) || 0));
 
   const pays = (payments ?? []) as PayRow[];
   const now = Date.now();
@@ -276,6 +280,8 @@ export default async function AdminFinanceiroPage() {
       <Bars data={revSeries} />
       <div className="adm-chart-foot"><span>{revSeries[0]?.label}</span><span>passa o mouse pra ver o dia</span><span>{revSeries[29]?.label}</span></div>
     </section>
+
+    <AdminDiscount initialPct={discountPct} />
 
     <div className="dash-grid">
       <section className="dash-panel">
