@@ -18,6 +18,11 @@ export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 
+// Landing sem preços: a seção #planos vira um CTA direto pro cadastro.
+// Pra voltar a mostrar os cards com valores, basta ligar a flag —
+// o componente <Pricing> e os cards do CTA final continuam aqui.
+const SHOW_LANDING_PRICES = false;
+
 export default async function Home() {
   // Logado não vê landing — vai direto pro painel.
   if (await verifiedSession()) redirect("/app");
@@ -117,7 +122,12 @@ export default async function Home() {
 
         <section className="section toolkit-section light-section"><div className="container"><div className="section-heading centered"><span className="eyebrow">{h.teyebrow}</span><h2>{h.ttitleA}<br /><span className="muted-heading">{h.ttitleB}</span></h2></div><div className="toolkit-grid">{[{ icon: Search, title: h.tk1t, text: h.tk1p }, { icon: Radar, title: h.tk2t, text: h.tk2p }, { icon: MessageCircle, title: h.tk3t, text: h.tk3p }, { icon: AudioLines, title: h.tk4t, text: h.tk4p }, { icon: Bookmark, title: h.tk5t, text: h.tk5p }, { icon: Globe, title: h.tk6t, text: h.tk6p }].map(({ icon: Icon, title, text }) => <article key={title}><span><Icon size={21} /></span><h3>{title}</h3><p>{text}</p></article>)}</div><p className="roadmap-footnote">{h.tfoot}</p></div></section>
 
-        <div className="container"><Pricing plans={pricing.plans} source={pricing.source} locale={loc} t={t.pricing} discountPct={discountPct} /></div>
+        <div className="container">{SHOW_LANDING_PRICES
+          ? <Pricing plans={pricing.plans} source={pricing.source} locale={loc} t={t.pricing} discountPct={discountPct} />
+          : <section id="planos" className="section pricing-section">
+              <div className="section-heading centered"><span className="eyebrow">{t.pricing.eyebrow}</span><h2>{t.pricing.titleA}<br /><span className="muted-heading">{t.pricing.titleB}</span></h2><p>{t.pricing.sub}</p></div>
+              <div className="pricing-cta"><Link href="/cadastro" className="button button-primary">{h.ctab} <ArrowUpRight size={16} /></Link><p className="pricing-note"><ShieldCheck size={15} />{h.ctanote}</p></div>
+            </section>}</div>
 
         <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">{h.faqeyebrow}</span><h2>{h.faqtitleA}<br />{h.faqtitleB}</h2><p>{h.faqp}</p></div><div className="faq-list">{h.faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
 
@@ -126,7 +136,7 @@ export default async function Home() {
           <h2>{h.ctatitleA}<br /><span className="gradient-text">{h.ctatitleB}</span></h2>
           <p>{h.ctap}</p>
           <ul className="cta-benefits"><li><Check size={13} />{h.re1}</li><li><Check size={13} />{h.re2}</li><li><Check size={13} />{h.re3}</li></ul>
-          {pricing.plans.length > 0
+          {SHOW_LANDING_PRICES && pricing.plans.length > 0
             ? <div className="cta-plans">{pricing.plans.map((plan) => (
                 <Link key={plan.slug} href={`/cadastro?plano=${plan.slug}`}
                   className={`cta-plan${plan.featured ? " is-featured" : ""}`}>

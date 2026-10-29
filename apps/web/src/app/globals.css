@@ -162,6 +162,9 @@ select option { background: var(--panel); color: var(--white); }
 .lead-masked > span { letter-spacing: .5px; }
 .demo-upsell { text-align: center; }
 .demo-upsell .dialog-actions { justify-content: center; margin-top: 18px; }
+.pricing-cta { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-block: 10px 20px; }
+.pricing-cta .button { font-size: 13px; padding: 15px 30px; }
+.pricing-cta .pricing-note { margin: 0; }
 .results-toolbar { display: flex; align-items: center; justify-content: space-between; padding-block: 20px 15px; font-size: 10px; color: var(--muted); }
 .results-toolbar strong { font-weight: 550; color: var(--white); }
 .results-toolbar > div { display: flex; align-items: center; gap: 12px; }
