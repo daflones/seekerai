@@ -96,6 +96,7 @@ export function SearchConsole({
   const [sort, setSort] = useState("oportunidade");
   const [slow, setSlow] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   const deadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -175,7 +176,9 @@ export function SearchConsole({
   }
 
   function search() {
-    if (!canSearch || !service || busy) return;
+    // Sem saldo/plano: botão continua normal — a venda acontece no modal.
+    if (!canSearch) { setUpgradeOpen(true); return; }
+    if (!service || busy) return;
     // Resultados não salvos na tela: pergunta se quer guardar antes de sumir com eles.
     const unsaved = results?.some((_, i) => !saved[i]);
     if (unsaved) { setConfirming(true); return; }
@@ -402,39 +405,40 @@ export function SearchConsole({
           maxLength={120}
         />
       </label>
-      {canSearch
-        ? <button type="submit" className="button button-primary" disabled={busy}>
-            {busy ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
-            {busy ? t.searching : t.search}
-          </button>
-        : <Link href="/app/planos" className="button button-primary"><Lock size={15} />{t.subscribe}</Link>}
+      <button type="submit" className="button button-primary" disabled={busy}>
+        {busy ? <Loader2 size={16} className="spin" /> : <Search size={16} />}
+        {busy ? t.searching : t.search}
+      </button>
     </form>
 
     {canSearch && freeSearchesLeft !== null && <p className="seek-meta seek-free-left" role="note">
       {freeSearchesLeft === 1 ? t.freeLast : `${freeSearchesLeft} ${t.freeLeft}`}
     </p>}
 
-    {!canSearch && <>
-      <div className="seek-locked" role="note">
-        <Lock size={18} />
-        <div>
-          <strong>{t.lockedT}</strong>
-          <p>{t.lockedP}</p>
-          <Link href="/app/planos" className="text-link">{t.lockedLink} <ExternalLink size={12} /></Link>
+    {upgradeOpen && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={t.tutT}
+      onClick={() => setUpgradeOpen(false)}>
+      <section className="pix-panel pix-modal seek-upgrade" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="pix-close" aria-label={t.tutClose} onClick={() => setUpgradeOpen(false)}>×</button>
+        <div className="seek-locked" role="note">
+          <Lock size={18} />
+          <div>
+            <strong>{t.lockedT}</strong>
+            <p>{t.lockedP}</p>
+          </div>
         </div>
-      </div>
-      <div className="seek-tut">
-        <p className="seek-tut-title">{t.tutT}</p>
-        <ol>
-          <li><span className="seek-tut-num">1</span><span>{t.tutS1}</span></li>
-          <li><span className="seek-tut-num">2</span><span>{t.tutS2}</span></li>
-          <li><span className="seek-tut-num">3</span><span>{t.tutS3}</span></li>
-        </ol>
-        <Link href="/app/planos" className="button button-primary button-small">
-          <Sparkles size={14} />{t.tutCta}
-        </Link>
-      </div>
-    </>}
+        <div className="seek-tut">
+          <p className="seek-tut-title">{t.tutT}</p>
+          <ol>
+            <li><span className="seek-tut-num">1</span><span>{t.tutS1}</span></li>
+            <li><span className="seek-tut-num">2</span><span>{t.tutS2}</span></li>
+            <li><span className="seek-tut-num">3</span><span>{t.tutS3}</span></li>
+          </ol>
+          <Link href="/app/planos" className="button button-primary button-small">
+            <Sparkles size={14} />{t.tutCta}
+          </Link>
+        </div>
+      </section>
+    </div>}
 
     {busy && slow && <div className="seek-slow" role="status">
       <div className="seek-slow-text">

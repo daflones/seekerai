@@ -340,6 +340,8 @@ a.lead-action { text-decoration: none; }
 .seek-locked svg { color: var(--violet-light); flex-shrink: 0; margin-top: 2px; }
 .seek-locked strong { color: var(--white); font-size: 14px; }
 .seek-locked p { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 6px 0 8px; }
+.seek-upgrade { width: min(430px, 100%); }
+.seek-upgrade .seek-locked { margin-top: 0; }
 .seek-field-refine { min-width: 160px; }
 .seek-field em { font-style: normal; color: var(--muted); font-weight: 400; }
 
