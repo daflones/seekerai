@@ -215,7 +215,7 @@ async function createStripeSession(
     "subscription_data[metadata][plan_id]": plan.id,
     "subscription_data[metadata][period_months]": String(months),
     success_url: `${APP_URL}/app?checkout=sucesso`,
-    cancel_url: `${APP_URL}/planos?checkout=cancelado`,
+    cancel_url: `${APP_URL}/app/planos?checkout=cancelado`,
   });
   if (email) params.set("customer_email", email);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { CalendarClock, CheckCircle2, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
 import { callAction } from "@/lib/app-client";
@@ -40,6 +40,14 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
   const [pix, setPix] = useState<{ plan: string; pack?: CreditPack } & PixResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [period, setPeriod] = useState<BillingPeriod>("mensal");
+  const [canceled, setCanceled] = useState(false);
+
+  // Retorno do Stripe com checkout cancelado — aviso leve acima dos planos.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("checkout") === "cancelado") {
+      setCanceled(true);
+    }
+  }, []);
 
   const isIntl = !locale.isBrazil;
   const money = (cents: number) => formatMoney(cents, locale.currency, locale.lang);
@@ -85,6 +93,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
   }
 
   return <>
+    {canceled && <p className="seek-meta" role="status">{t.cancelNote}</p>}
     {hasSubscription && <p className="auth-success" role="status">
       <CheckCircle2 size={18} /> {t.hasSub}
     </p>}
