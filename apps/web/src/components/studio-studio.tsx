@@ -288,7 +288,7 @@ export function StudioStudio({ t, lang = "pt" }: { t: T; lang?: string }) {
             <a className="st-btn st-btn-primary" href={`/site/${project.site_slug}`} target="_blank" rel="noreferrer">
               <Globe size={15} /> /site/{project.site_slug}
             </a>
-            <a className="st-btn" href="/app/dominios">
+            <a className="st-btn" href={`/app/dominios?site=${project.site_slug}`}>
               <Globe size={15} /> Domínio próprio
             </a>
             <button type="button" className="st-btn" onClick={() => void copyLink()}>

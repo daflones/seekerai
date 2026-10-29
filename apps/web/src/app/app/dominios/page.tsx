@@ -6,8 +6,10 @@ import { DomainManager } from "@/components/domain-manager";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Domínios", robots: { index: false } };
 
-export default async function DominiosPage() {
-  const { supabase, user } = await requireSession("/app/dominios");
+export default async function DominiosPage({ searchParams }: { searchParams: Promise<{ site?: string }> }) {
+  const [{ site: initialSite }, { supabase, user }] = await Promise.all([
+    searchParams, requireSession("/app/dominios"),
+  ]);
   const admin = createSupabaseAdminClient();
 
   const [leadSites, studioSites, domainsRes, notifRes, priceRes] = await Promise.all([
@@ -43,6 +45,7 @@ export default async function DominiosPage() {
     </p>
     <DomainManager
       sites={sites}
+      initialSite={initialSite ?? null}
       domains={domainsRes.data ?? []}
       notifications={notifRes.data ?? []}
       priceCents={priceCents}

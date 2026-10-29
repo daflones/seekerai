@@ -231,7 +231,7 @@ a.lead-action { text-decoration: none; }
 .plan-features { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 8px; }
 .plan-features li { color: var(--muted); font-size: 11px; line-height: 1.7; padding-left: 17px; position: relative; }
 .plan-features li::before { content: ""; position: absolute; left: 0; top: 7px; width: 7px; height: 7px; border-radius: 50%; background: #a177ff66; }
-.plan-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 16px; }
+.plan-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 16px; }
 .pix-overlay { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--ink) 85%, transparent); backdrop-filter: blur(8px); }
 .pix-panel { margin-top: 30px; border: 1px solid #3d9d7433; border-radius: 15px; padding: 26px; background: #2f8f6a08; }
 .pix-modal { position: relative; margin-top: 0; width: min(400px, 100%); max-height: 90vh; overflow-y: auto; background: #140d22f5; border-color: #6fe3b344; box-shadow: 0 30px 80px #000000aa, 0 0 60px #6fe3b318; }

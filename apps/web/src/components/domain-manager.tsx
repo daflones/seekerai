@@ -29,12 +29,15 @@ const STATUS_LABEL: Record<string, string> = {
   removed: "Removido",
 };
 
-export function DomainManager({ sites, domains, notifications, priceCents }: {
+export function DomainManager({ sites, domains, notifications, priceCents, initialSite }: {
   sites: SiteRow[];
   domains: DomainRow[];
   notifications: NotifRow[];
   priceCents: number;
+  initialSite?: string | null;
 }) {
+  const [selected, setSelected] = useState(() =>
+    sites.some((s) => s.slug === initialSite) ? initialSite! : sites[0]?.slug ?? "");
   const [hosts, setHosts] = useState<Record<string, string>>({});
   const [checks, setChecks] = useState<Record<string, { state: "busy" | "free" | "taken" | "unknown" }>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -47,6 +50,12 @@ export function DomainManager({ sites, domains, notifications, priceCents }: {
     domains.filter((d) => d.status !== "rejected" && d.status !== "removed")
       .map((d) => [d.site_slug, d]));
   const unread = notifs.filter((n) => !n.lida);
+
+  const selSite = sites.find((s) => s.slug === selected);
+  const live = liveBySite.get(selected);
+  const host = hosts[selected] ?? live?.desired_host ?? "";
+  const check = checks[selected];
+  const siteName = (slug: string) => sites.find((s) => s.slug === slug)?.nome ?? slug;
 
   async function checkDomain(siteSlug: string) {
     const host = (hosts[siteSlug] ?? "").trim().toLowerCase().replace(/^www\./, "");
@@ -119,62 +128,85 @@ export function DomainManager({ sites, domains, notifications, priceCents }: {
       para apontar um domínio próprio.
     </p>}
 
-    <div className="domain-grid">
-      {sites.map((site) => {
-        const live = liveBySite.get(site.slug);
-        const host = hosts[site.slug] ?? live?.desired_host ?? "";
-        const check = checks[site.slug];
-        return <article className="plan-card-checkout domain-card" key={site.slug}>
-          <h3><Globe size={15} /> {site.nome}</h3>
-          <p className="plan-tagline">
-            <a className="text-link" href={`/site/${site.slug}`} target="_blank" rel="noopener noreferrer">
-              /site/{site.slug} <ExternalLink size={11} />
-            </a>
-          </p>
+    {sites.length > 0 && <section className="plan-card-checkout domain-buy">
+      <h3><Globe size={15} /> Domínio personalizado</h3>
+      <p className="domain-buy-pitch">
+        Seu site no endereço que é só seu — tipo <strong>seunegocio.com.br</strong>.
+        Passa muito mais credibilidade e ajuda a fechar o cliente.
+      </p>
 
-          {live && <p className={`domain-status domain-status-${live.status}`}>
-            {live.status === "active" && <BadgeCheck size={14} />}
-            {live.status === "pending_setup" && <Hourglass size={14} />}
-            {live.status === "pending_payment" && <Hourglass size={14} />}
-            <strong>{STATUS_LABEL[live.status] ?? live.status}</strong>
-            {" · "}{live.host ?? live.desired_host}
-            {live.status === "active" && live.expires_at && ` · até ${fmtDate(live.expires_at)}`}
-          </p>}
+      <label className="editor-block-label">Para qual site?
+        <select value={selected} onChange={(e) => { setSelected(e.target.value); setError(""); }}>
+          {sites.map((s) => <option key={s.slug} value={s.slug}>{s.nome} · /site/{s.slug}</option>)}
+        </select>
+      </label>
 
-          {(!live || live.status === "pending_payment") && <>
-            <label className="editor-block-label">Domínio desejado
-              <input
-                type="text"
-                placeholder="suaempresa.com.br"
-                value={host}
-                onChange={(e) => setHosts((h) => ({ ...h, [site.slug]: e.target.value }))}
-              />
-            </label>
-            {check?.state === "free" && <p className="domain-check is-free"><CheckCircle2 size={14} /> Parece disponível</p>}
-            {check?.state === "taken" && <p className="domain-check is-taken"><XCircle size={14} /> Já registrado — você pode tentar outro</p>}
-            {check?.state === "unknown" && <p className="domain-check"><SearchCheck size={14} /> Não conseguimos verificar — nossa equipe confere na ativação</p>}
-            <div className="plan-actions">
-              <button type="button" className="button button-glass button-small" disabled={busy !== null}
-                onClick={() => void checkDomain(site.slug)}>
-                {check?.state === "busy" ? <Loader2 size={14} className="spin" /> : <SearchCheck size={14} />}
-                Verificar
-              </button>
-              <button type="button" className="button button-primary button-small" disabled={busy !== null}
-                onClick={() => void buy(site.slug, "card")}>
-                {busy === `${site.slug}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-                Cartão · {money(priceCents)}/ano
-              </button>
-              <button type="button" className="button button-glass button-small" disabled={busy !== null}
-                onClick={() => void buy(site.slug, "pix")}>
-                {busy === `${site.slug}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
-                PIX · {money(priceCents)}
-              </button>
-            </div>
-            <p className="plan-billed-caption">Anuidade única — ativação manual em até 48h após o pagamento.</p>
-          </>}
-        </article>;
-      })}
-    </div>
+      {selSite && <p className="plan-tagline domain-site-link">
+        <a className="text-link" href={`/site/${selSite.slug}`} target="_blank" rel="noopener noreferrer">
+          Ver site atual <ExternalLink size={11} />
+        </a>
+      </p>}
+
+      {live && <p className={`domain-status domain-status-${live.status}`}>
+        {live.status === "active" && <BadgeCheck size={14} />}
+        {(live.status === "pending_setup" || live.status === "pending_payment") && <Hourglass size={14} />}
+        <strong>{STATUS_LABEL[live.status] ?? live.status}</strong>
+        {" · "}{live.host ?? live.desired_host}
+        {live.status === "active" && live.expires_at && ` · até ${fmtDate(live.expires_at)}`}
+      </p>}
+
+      {(!live || live.status === "pending_payment") && <>
+        <label className="editor-block-label">Domínio desejado
+          <div className="domain-host-row">
+            <input
+              type="text"
+              placeholder="suaempresa.com.br"
+              value={host}
+              onChange={(e) => setHosts((h) => ({ ...h, [selected]: e.target.value }))}
+            />
+            <button type="button" className="button button-glass button-small" disabled={busy !== null}
+              onClick={() => void checkDomain(selected)}>
+              {check?.state === "busy" ? <Loader2 size={14} className="spin" /> : <SearchCheck size={14} />}
+              Verificar
+            </button>
+          </div>
+        </label>
+        {check?.state === "free" && <p className="domain-check is-free"><CheckCircle2 size={14} /> Parece disponível</p>}
+        {check?.state === "taken" && <p className="domain-check is-taken"><XCircle size={14} /> Já registrado — você pode tentar outro</p>}
+        {check?.state === "unknown" && <p className="domain-check"><SearchCheck size={14} /> Não conseguimos verificar — nossa equipe confere na ativação</p>}
+        <div className="domain-pay">
+          <button type="button" className="button button-primary" disabled={busy !== null}
+            onClick={() => void buy(selected, "card")}>
+            {busy === `${selected}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
+            Cartão · {money(priceCents)}/ano
+          </button>
+          <button type="button" className="button button-glass" disabled={busy !== null}
+            onClick={() => void buy(selected, "pix")}>
+            {busy === `${selected}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
+            PIX · {money(priceCents)}
+          </button>
+        </div>
+        <p className="plan-billed-caption">Anuidade única — ativação manual em até 48h após o pagamento.</p>
+      </>}
+    </section>}
+
+    {domains.length > 0 && <section className="dash-panel domain-mine">
+      <h2><Globe size={16} /> Meus domínios</h2>
+      <ul className="domain-list">
+        {domains.map((d) => <li key={d.id}>
+          <span className="domain-list-host">
+            <Globe size={13} />{d.host ?? d.desired_host}
+          </span>
+          <span className="domain-list-site">{siteName(d.site_slug)}</span>
+          <span className={`domain-status domain-status-${d.status}`}>
+            {d.status === "active" && <BadgeCheck size={13} />}
+            {(d.status === "pending_setup" || d.status === "pending_payment") && <Hourglass size={13} />}
+            {STATUS_LABEL[d.status] ?? d.status}
+            {d.status === "active" && d.expires_at && ` · até ${fmtDate(d.expires_at)}`}
+          </span>
+        </li>)}
+      </ul>
+    </section>}
 
     {pix && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label="PIX"
       onClick={() => setPix(null)}>

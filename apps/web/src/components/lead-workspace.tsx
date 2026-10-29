@@ -457,14 +457,20 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
                 <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
                   <ExternalLink size={14} />{`/site/${siteSlug}`}
                 </a>
-                <a className="button button-glass button-small" href="/app/dominios">
-                  <Globe size={14} />Domínio próprio
-                </a>
                 <button type="button" className="button button-glass button-small lead-site-power"
                   disabled={siteToggleBusy} onClick={() => void toggleSite()}>
                   {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
                   {t.deactivateSite}
                 </button>
+              </div>
+              <div className="lead-domain-cta">
+                <div className="lead-domain-cta-copy">
+                  <strong><Globe size={13} />{t.domTitle}</strong>
+                  <span>{t.domPitch}</span>
+                </div>
+                <a className="button button-primary button-small" href={`/app/dominios?site=${siteSlug}`}>
+                  {t.domBtn}
+                </a>
               </div>
               <small className="lead-site-trial">{t.siteTrial}</small>
             </> : <div className="lead-site-off" role="status">
@@ -581,7 +587,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               {siteSlug
                 ? <>
                   <a className="button button-glass button-small" href={`/site/${siteSlug}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />{`/site/${siteSlug}`}</a>
-                  <a className="button button-glass button-small" href="/app/dominios"><Globe size={14} />Domínio próprio</a>
+                  <a className="button button-glass button-small" href={`/app/dominios?site=${siteSlug}`}><Globe size={14} />{t.domBtn}</a>
                 </>
                 : null}
               <button type="button" className="button button-glass button-small" onClick={() => openSite(o.conteudo)}><Eye size={14} />{t.openSite}</button>
