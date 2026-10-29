@@ -57,9 +57,17 @@ const CREDIT_PACKS: Record<string, { credits: number; amountCents: number; intlC
   pack250: { credits: 250, amountCents: 12997, intlCents: 2999 },
 };
 
+// Sinais antifraude recomendados pelo Stripe Radar: Customer estável por
+// usuário (histórico de pagamento) e endereço de faturamento obrigatório
+// no Checkout — vai pro PaymentMethod e alimenta o modelo de risco.
+function stripeRiskParams(params: URLSearchParams, customerId: string) {
+  params.set("customer", customerId);
+  params.set("billing_address_collection", "required");
+}
+
 async function createStripePackSession(
   userId: string,
-  email: string | null,
+  customerId: string,
   currency: BillingCurrency,
   pack: { credits: number; amountCents: number; intlCents: number },
 ): Promise<{ id: string; url: string }> {
@@ -75,10 +83,12 @@ async function createStripePackSession(
     "metadata[kind]": "credit_pack",
     "metadata[credits]": String(pack.credits),
     "metadata[currency]": currency,
+    "payment_intent_data[metadata][user_id]": userId,
+    "payment_intent_data[metadata][kind]": "credit_pack",
     success_url: `${APP_URL}/app?checkout=creditos`,
     cancel_url: `${APP_URL}/app/planos?checkout=cancelado`,
   });
-  if (email) params.set("customer_email", email);
+  stripeRiskParams(params, customerId);
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
@@ -100,6 +110,7 @@ async function createStripePackSession(
 
 async function createStripeDomainSession(
   userId: string,
+  customerId: string,
   amountCents: number,
   host: string,
 ): Promise<{ id: string; url: string }> {
@@ -113,9 +124,12 @@ async function createStripeDomainSession(
     "metadata[user_id]": userId,
     "metadata[kind]": "domain",
     "metadata[domain_host]": host,
+    "payment_intent_data[metadata][user_id]": userId,
+    "payment_intent_data[metadata][kind]": "domain",
     success_url: `${APP_URL}/app/dominios?checkout=dominio`,
     cancel_url: `${APP_URL}/app/dominios?checkout=cancelado`,
   });
+  stripeRiskParams(params, customerId);
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
@@ -220,10 +234,49 @@ async function ensureStripeCoupon(pct: number): Promise<string> {
   return id;
 }
 
+// Cliente Stripe estável por usuário — o Radar aprende o padrão de
+// pagamento da pessoa ao longo do tempo em vez de ver um "novo cliente"
+// a cada sessão. Sem isso, todo mundo parece suspeito pro modelo.
+async function ensureStripeCustomer(
+  db: ReturnType<typeof serviceClient>,
+  userId: string,
+  email: string | null,
+): Promise<string> {
+  const key = await requireSecret("STRIPE_SECRET_KEY");
+  const headers = { Authorization: `Bearer ${key}` };
+  const { data: profile } = await db.from("profiles")
+    .select("nome,stripe_customer_id").eq("id", userId).maybeSingle();
+  const saved = typeof profile?.stripe_customer_id === "string"
+    ? profile.stripe_customer_id : null;
+  if (saved) {
+    const res = await fetch(
+      `https://api.stripe.com/v1/customers/${encodeURIComponent(saved)}`,
+      { headers },
+    );
+    if (res.ok) return saved;
+  }
+  const params = new URLSearchParams({ "metadata[user_id]": userId });
+  if (email) params.set("email", email);
+  const nome = typeof profile?.nome === "string" ? profile.nome.trim() : "";
+  if (nome) params.set("name", nome.slice(0, 200));
+  const res = await fetch("https://api.stripe.com/v1/customers", {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  if (!res.ok || typeof data.id !== "string") {
+    console.error("[stripe] customer falhou:", res.status);
+    throw httpError(502, "Stripe recusou a criação do cliente");
+  }
+  await db.from("profiles").update({ stripe_customer_id: data.id }).eq("id", userId);
+  return data.id;
+}
+
 async function createStripeSession(
   plan: { id: string; slug: string; nome: string; preco_centavos: number },
   userId: string,
-  email: string | null,
+  customerId: string,
   currency: BillingCurrency,
   amountCents: number,
   months: number,
@@ -251,7 +304,7 @@ async function createStripeSession(
     cancel_url: `${APP_URL}/app?checkout=cancelado`,
   });
   if (couponId) params.set("discounts[0][coupon]", couponId);
-  if (email) params.set("customer_email", email);
+  stripeRiskParams(params, customerId);
 
   const res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
@@ -359,7 +412,8 @@ Deno.serve(async (req) => {
 
       if (method === "card") {
         // provider_ref do Stripe precisa ser o id da sessão — o webhook casa por ele.
-        const session = await createStripePackSession(user.id, null, currency, pack);
+        const customerId = await ensureStripeCustomer(db, user.id, user.email);
+        const session = await createStripePackSession(user.id, customerId, currency, pack);
         await db.from("payments")
           .update({ provider_ref: session.id })
           .eq("provider", "stripe").eq("provider_ref", internalRef);
@@ -449,7 +503,8 @@ Deno.serve(async (req) => {
       await db.from("domains").update({ payment_id: payment.id }).eq("id", domain.id);
 
       if (method === "card") {
-        const session = await createStripeDomainSession(user.id, priceCents, host);
+        const customerId = await ensureStripeCustomer(db, user.id, user.email);
+        const session = await createStripeDomainSession(user.id, customerId, priceCents, host);
         await db.from("payments")
           .update({ provider_ref: session.id })
           .eq("id", payment.id);
@@ -539,8 +594,9 @@ Deno.serve(async (req) => {
 
     if (method === "card") {
       const couponId = discountPct > 0 ? await ensureStripeCoupon(discountPct) : undefined;
+      const customerId = await ensureStripeCustomer(db, user.id, user.email);
       const session = await createStripeSession(
-        plan, user.id, null, currency, amountCents, periodDef.months, periodDef.label, couponId,
+        plan, user.id, customerId, currency, amountCents, periodDef.months, periodDef.label, couponId,
       );
       const { error } = await db.from("payments").insert({
         user_id: user.id,

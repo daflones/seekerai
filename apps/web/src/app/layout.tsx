@@ -96,6 +96,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           }}
         />
         <MetaPixel />
+        {/* Stripe.js em todas as páginas — fingerprint de dispositivo que
+            alimenta o Radar (recomendação oficial antifraude). */}
+        <Script src="https://js.stripe.com/endive/stripe.js" strategy="afterInteractive" />
       </body>
     </html>
   );

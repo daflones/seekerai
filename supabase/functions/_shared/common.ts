@@ -21,8 +21,8 @@ export function serviceClient(): SupabaseClient {
   });
 }
 
-/** Autentica o chamador pelo JWT Bearer e devolve o user id. */
-export async function requireUser(req: Request): Promise<{ id: string }> {
+/** Autentica o chamador pelo JWT Bearer e devolve id + e-mail do usuário. */
+export async function requireUser(req: Request): Promise<{ id: string; email: string | null }> {
   const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   if (!token) throw httpError(401, "Sessão ausente");
   const client = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_ANON_KEY"), {
@@ -31,7 +31,7 @@ export async function requireUser(req: Request): Promise<{ id: string }> {
   });
   const { data, error } = await client.auth.getUser();
   if (error || !data.user) throw httpError(401, "Sessão inválida");
-  return { id: data.user.id };
+  return { id: data.user.id, email: data.user.email ?? null };
 }
 
 export class HttpError extends Error {
