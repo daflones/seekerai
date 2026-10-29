@@ -52,9 +52,9 @@ const INTL_PRICES: Record<string, number> = {
 // Pacotes avulsos de créditos — somam no saldo (não é assinatura).
 // Os mesmos ids/valores do front (lib/i18n/shared.ts CREDIT_PACKS).
 const CREDIT_PACKS: Record<string, { credits: number; amountCents: number; intlCents: number }> = {
-  pack50: { credits: 50, amountCents: 2099, intlCents: 499 },
-  pack150: { credits: 150, amountCents: 3999, intlCents: 999 },
-  pack250: { credits: 250, amountCents: 5999, intlCents: 1499 },
+  pack50: { credits: 50, amountCents: 3997, intlCents: 799 },
+  pack150: { credits: 150, amountCents: 8997, intlCents: 1999 },
+  pack250: { credits: 250, amountCents: 12997, intlCents: 2999 },
 };
 
 async function createStripePackSession(

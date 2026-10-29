@@ -53,9 +53,9 @@ export const INTL_PRICES: Record<string, number> = {
 // Pacotes avulsos de créditos — os mesmos ids/valores da edge billing-checkout.
 export interface CreditPack { id: string; credits: number; brlCents: number; intlCents: number }
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "pack50", credits: 50, brlCents: 2099, intlCents: 499 },
-  { id: "pack150", credits: 150, brlCents: 3999, intlCents: 999 },
-  { id: "pack250", credits: 250, brlCents: 5999, intlCents: 1499 },
+  { id: "pack50", credits: 50, brlCents: 3997, intlCents: 799 },
+  { id: "pack150", credits: 150, brlCents: 8997, intlCents: 1999 },
+  { id: "pack250", credits: 250, brlCents: 12997, intlCents: 2999 },
 ];
 
 export function formatMoney(cents: number, currency: Currency, lang: Lang = "pt"): string {
