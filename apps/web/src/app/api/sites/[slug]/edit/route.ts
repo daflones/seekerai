@@ -15,18 +15,40 @@ const MAX_DOC = 2_000_000;
 // Folhas de estilo locais (/_next/static/…) morrem a cada redeploy —
 // o doc capturado fica autossuficiente com o CSS embutido. Links
 // externos (Google Fonts etc.) continuam como <link>.
-async function inlineLocalStyles(doc: string, origin: string): Promise<string> {
+async function inlineLocalStyles(doc: string, base: string): Promise<string> {
   const tags = doc.match(/<link[^>]+rel="stylesheet"[^>]*>/gi) ?? [];
   for (const tag of tags) {
     const href = tag.match(/href="([^"]+)"/i)?.[1];
     if (!href || /^https?:/i.test(href)) continue;
-    const css = await fetch(new URL(href, origin))
+    const css = await fetch(new URL(href, base))
       .then((r) => (r.ok ? r.text() : "")).catch(() => "");
     if (css) {
-      doc = doc.replace(tag, `<style>${css.replace(/<\/style/gi, "<\\/style")}</style>`);
+      doc = doc.replace(tag, () => `<style>${css.replace(/<\/style/gi, "<\\/style")}</style>`);
     }
   }
   return doc;
+}
+
+// Auto-fetch da própria página /site: o container não alcança o domínio
+// público (hairpin NAT), então o loopback vai primeiro. Funciona no dev
+// (127.0.0.1:3000) e no standalone de produção (PORT).
+async function captureSiteDoc(slug: string, origin: string) {
+  const bases = [
+    `http://127.0.0.1:${process.env.PORT ?? "3000"}`,
+    origin,
+  ];
+  let doc: string | null = null;
+  for (const base of [...new Set(bases)]) {
+    const res = await fetch(`${base}/site/${slug}`, {
+      headers: { [EDITOR_HEADER]: editorToken() },
+      signal: AbortSignal.timeout(45_000),
+    }).catch(() => null);
+    if (res?.ok) {
+      doc = await res.text().catch(() => null);
+      if (doc) return inlineLocalStyles(doc, base);
+    }
+  }
+  return null;
 }
 
 export async function GET(
@@ -51,16 +73,10 @@ export async function GET(
   }
 
   // Site renderizado por config (barbearia/beleza): captura o HTML
-  // público pra virar base editável. O header interno libera o gate.
-  const origin = _request.nextUrl.origin;
-  const res = await fetch(`${origin}/site/${slug}`, {
-    headers: { [EDITOR_HEADER]: editorToken() },
-  });
-  if (!res.ok) return NextResponse.json({ error: "Falha ao carregar o site." }, { status: 502 });
-  const doc = await inlineLocalStyles(
-    (await res.text()).replace(/<script[\s\S]*?<\/script>/gi, ""),
-    origin,
-  );
+  // renderizado pra virar base editável. O header interno libera o gate.
+  const doc = await captureSiteDoc(slug, _request.nextUrl.origin)
+    .then((d) => d?.replace(/<script[\s\S]*?<\/script>/gi, "") ?? null);
+  if (!doc) return NextResponse.json({ error: "Falha ao carregar o site." }, { status: 502 });
   if (doc.length > MAX_DOC) {
     return NextResponse.json({ error: "Site grande demais pra editar." }, { status: 413 });
   }

@@ -33,7 +33,7 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
       ]);
       const res = await fetch(`/api/sites/${slug}/edit`);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.doc || destroyed) { setFail(data.error ?? "load"); return; }
+      if (!res.ok || !data.doc || destroyed) { setFail(data.error ?? t.loadFail); return; }
 
       const parsed = new DOMParser().parseFromString(data.doc, "text/html");
       const cssText = [...parsed.querySelectorAll("style")]
@@ -114,7 +114,7 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
       editorRef.current = editor;
       setCanRestore(Boolean(data.canRestore));
       setStatus("ready");
-    })().catch(() => setFail("load"));
+    })().catch(() => setFail(t.loadFail));
     return () => { destroyed = true; editor?.destroy(); editorRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
