@@ -500,7 +500,7 @@ const pt = {
   },
   siteEdit: {
     back: "Voltar", title: "Editando site",
-    hint: "Clique nos textos pra editar · arraste blocos do painel · duplo clique na imagem pra trocar",
+    hint: "Clique nos textos pra editar · arraste qualquer elemento pra onde quiser · Ctrl+S salva",
     save: "Salvar", saving: "Salvando…", saved: "Alterações salvas.",
     openSite: "Ver site publicado", saveFail: "Falha ao salvar as alterações.",
     loadFail: "Não consegui carregar o site pra editar.",
@@ -508,6 +508,7 @@ const pt = {
     restoreAsk: "Descartar suas edições e voltar ao site gerado pela IA?",
     bHeading: "Título", bButton: "Botão", bSection: "Seção",
     bDivider: "Divisor", bWhatsapp: "Botão WhatsApp",
+    undo: "Desfazer (Ctrl+Z)", redo: "Refazer (Ctrl+Shift+Z)", preview: "Visualizar",
   },
   studio: {
     eyebrow: "ESTÚDIO DE CRIAÇÃO", title: "Crie um site ou app sob medida", dot: ".",
@@ -1026,7 +1027,7 @@ export const messages: Record<Lang, Messages> = {
     },
     siteEdit: {
       back: "Back", title: "Editing site",
-      hint: "Click texts to edit · drag blocks from the panel · double-click an image to change it",
+      hint: "Click texts to edit · drag any element anywhere · Ctrl+S saves",
       save: "Save", saving: "Saving…", saved: "Changes saved.",
       openSite: "View published site", saveFail: "Failed to save changes.",
       loadFail: "Couldn't load the site for editing.",
@@ -1034,6 +1035,7 @@ export const messages: Record<Lang, Messages> = {
       restoreAsk: "Discard your edits and go back to the AI-generated site?",
       bHeading: "Heading", bButton: "Button", bSection: "Section",
       bDivider: "Divider", bWhatsapp: "WhatsApp button",
+      undo: "Undo (Ctrl+Z)", redo: "Redo (Ctrl+Shift+Z)", preview: "Preview",
     },
     studio: {
       eyebrow: "CREATION STUDIO", title: "Build a custom site or app", dot: ".",
@@ -1549,7 +1551,7 @@ export const messages: Record<Lang, Messages> = {
     },
     siteEdit: {
       back: "Volver", title: "Editando sitio",
-      hint: "Haz clic en los textos para editar · arrastra bloques del panel · doble clic en la imagen para cambiarla",
+      hint: "Haz clic en los textos para editar · arrastra cualquier elemento donde quieras · Ctrl+S guarda",
       save: "Guardar", saving: "Guardando…", saved: "Cambios guardados.",
       openSite: "Ver sitio publicado", saveFail: "Error al guardar los cambios.",
       loadFail: "No se pudo cargar el sitio para editar.",
@@ -1557,6 +1559,7 @@ export const messages: Record<Lang, Messages> = {
       restoreAsk: "¿Descartar tus ediciones y volver al sitio generado por la IA?",
       bHeading: "Título", bButton: "Botón", bSection: "Sección",
       bDivider: "Divisor", bWhatsapp: "Botón de WhatsApp",
+      undo: "Deshacer (Ctrl+Z)", redo: "Rehacer (Ctrl+Mayús+Z)", preview: "Vista previa",
     },
     studio: {
       eyebrow: "ESTUDIO DE CREACIÓN", title: "Crea un sitio o app a medida", dot: ".",
@@ -2071,7 +2074,7 @@ export const messages: Record<Lang, Messages> = {
     },
     siteEdit: {
       back: "Retour", title: "Modification du site",
-      hint: "Cliquez sur les textes pour modifier · glissez des blocs du panneau · double-clic sur l'image pour la changer",
+      hint: "Cliquez sur les textes pour modifier · déplacez n'importe quel élément librement · Ctrl+S enregistre",
       save: "Enregistrer", saving: "Enregistrement…", saved: "Modifications enregistrées.",
       openSite: "Voir le site publié", saveFail: "Échec de l'enregistrement.",
       loadFail: "Impossible de charger le site pour modification.",
@@ -2079,6 +2082,7 @@ export const messages: Record<Lang, Messages> = {
       restoreAsk: "Abandonner vos modifications et revenir au site généré par l'IA ?",
       bHeading: "Titre", bButton: "Bouton", bSection: "Section",
       bDivider: "Séparateur", bWhatsapp: "Bouton WhatsApp",
+      undo: "Annuler (Ctrl+Z)", redo: "Rétablir (Ctrl+Maj+Z)", preview: "Aperçu",
     },
     studio: {
       eyebrow: "STUDIO DE CRÉATION", title: "Créez un site ou une app sur mesure", dot: ".",
@@ -2593,7 +2597,7 @@ export const messages: Record<Lang, Messages> = {
     },
     siteEdit: {
       back: "Zurück", title: "Site bearbeiten",
-      hint: "Texte anklicken zum Bearbeiten · Blöcke aus dem Panel ziehen · Bild doppelklicken zum Wechseln",
+      hint: "Texte anklicken zum Bearbeiten · Elemente frei verschieben · Strg+S speichert",
       save: "Speichern", saving: "Speichern…", saved: "Änderungen gespeichert.",
       openSite: "Veröffentlichte Site ansehen", saveFail: "Speichern fehlgeschlagen.",
       loadFail: "Site konnte zum Bearbeiten nicht geladen werden.",
@@ -2601,6 +2605,7 @@ export const messages: Record<Lang, Messages> = {
       restoreAsk: "Deine Änderungen verwerfen und zur KI-Version zurückkehren?",
       bHeading: "Überschrift", bButton: "Button", bSection: "Abschnitt",
       bDivider: "Trenner", bWhatsapp: "WhatsApp-Button",
+      undo: "Rückgängig (Strg+Z)", redo: "Wiederholen (Strg+Umschalt+Z)", preview: "Vorschau",
     },
     studio: {
       eyebrow: "CREATION STUDIO", title: "Erstelle eine Website oder App nach Maß", dot: ".",
@@ -3115,7 +3120,7 @@ export const messages: Record<Lang, Messages> = {
     },
     siteEdit: {
       back: "Indietro", title: "Modifica sito",
-      hint: "Clicca sui testi per modificare · trascina i blocchi dal pannello · doppio clic sull'immagine per cambiarla",
+      hint: "Clicca sui testi per modificare · trascina qualsiasi elemento dove vuoi · Ctrl+S salva",
       save: "Salva", saving: "Salvataggio…", saved: "Modifiche salvate.",
       openSite: "Vedi sito pubblicato", saveFail: "Salvataggio non riuscito.",
       loadFail: "Impossibile caricare il sito da modificare.",
@@ -3123,6 +3128,7 @@ export const messages: Record<Lang, Messages> = {
       restoreAsk: "Scartare le tue modifiche e tornare al sito generato dall'IA?",
       bHeading: "Titolo", bButton: "Pulsante", bSection: "Sezione",
       bDivider: "Divisore", bWhatsapp: "Pulsante WhatsApp",
+      undo: "Annulla (Ctrl+Z)", redo: "Ripeti (Ctrl+Maiusc+Z)", preview: "Anteprima",
     },
     studio: {
       eyebrow: "STUDIO DI CREAZIONE", title: "Crea un sito o un'app su misura", dot: ".",

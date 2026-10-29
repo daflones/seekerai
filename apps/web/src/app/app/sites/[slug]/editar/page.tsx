@@ -16,5 +16,5 @@ export default async function EditSitePage({ params }: { params: Promise<{ slug:
   ]);
   const site = await loadEditableSite(slug, session.user.id, session.profile.role === "admin");
   if (!site) notFound();
-  return <SiteEditor slug={slug} nome={site.nome} t={getMessages(loc.lang).siteEdit} />;
+  return <SiteEditor slug={slug} nome={site.nome} lang={loc.lang} t={getMessages(loc.lang).siteEdit} />;
 }

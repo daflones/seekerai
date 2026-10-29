@@ -2,23 +2,95 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Loader2, RotateCcw, Save } from "lucide-react";
+import {
+  ArrowLeft, ExternalLink, Eye, Loader2, Redo2, RotateCcw, Save, Undo2,
+} from "lucide-react";
 import type grapesjs from "grapesjs";
+import type { Component } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
+import gjsLocalePt from "grapesjs/locale/pt";
+import gjsLocaleEn from "grapesjs/locale/en";
+import gjsLocaleEs from "grapesjs/locale/es";
+import gjsLocaleFr from "grapesjs/locale/fr";
+import gjsLocaleDe from "grapesjs/locale/de";
+import gjsLocaleIt from "grapesjs/locale/it";
 import type { Messages } from "@/lib/i18n/messages";
 
 type GjsEditor = ReturnType<typeof grapesjs.init>;
 type T = Messages["siteEdit"];
 
+const LOCALES: Record<string, Record<string, unknown>> = {
+  pt: gjsLocalePt, en: gjsLocaleEn, es: gjsLocaleEs,
+  fr: gjsLocaleFr, de: gjsLocaleDe, it: gjsLocaleIt,
+};
+
+// Tags sem conteúdo editável — não ganham drag/resize no canvas.
+const SKIP_TAGS = new Set([
+  "script", "style", "title", "meta", "link", "head",
+  "noscript", "template", "option", "optgroup",
+]);
+// Elementos "void" não aceitam filhos — sem droppable.
+const VOID_TAGS = new Set([
+  "img", "input", "br", "hr", "source", "track", "wbr",
+  "area", "base", "col", "embed", "video", "audio", "iframe", "canvas",
+]);
+
+// Edição livre: todo elemento vira arrastável (posicionamento livre,
+// segue o mouse), redimensionável pelas 8 alças, copiável e removível.
+const FREE_PROPS = {
+  draggable: true, resizable: true, copyable: true, removable: true,
+  selectable: true, hoverable: true, stylable: true, layerable: true,
+  badgable: true, highlightable: true,
+};
+
+const UNLOCKED = new WeakSet<Component>();
+
+function unlockTree(root: Component) {
+  if (UNLOCKED.has(root)) return;
+  UNLOCKED.add(root);
+  const tag = (root.get("tagName") ?? "").toLowerCase();
+  if (!SKIP_TAGS.has(tag)) {
+    root.set({ ...FREE_PROPS, droppable: !VOID_TAGS.has(tag) });
+  }
+  if (tag !== "svg") root.components().forEach(unlockTree);
+}
+
+// Deixa o documento pronto pra edição: remove lixo do Next (noscript/
+// template poluem a árvore de camadas), neutraliza os estados iniciais
+// do Framer Motion que ficam congelados sem o JS (opacity:0 +
+// translate/blur), liga controles nativos dos vídeos e destrava
+// imagens lazy pra aparecerem no canvas.
+function prepareDoc(parsed: Document) {
+  parsed.querySelectorAll("noscript,template").forEach((n) => n.remove());
+  parsed.querySelectorAll('img[loading="lazy"]').forEach((i) => i.removeAttribute("loading"));
+  parsed.querySelectorAll("video:not([controls])").forEach((v) => {
+    v.setAttribute("controls", "");
+    v.setAttribute("preload", "metadata");
+  });
+  parsed.querySelectorAll('button[class*="video-play"]').forEach((b) => b.remove());
+  parsed.querySelectorAll<HTMLElement>("[style]").forEach((el) => {
+    const s = el.style;
+    if (parseFloat(s.opacity || "1") !== 0) return;
+    s.removeProperty("opacity");
+    const tr = (s.transform || "")
+      .replace(/translate3d?\([^)]*\)/gi, "")
+      .replace(/translate[XYZ]\([^)]*\)/gi, "").trim();
+    const fl = (s.filter || "").replace(/blur\([^)]*\)/gi, "").trim();
+    if (s.transform) { if (tr) s.setProperty("transform", tr); else s.removeProperty("transform"); }
+    if (s.filter) { if (fl) s.setProperty("filter", fl); else s.removeProperty("filter"); }
+  });
+}
+
 // Editor visual do site do lead/estúdio (GrapesJS): edita texto inline,
-// troca imagens, arrasta/redimensiona/duplica elementos e adiciona
-// blocos novos. Salva o HTML final em config.html — o /site serve via
-// iframe como tipo "custom".
-export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T }) {
+// troca imagens, arrasta em posição livre, redimensiona pelas alças,
+// duplica/remove elementos e adiciona blocos novos. Salva o HTML final
+// em config.html — o /site serve via iframe como tipo "custom".
+export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string; lang: string; t: T }) {
   const holder = useRef<HTMLDivElement>(null);
   const editorRef = useRef<GjsEditor | null>(null);
   const headRef = useRef("");
   const scriptsRef = useRef("");
+  const saveRef = useRef<() => void>(() => {});
   const [status, setStatus] = useState<"loading" | "ready" | "saving" | "restoring">("loading");
   const [canRestore, setCanRestore] = useState(false);
   const [notice, setNotice] = useState("");
@@ -36,6 +108,7 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
       if (!res.ok || !data.doc || destroyed) { setFail(data.error ?? t.loadFail); return; }
 
       const parsed = new DOMParser().parseFromString(data.doc, "text/html");
+      prepareDoc(parsed);
       const cssText = [...parsed.querySelectorAll("style")]
         .map((s) => s.textContent ?? "").join("\n");
       const links = [...parsed.querySelectorAll('link[rel="stylesheet"]')]
@@ -57,7 +130,30 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
         width: "auto",
         storageManager: false,
         plugins: [blocksBasic],
-        canvas: { styles: links },
+        // Posicionamento livre estilo ferramenta de design: o elemento
+        // segue o mouse durante o arraste e fica onde foi solto.
+        dragMode: "absolute",
+        i18n: { locale: lang, messages: { [lang]: LOCALES[lang] ?? {} } },
+        canvas: {
+          styles: links,
+          // Seleção/highlight/toolbar no tema do app (vivem dentro do
+          // iframe do canvas — CSS da página não alcança lá).
+          frameStyle: `
+            .gjs-selected { outline: 2px solid #9667ff !important; outline-offset: -2px; }
+            .gjs-hovered { outline: 1px dashed rgba(150,103,255,.65) !important; }
+            .gjs-badge, .gjs-badge * { background: #9667ff !important; }
+            .gjs-toolbar { background: linear-gradient(135deg,#a879ff,#7b3ff2) !important;
+              border-radius: 8px !important; box-shadow: 0 8px 24px -6px rgba(150,103,255,.55) !important; }
+            .gjs-resizer-h { border-color: #9667ff !important; background: #9667ff !important; }
+            .gjs-placeholder { background: rgba(150,103,255,.18) !important;
+              border: 1.5px dashed #9667ff !important; box-shadow: 0 0 0 2000px rgba(9,7,17,.06) !important; }
+            .gjs-rte-toolbar { background: #191526 !important; border-radius: 8px !important;
+              box-shadow: 0 8px 24px -8px rgba(0,0,0,.6) !important; }
+            .gjs-rte-action { color: #d8bcec !important; }
+            ::-webkit-scrollbar { width: 9px; height: 9px; }
+            ::-webkit-scrollbar-thumb { background: #2c2440; border-radius: 8px; }
+          `,
+        },
         deviceManager: {
           devices: [
             { name: "Desktop", width: "" },
@@ -85,8 +181,15 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
         },
       });
 
+      // Todo elemento vira editável: arrasta, redimensiona, copia e remove.
+      // O handler cobre tanto o load inicial quanto blocos novos.
+      editor.on("component:add", (c: Component) => unlockTree(c));
       editor.setComponents(bodyHtml);
       if (cssText) editor.setStyle(cssText);
+      editor.DomComponents.getWrapper()?.components().forEach(unlockTree);
+
+      // Ctrl+S salva direto do editor.
+      editor.Keymaps.add("sk:save", "ctrl+s,⌘+s", () => saveRef.current(), { prevent: true });
 
       // Blocos extras além do básico (colunas, texto, imagem, vídeo, mapa).
       const B = editor.BlockManager;
@@ -140,6 +243,7 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
     if (res.ok) { setNotice(t.saved); setCanRestore(Boolean(data.canRestore ?? true)); setStatus("ready"); }
     else { setFail(data.error ?? t.saveFail); setStatus("ready"); }
   };
+  saveRef.current = () => void save();
 
   const restore = async () => {
     if (status === "restoring" || !window.confirm(t.restoreAsk)) return;
@@ -151,12 +255,26 @@ export function SiteEditor({ slug, nome, t }: { slug: string; nome: string; t: T
     setStatus("ready");
   };
 
+  const gjs = () => editorRef.current;
+
   return <div className="site-editor">
     <div className="site-editor-bar">
       <Link href="/app" className="text-link"><ArrowLeft size={14} />{t.back}</Link>
       <span className="site-editor-title">{t.title} — <strong>{nome}</strong></span>
       <span className="site-editor-hint">{t.hint}</span>
       <div className="site-editor-actions">
+        <button type="button" className="button button-glass button-icon" title={t.undo}
+          onClick={() => gjs()?.UndoManager.undo()} disabled={status !== "ready"}>
+          <Undo2 size={15} />
+        </button>
+        <button type="button" className="button button-glass button-icon" title={t.redo}
+          onClick={() => gjs()?.UndoManager.redo()} disabled={status !== "ready"}>
+          <Redo2 size={15} />
+        </button>
+        <button type="button" className="button button-glass button-icon" title={t.preview}
+          onClick={() => gjs()?.runCommand("core:preview")} disabled={status !== "ready"}>
+          <Eye size={15} />
+        </button>
         {canRestore && (
           <button type="button" className="button button-glass button-small" onClick={() => void restore()}
             disabled={status !== "ready"}>
