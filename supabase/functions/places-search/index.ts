@@ -17,7 +17,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
-import { getSetting, requireSecret } from "../_shared/secrets.ts";
+import { getSecret, getSetting, requireSecret } from "../_shared/secrets.ts";
 import { igProfileCached, igCachePut } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
@@ -252,18 +252,29 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
  * thumbnail e category em português. Terceira fonte da cadeia.
  */
 async function searchSerper(query: string, regionCode: string): Promise<NormalizedPlace[]> {
-  const key = await requireSecret("SERPER_API_KEY");
-  const res = await fetch("https://google.serper.dev/maps", {
-    method: "POST",
-    headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      q: query,
-      gl: regionCode.toLowerCase(),
-      hl: "pt-br",
-      num: 20,
-    }),
-    signal: AbortSignal.timeout(30_000),
-  }).catch(() => null);
+  // Chave principal + reserva (SERPER_API_KEY_2): se a primeira falhar
+  // (cota, rate limit, outage) tenta a segunda antes de desistir.
+  const keys = [
+    await getSecret("SERPER_API_KEY"),
+    await getSecret("SERPER_API_KEY_2"),
+  ].filter((k): k is string => Boolean(k));
+  if (!keys.length) throw httpError(502, "Serper não configurado");
+  let res: Response | null = null;
+  for (const key of keys) {
+    res = await fetch("https://google.serper.dev/maps", {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        q: query,
+        gl: regionCode.toLowerCase(),
+        hl: "pt-br",
+        num: 20,
+      }),
+      signal: AbortSignal.timeout(30_000),
+    }).catch(() => null);
+    if (res?.ok) break;
+    res = null;
+  }
   if (!res?.ok) throw httpError(502, "Serper indisponível no momento");
   const data = await res.json().catch(() => null);
   const places = isRecord(data) && Array.isArray(data.places) ? data.places : [];

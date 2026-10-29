@@ -1502,17 +1502,25 @@ interface SerperDetails {
 
 async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): Promise<SerperDetails> {
   const empty: SerperDetails = { reviews: [], horariosLabel: [] };
-  const key = await getSecret("SERPER_API_KEY");
-  if (!key) return empty;
+  // Principal + reserva: se a primeira chave falhar (cota/rate limit)
+  // a segunda responde a mesma requisição.
+  const keys = [
+    await getSecret("SERPER_API_KEY"),
+    await getSecret("SERPER_API_KEY_2"),
+  ].filter((k): k is string => Boolean(k));
+  if (!keys.length) return empty;
   const gl = (leadPais(lead) ?? "BR").toLowerCase();
   const post = async (path: string, body: Record<string, unknown>) => {
-    const r = await fetch(`https://google.serper.dev${path}`, {
-      method: "POST",
-      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, gl, hl: placesLang(lang) }),
-      signal: AbortSignal.timeout(20_000),
-    }).catch(() => null);
-    return r?.ok ? await r.json().catch(() => null) : null;
+    for (const key of keys) {
+      const r = await fetch(`https://google.serper.dev${path}`, {
+        method: "POST",
+        headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, gl, hl: placesLang(lang) }),
+        signal: AbortSignal.timeout(20_000),
+      }).catch(() => null);
+      if (r?.ok) return await r.json().catch(() => null);
+    }
+    return null;
   };
   // /reviews só aceita cid numérico — lead vindo de busca Serper já guarda
   // cid; lead com placeId ChIJ resolve o cid via busca por nome+cidade.
