@@ -10,6 +10,8 @@ export const metadata: Metadata = { title: "Minha plataforma", robots: { index: 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [session, loc, theme] = await Promise.all([requireSession(), getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
+  // Completa a cota diária (13) de quem nunca pagou antes de ler o saldo.
+  await session.supabase.rpc("claim_daily_credits");
   const { data: wallet } = await session.supabase
     .from("credit_wallets").select("saldo").eq("user_id", session.user.id).maybeSingle();
   return (

@@ -13,6 +13,8 @@ export default async function BuscarPage() {
     requireSession("/app/buscar"), getLocale(),
   ]);
   const t = getMessages(loc.lang).seek;
+  // Renova a cota diária antes de calcular saldo/buscas restantes.
+  await supabase.rpc("claim_daily_credits");
   const [{ data: services }, { data: subs }, { data: wallet }] = await Promise.all([
     supabase.from("services_catalog").select("slug,nome,categoria").eq("ativo", true).order("nome"),
     supabase.from("subscriptions").select("status").eq("user_id", user.id)

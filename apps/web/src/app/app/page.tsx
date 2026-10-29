@@ -16,6 +16,8 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
+  // Cota diária de quem nunca pagou: completa até 13 antes de exibir.
+  await supabase.rpc("claim_daily_credits");
   const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),

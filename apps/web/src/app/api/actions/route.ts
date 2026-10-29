@@ -62,6 +62,8 @@ export async function POST(request: NextRequest) {
       .in("status", ["active"])
       .maybeSingle();
     if (!sub) {
+      // Tenta renovar a cota diária antes de barrar por saldo.
+      await session.supabase.rpc("claim_daily_credits");
       const { data: wallet } = await session.supabase
         .from("credit_wallets")
         .select("saldo")
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
       if (!wallet || wallet.saldo <= 0) {
         return NextResponse.json(
-          { error: "Créditos insuficientes — seus créditos grátis acabaram. Assine um plano para continuar usando o radar." },
+          { error: "Créditos insuficientes — seus créditos grátis de hoje acabaram e voltam amanhã. Assine um plano para continuar agora." },
           { status: 403 },
         );
       }
