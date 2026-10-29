@@ -42,6 +42,9 @@ const EDGE_SECRET_KEYS = [
   "NVIDIA_API_KEY",
   "NVIDIA_TEXT_MODEL",
   "NVIDIA_IMAGE_MODEL",
+  "META_PIXEL_ID",
+  "META_CAPI_TOKEN",
+  "META_TEST_EVENT_CODE",
 ];
 
 const env = loadLocalEnv();

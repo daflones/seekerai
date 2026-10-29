@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Briefcase, CircleEllipsis, Facebook, Instagram, Lightbulb, ListChecks, MessageCircle, MessagesSquare, Search, Share2, TrendingUp, Youtube } from "lucide-react";
 import { Brand } from "./brand";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import { trackMeta } from "@/lib/meta";
 
 export function WelcomeQuiz({ name, t }: { name: string; t?: Messages["welcome"] }) {
   const tt = t ?? getMessages("pt").welcome;
@@ -28,6 +29,8 @@ export function WelcomeQuiz({ name, t }: { name: string; t?: Messages["welcome"]
     { value: "outra", label: tt.d7, icon: CircleEllipsis },
   ];
   const router = useRouter();
+  // Cadastro concluído — evento de conversão da campanha.
+  useEffect(() => { trackMeta("CompleteRegistration"); }, []);
   const [origem, setOrigem] = useState("");
   const [dificuldade, setDificuldade] = useState("");
   const [busy, setBusy] = useState(false);

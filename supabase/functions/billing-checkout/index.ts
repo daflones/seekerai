@@ -26,6 +26,10 @@ interface CheckoutBody {
   packId?: string;
   currency?: string;
   period?: string;
+  domainSiteSlug?: string;
+  domainHost?: string;
+  fbp?: string;
+  fbc?: string;
 }
 
 type BillingCurrency = "brl" | "usd" | "eur";
@@ -290,6 +294,14 @@ Deno.serve(async (req) => {
     }
     const db = serviceClient();
 
+    // Cookies do Pixel enviados pelo cliente — o webhook repassa pro
+    // evento Purchase (CAPI) casar a conversão com a sessão do anúncio.
+    const fb = {
+      fbp: typeof body.fbp === "string" ? body.fbp.slice(0, 200) : undefined,
+      fbc: typeof body.fbc === "string" ? body.fbc.slice(0, 200) : undefined,
+    };
+    const fbMeta = (fb.fbp || fb.fbc) ? { fb } : {};
+
     // Pacote avulso de créditos — só para quem já tem assinatura ativa.
     if (body.creditPack === true) {
       const { data: sub } = await db.from("subscriptions")
@@ -307,7 +319,7 @@ Deno.serve(async (req) => {
         method,
         amount_cents: currency === "brl" ? pack.amountCents : pack.intlCents,
         status: "pending",
-        metadata: { kind: "credit_pack", credits: pack.credits, currency },
+        metadata: { kind: "credit_pack", credits: pack.credits, currency, ...fbMeta },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
@@ -395,7 +407,7 @@ Deno.serve(async (req) => {
         method,
         amount_cents: priceCents,
         status: "pending",
-        metadata: { kind: "domain", domain_id: domain.id, currency: "brl" },
+        metadata: { kind: "domain", domain_id: domain.id, currency: "brl", ...fbMeta },
       }).select("id").single();
       if (payError || !payment) {
         throw httpError(500, `Falha ao registrar pagamento: ${payError?.message ?? "erro"}`);
@@ -483,7 +495,7 @@ Deno.serve(async (req) => {
         method: "card",
         amount_cents: amountCents,
         status: "pending",
-        metadata: { currency, period, months: periodDef.months },
+        metadata: { currency, period, months: periodDef.months, ...fbMeta },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
       return json({ provider: "stripe", method, checkoutUrl: session.url });
@@ -499,7 +511,7 @@ Deno.serve(async (req) => {
       method: "pix",
       amount_cents: amountCents,
       status: "pending",
-      metadata: { period, months: periodDef.months },
+      metadata: { period, months: periodDef.months, ...fbMeta },
     });
     if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 

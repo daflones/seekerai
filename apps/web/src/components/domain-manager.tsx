@@ -7,6 +7,7 @@ import {
   Globe, Hourglass, Loader2, QrCode, SearchCheck, XCircle,
 } from "lucide-react";
 import { callAction } from "@/lib/app-client";
+import { metaCookies, trackMeta } from "@/lib/meta";
 
 interface SiteRow { slug: string; nome: string; tipo: string }
 interface DomainRow {
@@ -79,8 +80,11 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
     if (!HOST_RE.test(host)) { setError("Domínio inválido — use o formato exemplo.com.br"); return; }
     setBusy(`${siteSlug}:${method}`);
     setError("");
+    trackMeta("InitiateCheckout", {
+      value: priceCents / 100, currency: "BRL", content_name: `domain:${host}`,
+    });
     const res = await callAction<{ checkoutUrl?: string } & PixResult>("billing-checkout", {
-      method, currency: "brl", domainSiteSlug: siteSlug, domainHost: host,
+      method, currency: "brl", domainSiteSlug: siteSlug, domainHost: host, ...metaCookies(),
     });
     setBusy(null);
     if (!res.ok) { setError(res.error); return; }

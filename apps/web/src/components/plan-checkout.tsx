@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { CalendarClock, CheckCircle2, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
 import { callAction } from "@/lib/app-client";
+import { metaCookies, trackMeta } from "@/lib/meta";
 import { CREDIT_PACKS, formatMoney, INTL_PRICES, type CreditPack, type Locale } from "@/lib/i18n/shared";
 import { BILLING_PERIODS, periodDef, periodMonthlyCents, periodTotalCents, type BillingPeriod } from "@/lib/plans/periods";
 import type { Messages } from "@/lib/i18n/messages";
@@ -59,8 +60,14 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, locale, 
     setError("");
     setPix(null);
     const payload = pack
-      ? { creditPack: true, packId: pack.id, method, currency: locale.currency }
-      : { planSlug, method, currency: locale.currency, period };
+      ? { creditPack: true, packId: pack.id, method, currency: locale.currency, ...metaCookies() }
+      : { planSlug, method, currency: locale.currency, period, ...metaCookies() };
+    const valueCents = pack ? packCents(pack) : totalFor(plans.find((p) => p.slug === planSlug)!);
+    trackMeta("InitiateCheckout", {
+      value: valueCents / 100,
+      currency: locale.currency.toUpperCase(),
+      content_name: pack ? `credit-pack-${pack.id}` : `plan-${planSlug}-${period}`,
+    });
     const res = await callAction<{ checkoutUrl?: string } & PixResult>("billing-checkout", payload);
     setBusy(null);
     if (!res.ok) { setError(res.error); return; }

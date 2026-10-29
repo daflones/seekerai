@@ -13,6 +13,7 @@ import {
   timingSafeEqual,
 } from "../_shared/common.ts";
 import { requireSecret } from "../_shared/secrets.ts";
+import { trackPurchase } from "../_shared/meta.ts";
 
 const SIGNATURE_TOLERANCE_SECONDS = 300;
 
@@ -95,7 +96,7 @@ async function processEvent(
 
     // Domínio próprio (checkout mode=payment) — ativação manual pelo admin.
     const { data: pack } = await db.from("payments")
-      .select("id, metadata").eq("provider", "stripe").eq("provider_ref", sessionId)
+      .select("id, user_id, amount_cents, metadata").eq("provider", "stripe").eq("provider_ref", sessionId)
       .maybeSingle();
     if (pack && (pack.metadata as Record<string, unknown>)?.kind === "domain") {
       const { data, error } = await db.rpc("confirm_domain_payment", {
@@ -103,6 +104,7 @@ async function processEvent(
         p_provider_ref: sessionId,
       });
       if (error) throw httpError(500, `confirm_domain_payment: ${error.message}`);
+      await trackPurchase(pack);
       return data as Record<string, unknown>;
     }
 
@@ -113,6 +115,7 @@ async function processEvent(
         p_provider_ref: sessionId,
       });
       if (error) throw httpError(500, `confirm_credit_pack_payment: ${error.message}`);
+      await trackPurchase(pack);
       return data as Record<string, unknown>;
     }
 
@@ -141,6 +144,7 @@ async function processEvent(
       p_months: months,
     });
     if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
+    if (pack) await trackPurchase(pack);
     return data as Record<string, unknown>;
   }
 

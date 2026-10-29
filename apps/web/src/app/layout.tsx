@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { cookies } from "next/headers";
 import { LOCALE_COOKIE, THEME_COOKIE } from "@/lib/i18n/shared";
+import { MetaPixel } from "@/components/meta-pixel";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/sora";
 import "./globals.css";
@@ -94,6 +95,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-KG2R7LSQ');`,
           }}
         />
+        <MetaPixel />
       </body>
     </html>
   );
