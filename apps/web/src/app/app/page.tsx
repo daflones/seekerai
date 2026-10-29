@@ -119,7 +119,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
                   <li key={`${o.created_at}-${i}`}>
                     <span>{t.actionLabels[o.action] ?? o.action}</span>
                     <span className="dash-op-meta">
-                      {o.cost} cr · {t.statusLabels[o.status] ?? o.status} · {new Date(o.created_at).toLocaleDateString(dateLocale)}
+                      {o.cost} cr · {t.statusLabels[o.status] ?? o.status} · {new Date(o.created_at).toLocaleDateString(dateLocale, { timeZone: "America/Sao_Paulo" })}
                     </span>
                   </li>
                 ))}

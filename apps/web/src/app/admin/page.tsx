@@ -35,6 +35,11 @@ const TICKET_STATUS_LABEL: Record<string, string> = {
 const DAY = 24 * 60 * 60 * 1000;
 const brl = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+// Server component renderiza no fuso do host (UTC) — fixa BR pra exibição.
+const fmtHora = (iso: string) => new Date(iso).toLocaleString("pt-BR", {
+  day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
 
 function daySeries(dates: string[], days = 30): { label: string; value: number }[] {
   const today = new Date();
@@ -377,7 +382,7 @@ export default async function AdminPage() {
                   <span className={`adm-tag adm-tag-${p.status}`}>{p.status}</span>
                   <span className="adm-mono">{brl(p.amount_cents ?? 0)}</span>
                   <span>{p.method ?? "?"} · {p.provider ?? "?"} · {(p.metadata as Record<string, unknown> | null)?.kind as string ?? "plan"}</span>
-                  <small>{new Date(p.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
+                  <small>{fmtHora(p.created_at)}</small>
                 </li>
               ))}
             </ul>}
@@ -394,7 +399,7 @@ export default async function AdminPage() {
                 <li key={i} className="adm-feed-row">
                   <span className="adm-mono">{a.acao}</span>
                   <span>{a.alvo}</span>
-                  <small title={JSON.stringify(a.diff)}>{new Date(a.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small>
+                  <small title={JSON.stringify(a.diff)}>{fmtHora(a.created_at)}</small>
                 </li>
               ))}
             </ul>}
