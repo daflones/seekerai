@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadSite } from "@/lib/sites";
+import { EDITOR_HEADER, editorToken } from "@/lib/site-editor";
 import { siteStrings } from "@/components/site/site-i18n";
 import { BarbershopSite } from "@/components/site/barbershop-site";
 import { BeautySite } from "@/components/site/beauty-site";
@@ -28,7 +30,6 @@ async function siteBlocked(leadId: string | null, ownerId?: string | null): Prom
       .select("user_id").eq("id", leadId).maybeSingle();
     userId = (lead?.user_id as string | undefined) ?? null;
   }
-  if (!userId) return false;
   if (!userId) return false;
   const [{ data: sub }, { data: profile }] = await Promise.all([
     admin.from("subscriptions").select("user_id")
@@ -87,10 +88,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function SitePage({ params }: Props) {
   const { slug } = await params;
   if (!/^[a-z0-9-]{2,80}$/.test(slug)) notFound();
-  const site = await loadSite(slug);
+  // Fetch interno do editor visual: pula o gate pra capturar o HTML.
+  const internal = (await headers()).get(EDITOR_HEADER) === editorToken();
+  const site = await loadSite(slug, { raw: internal });
   if (site) {
     const owner = (site.config as { owner?: string }).owner ?? null;
-    if (await siteBlocked(site.lead_id, owner)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
+    if (!internal && await siteBlocked(site.lead_id, owner)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
     // Projetos do estúdio: HTML gerado por IA, renderizado direto.
     // target=mobile veste moldura de telefone.
     if (site.tipo === "custom" && site.config.html) {

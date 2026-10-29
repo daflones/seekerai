@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
-  Lock, MapPin, MessageSquareText, Phone, Sparkles, Star, Trash2, Globe, Users,
+  Lock, MapPin, MessageSquareText, Pencil, Phone, Sparkles, Star, Trash2, Globe, Users,
   MessageCircle, FileText, MonitorSmartphone, Power,
 } from "lucide-react";
 import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
@@ -458,6 +458,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
                 </button>
                 <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
                   <ExternalLink size={14} />{`/site/${siteSlug}`}
+                </a>
+                <a className="button button-glass button-small" href={`/app/sites/${siteSlug}/editar`}>
+                  <Pencil size={14} />{t.editSite}
                 </a>
                 <button type="button" className="button button-glass button-small lead-site-power"
                   disabled={siteToggleBusy} onClick={() => void toggleSite()}>

@@ -225,6 +225,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
       {refs.length > 0 && <div className="st-refs">
         {refs.map((r, i) => <div key={r.url} className="st-ref">
           {r.kind === "image"
+            // eslint-disable-next-line @next/next/no-img-element -- thumbnail pequeno de referência
             ? <img src={r.url} alt="" loading="lazy" />
             : <span className="st-ref-vid"><Clapperboard size={16} /></span>}
           <button type="button" className="st-ref-x" aria-label="Remover"

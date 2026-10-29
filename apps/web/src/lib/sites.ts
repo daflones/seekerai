@@ -106,17 +106,19 @@ export interface SiteRow {
   publicado: boolean;
 }
 
-export async function loadSite(slug: string): Promise<SiteRow | null> {
+export async function loadSite(slug: string, opts: { raw?: boolean } = {}): Promise<SiteRow | null> {
   const admin = createSupabaseAdminClient();
-  const { data } = await admin.from("sites")
+  let query = admin.from("sites")
     .select("slug,tipo,nome,lead_id,config,publicado,created_at,sem_expiracao")
-    .eq("slug", slug).eq("publicado", true).maybeSingle();
+    .eq("slug", slug);
+  if (!opts.raw) query = query.eq("publicado", true);
+  const { data } = await query.maybeSingle();
   if (!data) return null;
 
   // Trial de 7 dias do site de lead: expira na leitura quando o lead não
   // fechou — garante desativação mesmo sem cron rodando.
   const stale = Date.now() - new Date(data.created_at as string).getTime() > 7 * 86_400_000;
-  if (data.lead_id && stale && !data.sem_expiracao) {
+  if (!opts.raw && data.lead_id && stale && !data.sem_expiracao) {
     const { data: lead } = await admin.from("leads")
       .select("status").eq("id", data.lead_id).maybeSingle();
     if (lead?.status !== "ganho") {
