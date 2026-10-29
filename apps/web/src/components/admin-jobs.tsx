@@ -110,7 +110,7 @@ export function AdminJobs({ initial }: { initial: AdminJob[] }) {
                 <span className={`ticket-status ticket-${j.status === "done" ? "resolvido" : j.status === "error" ? "cancelado" : "em_andamento"}`}>
                   {j.status === "done" ? "Concluído" : j.status === "error" ? "Erro" : running ? `${pct}%` : j.status}
                 </span>
-                <small>{elapsed(j.created_at)}</small>
+                <small suppressHydrationWarning>{elapsed(j.created_at)}</small>
                 <ChevronDown size={14} className={openId === j.id ? "adm-job-open" : ""} />
               </span>
             </button>

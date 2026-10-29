@@ -227,7 +227,7 @@ export function AdminFinanceiro() {
           <li key={s.id}>
             <span>
               {brl(s.amount)} → {s.pixKeyMask}
-              <small className="fin-saque-sub"> {new Date(s.created_at).toLocaleString("pt-BR")}{s.erro ? ` · ${s.erro}` : ""}</small>
+              <small className="fin-saque-sub"> {new Date(s.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}{s.erro ? ` · ${s.erro}` : ""}</small>
             </span>
             <strong className={`fin-status fin-${s.status}`}>{STATUS_LABEL[s.status] ?? s.status}</strong>
           </li>

@@ -577,7 +577,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       {outputs.map((o) => <article key={o.id} className="lead-output">
         <button type="button" className="lead-output-head" onClick={() => setOpen((s) => ({ ...s, [o.id]: !s[o.id] }))}>
           <span>{OUTPUT_LABEL[o.tipo]}</span>
-          <small>{new Date(o.created_at).toLocaleString()}{o.modelo ? ` · ${o.modelo}` : ""}</small>
+          <small>{new Date(o.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}{o.modelo ? ` · ${o.modelo}` : ""}</small>
         </button>
         {open[o.id] && <div className="lead-output-body">
           {o.tipo === "generate_site" && <>

@@ -14,7 +14,9 @@ export interface DomainAdminRow {
 
 const money = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleString("pt-BR") : "—";
+const fmtDate = (iso: string | null) => iso
+  ? new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  : "—";
 const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Aguardando pagamento",
   pending_setup: "Pago — configurar",
@@ -105,7 +107,7 @@ export function AdminDomains({ rows, priceCents }: { rows: DomainAdminRow[]; pri
                 <strong>{r.host ?? r.desiredHost}</strong>
                 <small>{r.siteNome} · /site/{r.siteSlug}</small>
                 <small>{r.userEmail} · pedido {fmtDate(r.createdAt)}</small>
-                <small>
+                <small suppressHydrationWarning>
                   {STATUS_LABEL[r.status] ?? r.status}
                   {r.payment && ` · ${r.payment.provider === "stripe" ? "cartão" : "PIX"} ${money(r.payment.amount_cents)} (${r.payment.status})`}
                   {r.status === "active" && days !== null && ` · ${days >= 0 ? `${days}d restantes` : "expirado"} · até ${fmtDate(r.expiresAt)}`}

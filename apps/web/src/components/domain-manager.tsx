@@ -19,7 +19,9 @@ interface PixResult { qrCode?: string | null; qrCodeImage?: string | null; expir
 const HOST_RE = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const money = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const fmtDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+const fmtDate = (iso: string | null) => iso
+  ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  : "—";
 
 const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Aguardando pagamento",

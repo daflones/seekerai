@@ -75,7 +75,7 @@ export function AdminChamados({ tickets: initial }: { tickets: TicketRow[] }) {
           <button type="button" className={`ticket-open ${openId === t.id ? "active" : ""}`} onClick={() => setOpenId(openId === t.id ? null : t.id)}>
             <div>
               <strong>{t.assunto}</strong>
-              <small>{t.cliente} · {new Date(t.created_at).toLocaleDateString("pt-BR")} · {t.categoria} · prioridade {t.prioridade}</small>
+              <small>{t.cliente} · {new Date(t.created_at).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} · {t.categoria} · prioridade {t.prioridade}</small>
             </div>
             <span className="ticket-open-right">
               {t.atendente === "ia" && <span className="ticket-ia" title="Atendido pela IA de suporte">IA</span>}

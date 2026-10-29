@@ -14,7 +14,9 @@ const OUTPUT_LABELS: Record<string, string> = {
   generate_site: "Site", generate_image: "Imagem", image_prompt: "Prompt de imagem",
 };
 const money = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const dateTag = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+const dateTag = (iso: string | null) => iso
+  ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  : "—";
 const periodLabel = (months: number) =>
   months === 1 ? "mensal" : months === 3 ? "trimestral" : months === 12 ? "anual" : `${months} meses`;
 

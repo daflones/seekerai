@@ -68,8 +68,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const theme = jar.get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
   const htmlLang = (jar.get(LOCALE_COOKIE)?.value ?? "pt-BR").split("-")[0] || "pt";
   return (
-    <html lang={htmlLang} data-theme={theme}>
-      <body>
+    <html lang={htmlLang} data-theme={theme} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         {/* Google Tag Manager (noscript) — logo após a abertura do <body>. */}
         <noscript>
           <iframe

@@ -150,7 +150,7 @@ export function IntegrationsEditor({
           {runs.map((run) => <div className="editor-feature" key={run.id}>
             <div>
               <strong>{run.query}</strong>
-              <small>{run.provider === "apify" ? "Apify" : "Google Places"} · {run.resultados} resultados · {new Date(run.created_at).toLocaleString("pt-BR")}</small>
+              <small>{run.provider === "apify" ? "Apify" : "Google Places"} · {run.resultados} resultados · {new Date(run.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small>
             </div>
             <button type="button" className="editor-remove" disabled={busy !== null}
               onClick={() => removeRun(run.id)}>

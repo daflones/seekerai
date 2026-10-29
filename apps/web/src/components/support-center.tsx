@@ -47,7 +47,7 @@ export function SupportCenter({ tickets: initial, admin = false, t, lang = "pt" 
               <strong>{t.assunto}</strong>
               <small>
                 {admin && t.cliente ? `${t.cliente} · ` : ""}
-                {new Date(t.created_at).toLocaleDateString(tag)} · {tt.priorityOf} {prioLabel(t.prioridade).toLowerCase()}
+                {new Date(t.created_at).toLocaleDateString(tag, { timeZone: "America/Sao_Paulo" })} · {tt.priorityOf} {prioLabel(t.prioridade).toLowerCase()}
               </small>
             </div>
             <span className="ticket-open-right">
