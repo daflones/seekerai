@@ -3,6 +3,7 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
 
 // Referências visuais do estúdio (imagens/vídeos que o usuário anexa no
 // prompt) — sobem pro bucket público `studio-refs` e vão como contexto
@@ -24,6 +25,12 @@ export async function POST(request: NextRequest) {
   }
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
+  if (session.profile?.role !== "admin") {
+    const planSlug = await userPlanSlug(session.supabase, session.user.id);
+    if (!planAllowsPaidFeatures(planSlug)) {
+      return NextResponse.json({ error: "A criação de sites e apps está nos planos Pro e King." }, { status: 403 });
+    }
+  }
 
   const limit = await authRateLimit("app-action", session.user.id, request.headers);
   if (!limit.allowed) {

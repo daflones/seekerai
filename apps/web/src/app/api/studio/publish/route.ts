@@ -4,6 +4,7 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
 
 // Publica o projeto do estúdio em /site/<slug> — sites.tipo="custom"
 // renderiza o HTML salvo em config.html (iframe).
@@ -20,6 +21,12 @@ export async function POST(request: NextRequest) {
   }
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
+  if (session.profile?.role !== "admin") {
+    const planSlug = await userPlanSlug(session.supabase, session.user.id);
+    if (!planAllowsPaidFeatures(planSlug)) {
+      return NextResponse.json({ error: "A criação de sites e apps está nos planos Pro e King." }, { status: 403 });
+    }
+  }
 
   let value: unknown;
   try { value = await request.json(); } catch {

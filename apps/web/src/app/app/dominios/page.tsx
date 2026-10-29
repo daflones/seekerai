@@ -1,16 +1,34 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Lock } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { DomainManager } from "@/components/domain-manager";
+import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Domínios", robots: { index: false } };
 
 export default async function DominiosPage({ searchParams }: { searchParams: Promise<{ site?: string }> }) {
-  const [{ site: initialSite }, { supabase, user }] = await Promise.all([
+  const [{ site: initialSite }, { supabase, user, profile }] = await Promise.all([
     searchParams, requireSession("/app/dominios"),
   ]);
   const admin = createSupabaseAdminClient();
+  const planSlug = await userPlanSlug(supabase, user.id);
+
+  // Domínio personalizado é exclusivo dos planos Pro e King.
+  if (profile.role !== "admin" && !planAllowsPaidFeatures(planSlug)) {
+    return <>
+      <span className="eyebrow">SEU ENDEREÇO NA WEB</span>
+      <h1>Domínio próprio<span className="gradient-text">.</span></h1>
+      <div className="site-soon">
+        <span className="site-soon-badge"><Lock size={13} />PLANOS PRO E KING</span>
+        <h1>Domínio personalizado pros seus sites.</h1>
+        <p>Crie endereços tipo suaempresa.com.br para os sites que você gera — recurso disponível a partir do plano Pro.</p>
+        <Link href="/app/planos" className="button button-primary">Ver planos</Link>
+      </div>
+    </>;
+  }
 
   const [leadSites, studioSites, domainsRes, notifRes, priceRes] = await Promise.all([
     admin.from("sites")

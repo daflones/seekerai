@@ -6,6 +6,7 @@ import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { refundCreditAction } from "@/lib/billing/refund";
+import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
 
 // Estúdio: prompt livre → app/site HTML completo via edge ai-generate
 // (action generate_app). Geração detached com polling — sair da página
@@ -82,6 +83,16 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
   if (!session.profile?.consentimento_em || !session.profile?.onboarding_concluido) {
     return NextResponse.json({ error: "Conclua seu cadastro antes." }, { status: 403 });
+  }
+  // Apps web/mobile são exclusivos Pro/King (admin testa sempre).
+  if (session.profile?.role !== "admin") {
+    const planSlug = await userPlanSlug(session.supabase, session.user.id);
+    if (!planAllowsPaidFeatures(planSlug)) {
+      return NextResponse.json(
+        { error: "A criação de sites e apps está nos planos Pro e King." },
+        { status: 403 },
+      );
+    }
   }
 
   const raw = await request.text().catch(() => "");

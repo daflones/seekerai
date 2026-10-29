@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { loadEditableSite, siteEditorAllowed } from "@/lib/site-editor";
+import { userPlanSlug } from "@/lib/plans/capabilities";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { SiteEditor } from "@/components/site-editor";
@@ -18,12 +19,14 @@ export default async function EditSitePage({ params }: { params: Promise<{ slug:
   ]);
   const t = getMessages(loc.lang).siteEdit;
 
-  // Beta fechado: fora do grupo autorizado vê a tela "em breve".
-  if (!siteEditorAllowed(session.user.email, session.profile.role === "admin")) {
+  // Pro/King (ou admin/beta): fora do grupo autorizado vê a tela de upgrade.
+  const planSlug = await userPlanSlug(session.supabase, session.user.id);
+  if (!siteEditorAllowed(session.user.email, session.profile.role === "admin", planSlug)) {
     return <div className="site-soon">
       <span className="site-soon-badge"><Sparkles size={13} />{t.soon}</span>
       <h1>{t.title}</h1>
       <p>{t.soonText}</p>
+      <Link href="/app/planos" className="button button-primary">{t.plansB}</Link>
       <Link href="/app" className="text-link"><ArrowLeft size={14} />{t.back}</Link>
     </div>;
   }

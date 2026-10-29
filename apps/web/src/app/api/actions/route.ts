@@ -6,6 +6,7 @@ import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { refundCreditAction } from "@/lib/billing/refund";
+import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
 
 // Proxy autenticado para as edge functions que exigem o JWT do usuário.
 // O token nunca chega ao cliente: o servidor repassa a sessão validada.
@@ -70,6 +71,26 @@ export async function POST(request: NextRequest) {
       if (!wallet || wallet.saldo <= 0) {
         return NextResponse.json(
           { error: "Créditos insuficientes — assine um plano para usar o radar." },
+          { status: 403 },
+        );
+      }
+    }
+  }
+
+  // Recursos Pro/King: checkout de domínio personalizado e geração de
+  // app do estúdio não podem ser chamados por planos menores.
+  if (profile.role !== "admin") {
+    const payload = parsed.data.payload as Record<string, unknown>;
+    const domainCheckout = parsed.data.funcao === "billing-checkout"
+      && typeof payload.domainHost === "string" && payload.domainHost;
+    const appGen = parsed.data.funcao === "ai-generate" && payload.action === "generate_app";
+    if (domainCheckout || appGen) {
+      const planSlug = await userPlanSlug(session.supabase, session.user.id);
+      if (!planAllowsPaidFeatures(planSlug)) {
+        return NextResponse.json(
+          { error: domainCheckout
+              ? "Domínio personalizado está nos planos Pro e King."
+              : "A criação de sites e apps está nos planos Pro e King." },
           { status: 403 },
         );
       }

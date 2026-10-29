@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifiedSession } from "@/lib/auth/session";
 import { authRateLimit } from "@/lib/auth/rate-limit";
+import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
 
 const HOST_RE = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const UA = { "User-Agent": "SeekerAi/1.0 (+https://seekerai.digital)", Accept: "application/rdap+json, application/json" };
@@ -22,6 +23,13 @@ function rdapUrls(host: string): string[] {
 export async function GET(request: NextRequest) {
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
+  // Domínio personalizado é recurso dos planos Pro e King.
+  if (session.profile?.role !== "admin") {
+    const planSlug = await userPlanSlug(session.supabase, session.user.id);
+    if (!planAllowsPaidFeatures(planSlug)) {
+      return NextResponse.json({ error: "Domínio personalizado está nos planos Pro e King." }, { status: 403 });
+    }
+  }
 
   const limit = await authRateLimit("admin-integration", session.user.id, request.headers);
   if (!limit.allowed) {

@@ -5,12 +5,20 @@ import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { EDITOR_HEADER, editorToken, loadEditableSite, siteEditorAllowed } from "@/lib/site-editor";
+import { userPlanSlug } from "@/lib/plans/capabilities";
 
 // Editor visual de sites: GET devolve o documento HTML pra editar,
 // POST salva a versão editada em config.html (tipo "custom" — o /site
 // já serve via iframe), DELETE restaura o original gerado pela IA.
 const saveSchema = z.object({ doc: z.string().min(50).max(2_000_000) });
 const MAX_DOC = 2_000_000;
+
+// Gate unificado: Pro/King, admin ou conta beta — sem isso nem o GET
+// abre (o usuário nem descobre se o slug existe).
+async function editorGate(session: { supabase: Parameters<typeof userPlanSlug>[0]; user: { id: string; email?: string | null }; profile: { role?: string } | null }) {
+  const planSlug = await userPlanSlug(session.supabase, session.user.id);
+  return siteEditorAllowed(session.user.email, session.profile?.role === "admin", planSlug);
+}
 
 // Folhas de estilo locais (/_next/static/…) morrem a cada redeploy —
 // o doc capturado fica autossuficiente com o CSS embutido. Links
@@ -58,8 +66,8 @@ export async function GET(
   const { slug } = await params;
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
-  if (!siteEditorAllowed(session.user.email, session.profile?.role === "admin")) {
-    return NextResponse.json({ error: "O editor de sites chega em breve pra todos." }, { status: 403 });
+  if (!(await editorGate(session))) {
+    return NextResponse.json({ error: "O editor de sites está nos planos Pro e King." }, { status: 403 });
   }
 
   const site = await loadEditableSite(slug, session.user.id, session.profile?.role === "admin");
@@ -96,8 +104,8 @@ export async function POST(
   }
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
-  if (!siteEditorAllowed(session.user.email, session.profile?.role === "admin")) {
-    return NextResponse.json({ error: "O editor de sites chega em breve pra todos." }, { status: 403 });
+  if (!(await editorGate(session))) {
+    return NextResponse.json({ error: "O editor de sites está nos planos Pro e King." }, { status: 403 });
   }
 
   const parsed = saveSchema.safeParse(await request.json().catch(() => null));
@@ -156,8 +164,8 @@ export async function DELETE(
   }
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
-  if (!siteEditorAllowed(session.user.email, session.profile?.role === "admin")) {
-    return NextResponse.json({ error: "O editor de sites chega em breve pra todos." }, { status: 403 });
+  if (!(await editorGate(session))) {
+    return NextResponse.json({ error: "O editor de sites está nos planos Pro e King." }, { status: 403 });
   }
 
   const site = await loadEditableSite(slug, session.user.id, session.profile?.role === "admin");

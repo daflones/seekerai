@@ -70,16 +70,29 @@ try {
   };
   const dono = await mkUser(`devin-edit-dono-${TS}@seekerai.digital`);
   const bloqueado = await mkUser(`devin-edit-bloq-${TS}@seekerai.digital`);
-  users.push(dono, bloqueado);
+  const essencial = await mkUser(`devin-edit-ess-${TS}@seekerai.digital`);
+  const pro = await mkUser(`devin-edit-pro-${TS}@seekerai.digital`);
+  users.push(dono, bloqueado, essencial, pro);
   // Intruso usa o e-mail beta real (não-admin): se a conta já existir,
   // só reusa pra sessão — e não apaga no cleanup.
   const list = await (await fetch(`${SUPA}/auth/v1/admin/users?per_page=500`, { headers: svc })).json();
   const existing = (list.users ?? []).find((x) => x.email === BETA_EMAIL);
   const intruso = existing ? { id: existing.id, email: BETA_EMAIL, keep: true } : await mkUser(BETA_EMAIL);
   if (!existing) users.push(intruso);
-  // Dono vira admin pra passar no beta fechado (intruso passa pelo e-mail).
+  // Dono vira admin pra passar no gate (intruso passa pelo e-mail beta).
   await rest(`profiles?id=eq.${dono.id}`, { method: "PATCH", body: JSON.stringify({ role: "admin" }) });
-  ok("usuários criados", Boolean(dono?.id && intruso?.id && bloqueado?.id));
+  // Assinaturas ativas: essencial deve seguir bloqueado, pro deve liberar.
+  const planos = await (await rest("plans?slug=in.(essencial,pro)&select=id,slug")).json();
+  const pid = (s) => planos?.find((p) => p.slug === s)?.id;
+  if (pid("essencial") && essencial?.id) {
+    await rest("subscriptions", { method: "POST", body: JSON.stringify(
+      { user_id: essencial.id, plan_id: pid("essencial"), provider: "e2e", status: "active" }) });
+  }
+  if (pid("pro") && pro?.id) {
+    await rest("subscriptions", { method: "POST", body: JSON.stringify(
+      { user_id: pro.id, plan_id: pid("pro"), provider: "e2e", status: "active" }) });
+  }
+  ok("usuários criados", Boolean(dono?.id && intruso?.id && bloqueado?.id && essencial?.id && pro?.id && pid("pro")));
 
   /* ---------- 2. Site custom do dono ---------- */
   await rest("sites", {
@@ -114,6 +127,8 @@ try {
   const cookieDono = await sessionCookie(dono.email);
   const cookieIntruso = await sessionCookie(intruso.email);
   const cookieBloq = await sessionCookie(bloqueado.email);
+  const cookieEss = await sessionCookie(essencial.email);
+  const cookiePro = await sessionCookie(pro.email);
   ok("sessão do dono via /auth/confirm", Boolean(cookieDono));
   ok("sessão do intruso", Boolean(cookieIntruso));
 
@@ -134,6 +149,12 @@ try {
   ok("POST usuário comum → 403 em breve", bloqPost.status === 403, `status ${bloqPost.status}`);
   const invade = await api(`/api/sites/${SLUG}/edit`, cookieIntruso);
   ok("GET intruso beta → 404", invade.status === 404, `status ${invade.status}`);
+  // Matriz de planos: essencial com assinatura ativa segue bloqueado (403);
+  // pro passa o gate e cai no ownership (404 — o site não é dele).
+  const ess = await api(`/api/sites/${SLUG}/edit`, cookieEss);
+  ok("GET plano essencial → 403", ess.status === 403, `status ${ess.status}`);
+  const proGet = await api(`/api/sites/${SLUG}/edit`, cookiePro);
+  ok("GET plano pro → 404 (gate ok, não é dono)", proGet.status === 404, `status ${proGet.status}`);
 
   /* ---------- 7. POST salva edição ---------- */
   const post = await api(`/api/sites/${SLUG}/edit`, cookieDono, {
