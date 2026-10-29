@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Hourglass, Loader2, MessageCircle, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, ChevronLeft, ChevronRight, Hourglass, Loader2, MessageCircle, XCircle } from "lucide-react";
 import { TicketChat, TICKET_STATUS_LABEL } from "@/components/ticket-chat";
 import type { TicketRow } from "@/components/support-center";
 
@@ -57,6 +57,23 @@ export function AdminChamados({ tickets: initial }: { tickets: TicketRow[] }) {
     setTickets((l) => l.map((t) => (t.id === id ? { ...t, status } : t)));
   }
 
+  // Devolve o chamado pra IA — ela retoma com o histórico inteiro,
+  // incluindo as mensagens que o humano mandou.
+  async function handToIa(id: string) {
+    if (busyStatus) return;
+    setBusyStatus(`${id}:ia`);
+    setError("");
+    const res = await fetch(`/api/admin/tickets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ atendente: "ia" }),
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => null) : null;
+    setBusyStatus(null);
+    if (!res?.ok) { setError(data?.error ?? "Não foi possível atualizar."); return; }
+    setTickets((l) => l.map((t) => (t.id === id ? { ...t, atendente: "ia", status: "em_andamento" } : t)));
+  }
+
   return <>
     <div className="chamados-filters">
       {FILTROS.map(([key, label]) => (
@@ -96,6 +113,15 @@ export function AdminChamados({ tickets: initial }: { tickets: TicketRow[] }) {
                     {TICKET_STATUS_LABEL[s]}
                   </button>
                 ))}
+                {t.atendente !== "ia" && (
+                  <button type="button" className="status-btn status-ia"
+                    disabled={busyStatus !== null}
+                    title="A IA retoma o atendimento com o histórico completo da conversa"
+                    onClick={() => void handToIa(t.id)}>
+                    {busyStatus === `${t.id}:ia` ? <Loader2 size={13} className="spin" /> : <Bot size={13} />}
+                    Devolver pra IA
+                  </button>
+                )}
               </div>
               <TicketChat ticketId={t.id} status={t.status} onStatus={(s) => setTickets((l) => l.map((x) => (x.id === t.id ? { ...x, status: s } : x)))} />
             </div>

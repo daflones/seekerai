@@ -2,9 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
+import { triggerSupportAgent } from "@/lib/support/agent";
 
 const schema = z.object({
-  status: z.enum(["aberto", "em_andamento", "pendente", "resolvido", "cancelado", "expirado"]),
+  status: z.enum(["aberto", "em_andamento", "pendente", "resolvido", "cancelado", "expirado"]).optional(),
+  // Devolve o atendimento pra IA: ela volta a responder usando todo o
+  // histórico do chamado (inclusive o que o humano disse).
+  atendente: z.enum(["admin", "ia"]).optional(),
 });
 
 // Muda o status do chamado (somente admin).
@@ -27,12 +31,20 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   }
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Status inválido." }, { status: 400 });
+  if (!parsed.success || (!parsed.data.status && !parsed.data.atendente)) {
+    return NextResponse.json({ error: "Status inválido." }, { status: 400 });
+  }
 
+  const handBackToIa = parsed.data.atendente === "ia";
   const { error } = await session.supabase
     .from("support_tickets")
-    .update({ status: parsed.data.status, atendente: "admin" })
+    .update(handBackToIa
+      ? { atendente: "ia", status: "em_andamento" }
+      : { ...(parsed.data.status ? { status: parsed.data.status } : {}), atendente: "admin" })
     .eq("id", id);
   if (error) return NextResponse.json({ error: "Não foi possível atualizar o chamado." }, { status: 500 });
+  // Se a última palavra foi do cliente, a IA responde já; senão ela
+  // espera a próxima mensagem dele (a edge ignora se não for o caso).
+  if (handBackToIa) triggerSupportAgent(id);
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

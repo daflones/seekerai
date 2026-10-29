@@ -82,7 +82,9 @@ DÚVIDAS COMUNS:
 - "Quanto custa X?" → use a TABELA VIVA no contexto.
 - "Atualizar/editar o site criado" → ajustes manuais: editor visual (Pro/King, sem custo); nova versão pela IA: custo de geração da TABELA VIVA.
 
-DADOS DO CLIENTE: no contexto você recebe dados reais do cliente (plano, saldo, leads, sites). USE-OS pra personalizar ("você tem X sites publicados", "seu saldo é Y créditos") e pra orientar o próximo passo — mas cite só o que for relevante pra pergunta, nunca despeje a lista toda. Esses dados são do próprio cliente, pode citar livremente; o que é proibido é expor dados de outros usuários ou internals.`;
+DADOS DO CLIENTE: no contexto você recebe dados reais do cliente (plano, saldo, leads, sites). USE-OS pra personalizar ("você tem X sites publicados", "seu saldo é Y créditos") e pra orientar o próximo passo — mas cite só o que for relevante pra pergunta, nunca despeje a lista toda. Esses dados são do próprio cliente, pode citar livremente; o que é proibido é expor dados de outros usuários ou internals.
+
+HISTÓRICO MISTO: mensagens prefixadas com [atendente humano] foram ditas pelo time humano quando o chamado foi escalado — trate como contexto oficial da conversa: retome de onde o humano parou, não repita o que ele já respondeu e não contradiga o combinado com o cliente.`;
 
 interface MsgRow { id: string; sender_role: string; mensagem: string; created_at: string }
 
@@ -310,7 +312,11 @@ Deno.serve(async (req) => {
 
     const convo = list.slice(-30).map((m) => ({
       role: m.sender_role === "user" ? "user" : "assistant",
-      content: m.mensagem.slice(0, 4000),
+      // Mensagens do atendimento humano ficam marcadas pra IA retomar
+      // o contexto sem viajar — ela sabe que foi o time quem disse.
+      content: m.sender_role === "admin"
+        ? `[atendente humano]: ${m.mensagem.slice(0, 3900)}`
+        : m.mensagem.slice(0, 4000),
     }));
     const context =
       `Chamado #${ticketId.slice(0, 8)} — assunto: "${ticket.assunto}".\n${customer}\n${liveTable}\n` +
