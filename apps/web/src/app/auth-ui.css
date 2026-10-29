@@ -470,6 +470,9 @@ a.lead-action { text-decoration: none; }
 .adm-tag-pending { background: #f59e0b1c; color: var(--warn); }
 .adm-tag-failed, .adm-tag-expired, .adm-tag-manual_review { background: #f871711c; color: var(--danger); }
 .adm-tag-manual_review { background: #f59e0b1c; color: var(--warn); }
+.adm-tag-refunded, .adm-tag-manual { background: #a879d11c; color: var(--violet-light); }
+.fin-count-extra { color: var(--cyan); font-weight: 700; }
+.fin-rev-chart { margin-bottom: 16px; }
 
 .adm-tools { display: flex; flex-direction: column; gap: 10px; }
 .adm-tools-bar { display: flex; flex-wrap: wrap; gap: 7px; }
