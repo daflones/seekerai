@@ -25,6 +25,15 @@ const COLORS = ["violet", "cyan", "amber"] as const;
 const initials = (nome: string | null) =>
   (nome ?? "?").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
+// Prévia do domínio que o usuário pode criar pro negócio na conta.
+const domainPreview = (nome: string | null) => {
+  const slug = (nome ?? "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    .slice(0, 30).replace(/-+$/g, "");
+  return `${slug || "seu-negocio"}.com.br`;
+};
+
 export function ProductDemo({ full = false, loc, t }: {
   full?: boolean;
   loc?: Locale;
@@ -187,6 +196,7 @@ export function ProductDemo({ full = false, loc, t }: {
                   <div className="opportunity"><span><i /> {tt.strong}</span><strong>{lead.score}<small>/100</small></strong></div>
                   <div className="lead-signals"><span><Globe size={12} />{siteLabel(lead)}</span><span><MapPin size={12} />{tt.local}</span></div>
                   <div className="lead-signals lead-masked"><span><MessageCircle size={12} />{lead.whatsapp ?? "—"}</span><span><Instagram size={12} />{lead.instagram ?? "—"}</span><Lock size={11} /></div>
+                  <div className="lead-domain"><Globe size={12} /><strong>{domainPreview(lead.nome)}</strong><em>{tt.domLbl}</em></div>
                   <button className="lead-action" onClick={() => { setActive(lead); setCopied(false); setCopyError(false); }}>{tt.view} <ArrowRight size={14} /></button>
                 </article>
               );
