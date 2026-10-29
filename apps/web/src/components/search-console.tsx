@@ -63,6 +63,7 @@ export function SearchConsole({
   canSearch = true,
   subscribed = true,
   freeSearchesLeft = null,
+  dailyActive = true,
   t = getMessages("pt").seek,
   loc,
 }: {
@@ -70,6 +71,7 @@ export function SearchConsole({
   canSearch?: boolean;
   subscribed?: boolean;
   freeSearchesLeft?: number | null;
+  dailyActive?: boolean;
   t?: Messages["seek"];
   loc?: Locale;
 }) {
@@ -414,7 +416,9 @@ export function SearchConsole({
     </form>
 
     {canSearch && freeSearchesLeft !== null && <p className="seek-meta seek-free-left" role="note">
-      {freeSearchesLeft === 1 ? t.freeLast : `${freeSearchesLeft} ${t.freeLeft}`}
+      {freeSearchesLeft === 1
+        ? (dailyActive ? t.freeLast : `${freeSearchesLeft} ${t.freeLeftExp}`)
+        : `${freeSearchesLeft} ${dailyActive ? t.freeLeft : t.freeLeftExp}`}
     </p>}
 
     {upgradeOpen && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={t.tutT}
@@ -424,8 +428,8 @@ export function SearchConsole({
         <div className="seek-locked" role="note">
           <Lock size={18} />
           <div>
-            <strong>{t.lockedT}</strong>
-            <p>{t.lockedP}</p>
+            <strong>{dailyActive ? t.lockedT : t.lockedExpT}</strong>
+            <p>{dailyActive ? t.lockedP : t.lockedExpP}</p>
           </div>
         </div>
         <div className="seek-tut">
@@ -477,7 +481,7 @@ export function SearchConsole({
     </div>}
 
     {error && (isCreditsError(error)
-      ? <OutOfCredits lang={locale.lang} trial={!subscribed} />
+      ? <OutOfCredits lang={locale.lang} trial={!subscribed} expired={!subscribed && !dailyActive} />
       : <p role="alert" className="auth-error">{error}</p>)}
 
     {meta && results !== null && !busy && <p className="seek-meta">

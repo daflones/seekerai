@@ -28,7 +28,7 @@ const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
   novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
 };
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, senderName = null, currency = "brl", lang = "pt", trial = false, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, senderName = null, currency = "brl", lang = "pt", trial = false, dailyActive = true, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
@@ -40,6 +40,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   currency?: Currency;
   lang?: Lang;
   trial?: boolean;
+  dailyActive?: boolean;
   t?: Messages["lead"];
   statusLabels?: Record<string, string>;
 }) {
@@ -432,7 +433,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </section>
 
     {error && (isCreditsError(error)
-      ? <OutOfCredits lang={lang} trial={trial} />
+      ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
       : <p role="alert" className="auth-error">{error}</p>)}
     {notice && <p role="status" className="editor-saved"><Sparkles size={14} />{notice}</p>}
 

@@ -17,13 +17,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const [{ supabase, user }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang);
-  const [{ data: lead }, { data: outputs }, { data: services }, { data: profile }, { data: subs }] = await Promise.all([
+  const [{ data: lead }, { data: outputs }, { data: services }, { data: profile }, { data: subs }, { data: daily }] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
     supabase.from("lead_outputs").select("id,tipo,conteudo,modelo,created_at")
       .eq("lead_id", id).order("created_at", { ascending: false }),
     supabase.from("services_catalog").select("slug,nome,enabled_actions"),
     supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
     supabase.from("subscriptions").select("status").eq("user_id", user.id).eq("status", "active").limit(1),
+    supabase.rpc("claim_daily_credits"),
   ]);
   if (!lead) notFound();
 
@@ -54,6 +55,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       currency={loc.currency}
       lang={loc.lang}
       trial={!(subs ?? []).length}
+      dailyActive={(daily as { ativo?: boolean } | null)?.ativo !== false}
       t={t.lead}
       statusLabels={t.leadsPage.status}
     />

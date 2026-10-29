@@ -37,7 +37,7 @@ function guessName(prompt: string): string {
   return clean.length > 60 ? `${clean.slice(0, 57)}…` : clean;
 }
 
-export function StudioStudio({ t, lang = "pt", trial = false }: { t: T; lang?: string; trial?: boolean }) {
+export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true }: { t: T; lang?: string; trial?: boolean; dailyActive?: boolean }) {
   const [target, setTarget] = useState<Target>("web");
   const [prompt, setPrompt] = useState("");
   const [refs, setRefs] = useState<Ref[]>([]);
@@ -263,7 +263,7 @@ export function StudioStudio({ t, lang = "pt", trial = false }: { t: T; lang?: s
       {uploading && <p className="st-note"><Loader2 size={13} className="spin" /> {t.uploading}</p>}
       {running && <p className="st-note"><Loader2 size={13} className="spin" /> {t.runningStatus}</p>}
       {error && (isCreditsError(error)
-        ? <OutOfCredits lang={lang} trial={trial} />
+        ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
         : <p className="st-err" role="alert">{error}</p>)}
     </div>
 

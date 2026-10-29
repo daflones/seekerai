@@ -16,8 +16,10 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  // Cota diária de quem nunca pagou: completa até 13 antes de exibir.
-  await supabase.rpc("claim_daily_credits");
+  // Cota diária de quem não tem plano: completa até 13 dentro da
+  // janela de 7 dias. 'ativo' diz se a renovação ainda está valendo.
+  const { data: daily } = await supabase.rpc("claim_daily_credits");
+  const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
   const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),
@@ -60,7 +62,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
         <span className="stat-icon"><CircleDollarSign size={18} /></span>
         <small>{t.s1l}</small>
         <strong>{wallet?.saldo ?? 0}</strong>
-        <span className="stat-sub">{assinatura ? t.s1subOn : t.s1subOff}</span>
+        <span className="stat-sub">{assinatura ? t.s1subOn : dailyActive ? t.s1subOff : t.s1subOffExp}</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><Users size={18} /></span>
