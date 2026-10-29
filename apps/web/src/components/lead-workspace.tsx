@@ -173,7 +173,6 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setError(data?.error ?? t.errNoContent);
       return;
     }
-    setNotice(t.siteRunning);
     pollSiteJob(data.jobId);
   }
 
@@ -423,7 +422,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={isBusy("deep_strategy")}
         onClick={() => void generate("deep_strategy")}>
         {isBusy("deep_strategy") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-        {t.actStrategy}
+        {isBusy("deep_strategy") ? t.actStrategyBusy : t.actStrategy}
       </button>}
       <button type="button" className="button button-glass button-small lead-delete" disabled={isBusy("delete")}
         onClick={() => void removeLead()}>
@@ -458,6 +457,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
                 <a className="button button-glass button-small" href={siteHref} target="_blank" rel="noopener noreferrer">
                   <ExternalLink size={14} />{`/site/${siteSlug}`}
                 </a>
+                <a className="button button-glass button-small" href="/app/dominios">
+                  <Globe size={14} />Domínio próprio
+                </a>
                 <button type="button" className="button button-glass button-small lead-site-power"
                   disabled={siteToggleBusy} onClick={() => void toggleSite()}>
                   {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
@@ -481,7 +483,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
             <button type="button" className="button button-primary button-small" disabled={isBusy("generate_site")}
               onClick={() => void generateSite()}>
               {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}
-              {t.actSite}
+              {isBusy("generate_site") ? t.actSiteBusy : t.actSite}
             </button>
             {isBusy("generate_site") && <small className="lead-step-wait">{t.siteRunning}</small>}
           </div>}
@@ -512,7 +514,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               <button type="button" className="button button-primary button-small" disabled={isBusy("sales_reply")}
                 onClick={() => generateOutreach()}>
                 {isBusy("sales_reply") ? <Loader2 size={14} className="spin" /> : <MessageSquareText size={14} />}
-                {t.msgGen}
+                {isBusy("sales_reply") ? t.msgGenBusy : t.msgGen}
               </button>
             </div>}
         </li>
@@ -529,7 +531,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               disabled={isBusy("generate_image")}
               onClick={() => void generateImage("generate_image", `post de WhatsApp divulgando o novo site de ${lead.nome}`)}>
               {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
-              {t.imgSupport}
+              {isBusy("generate_image") ? t.imgGenBusy : t.imgSupport}
             </button>
             <div className="lead-image-row">
               <input
@@ -542,12 +544,12 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               <button type="button" className="button button-glass button-small" disabled={isBusy("image_prompt") || !imagePrompt.trim()}
                 onClick={() => void generateImage("image_prompt")}>
                 {isBusy("image_prompt") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-                {t.imgPrompt}
+                {isBusy("image_prompt") ? t.imgPromptBusy : t.imgPrompt}
               </button>
               <button type="button" className="button button-glass button-small" disabled={isBusy("generate_image") || !imagePrompt.trim()}
                 onClick={() => void generateImage()}>
                 {isBusy("generate_image") ? <Loader2 size={14} className="spin" /> : <ImagePlus size={14} />}
-                {t.imgGen}
+                {isBusy("generate_image") ? t.imgGenBusy : t.imgGen}
               </button>
             </div>
             {latestImage && <div className="lead-output-image lead-step-image">
