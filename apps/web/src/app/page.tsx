@@ -5,6 +5,7 @@ import { Navigation } from "@/components/navigation";
 import { Pricing } from "@/components/pricing";
 import { ProductDemo } from "@/components/product-demo";
 import { publicPlanCards } from "@/lib/plans/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatPlanPrice } from "@/lib/plans/model";
 import { formatMoney, INTL_PRICES } from "@/lib/i18n/shared";
 import { getLocale, getTheme } from "@/lib/i18n";
@@ -24,6 +25,13 @@ export default async function Home() {
   const t = getMessages(loc.lang);
   const h = t.home;
   const pricing = await publicPlanCards();
+  // Desconto de primeira compra — na landing todo mundo é visitante
+  // (logado vai pro /app), então a promoção aparece para todos.
+  const { data: discRow } = await createSupabaseAdminClient()
+    .from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle();
+  const discountPct = Math.min(90, Math.max(0, Math.trunc(Number(discRow?.value ?? 0)) || 0));
+  const disc = (cents: number) =>
+    discountPct > 0 ? Math.max(100, Math.round(cents * (100 - discountPct) / 100)) : cents;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -109,7 +117,7 @@ export default async function Home() {
 
         <section className="section toolkit-section light-section"><div className="container"><div className="section-heading centered"><span className="eyebrow">{h.teyebrow}</span><h2>{h.ttitleA}<br /><span className="muted-heading">{h.ttitleB}</span></h2></div><div className="toolkit-grid">{[{ icon: Search, title: h.tk1t, text: h.tk1p }, { icon: Radar, title: h.tk2t, text: h.tk2p }, { icon: MessageCircle, title: h.tk3t, text: h.tk3p }, { icon: AudioLines, title: h.tk4t, text: h.tk4p }, { icon: Bookmark, title: h.tk5t, text: h.tk5p }, { icon: Globe, title: h.tk6t, text: h.tk6p }].map(({ icon: Icon, title, text }) => <article key={title}><span><Icon size={21} /></span><h3>{title}</h3><p>{text}</p></article>)}</div><p className="roadmap-footnote">{h.tfoot}</p></div></section>
 
-        <div className="container"><Pricing plans={pricing.plans} source={pricing.source} locale={loc} t={t.pricing} /></div>
+        <div className="container"><Pricing plans={pricing.plans} source={pricing.source} locale={loc} t={t.pricing} discountPct={discountPct} /></div>
 
         <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">{h.faqeyebrow}</span><h2>{h.faqtitleA}<br />{h.faqtitleB}</h2><p>{h.faqp}</p></div><div className="faq-list">{h.faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
 
@@ -124,9 +132,13 @@ export default async function Home() {
                   className={`cta-plan${plan.featured ? " is-featured" : ""}`}>
                   <strong>{plan.name}</strong>
                   <span className="cta-plan-price">
+                    {plan.priceCents > 0 && discountPct > 0 &&
+                      <s className="cta-plan-was">{loc.isBrazil
+                        ? `R$ ${formatPlanPrice(plan.priceCents)}`
+                        : formatMoney(INTL_PRICES[plan.slug] ?? plan.priceCents, loc.currency, loc.lang)}</s>}
                     {loc.isBrazil
-                      ? <>R$ {formatPlanPrice(plan.priceCents)}</>
-                      : formatMoney(INTL_PRICES[plan.slug] ?? plan.priceCents, loc.currency, loc.lang)}
+                      ? <>R$ {formatPlanPrice(disc(plan.priceCents))}</>
+                      : formatMoney(disc(INTL_PRICES[plan.slug] ?? plan.priceCents), loc.currency, loc.lang)}
                     <small>{t.pricing.perMonth}</small>
                   </span>
                   <em>{plan.content.cta} <ArrowUpRight size={13} /></em>

@@ -16,6 +16,9 @@
 .plan-card .plan-price { margin-block: 15px 13px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; font-size: clamp(32px, 3.1vw, 43px); font-weight: 600; letter-spacing: -.07em; line-height: 1.1; color: inherit; }
 .plan-card .plan-price > span { font-size: 13px; color: var(--plan-accent); letter-spacing: -.02em; margin-right: 2px; }
 .plan-card .plan-price > small { color: var(--plan-dim); font-size: 8px; font-weight: 400; margin-left: 1px; letter-spacing: 0; }
+.plan-card .plan-price-was { font-size: 16px; font-weight: 400; color: var(--plan-dim); letter-spacing: 0; margin-right: 3px; }
+.plan-card .plan-off-tag { display: inline-flex; width: fit-content; margin: -4px 0 8px; padding: 4px 10px; font-size: 8px; font-weight: 750; letter-spacing: .07em; color: var(--plan-accent); background: #ffffff0d; border: 1px solid var(--plan-line); border-radius: 99px; }
+.cta-plan-price s.cta-plan-was, .cta-plan-price .cta-plan-was { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-right: 5px; }
 .plan-card .plan-description { min-height: 47px; margin-top: 0; font-size: 11px; line-height: 1.85; color: var(--plan-dim); }
 .plan-card .plan-divider { background: var(--plan-line); margin-block: 20px 21px; }
 .plan-card ul { display: grid; gap: 15px; margin: 0; }
