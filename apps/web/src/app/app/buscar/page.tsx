@@ -13,14 +13,20 @@ export default async function BuscarPage() {
     requireSession("/app/buscar"), getLocale(),
   ]);
   const t = getMessages(loc.lang).seek;
-  const [{ data: services }, { data: subs }] = await Promise.all([
+  const [{ data: services }, { data: subs }, { data: wallet }] = await Promise.all([
     supabase.from("services_catalog").select("slug,nome,categoria").eq("ativo", true).order("nome"),
     supabase.from("subscriptions").select("status").eq("user_id", user.id)
       .in("status", ["active"]).limit(1),
+    supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
   ]);
   const subscribed = Boolean(subs?.length);
-  // Plano grátis: sem busca — o console mostra o box de assinatura.
-  const canSearch = profile.role === "admin" || subscribed;
+  const saldo = wallet?.saldo ?? 0;
+  // Trial: créditos de boas-vindas liberam a busca — a edge cobra
+  // 4 créditos por pesquisa. Saldo 0 → o console abre o upsell.
+  const canSearch = profile.role === "admin" || subscribed || saldo > 0;
+  const freeSearchesLeft = profile.role === "admin" || subscribed
+    ? null
+    : Math.floor(saldo / 4);
 
   return <>
     <span className="eyebrow">{t.eyebrow}</span>
@@ -29,6 +35,7 @@ export default async function BuscarPage() {
     <SearchConsole
       services={((services ?? []) as { slug: string; nome: string; categoria: string }[])
         .map((s) => ({ slug: s.slug, nome: serviceName(s.slug, s.nome, loc.lang), categoria: serviceCategory(s.categoria, loc.lang) }))}
-      canSearch={canSearch} loc={loc} t={t} />
+      canSearch={canSearch} subscribed={subscribed} freeSearchesLeft={freeSearchesLeft}
+      loc={loc} t={t} />
   </>;
 }

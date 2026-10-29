@@ -148,6 +148,9 @@ const pt = {
     noCreditsT: "Seus créditos acabaram",
     noCreditsP: "Compre uma recarga pra continuar agora ou aguarde a renovação do seu plano.",
     noCreditsCta: "Comprar créditos",
+    trialDoneT: "Gostou? Assine o plano!",
+    trialDoneP: "Seus créditos de boas-vindas acabaram. Com um plano você continua buscando clientes, gerando sites e mensagens no seu ritmo.",
+    trialDoneCta: "Ver planos e assinar",
   },
   dash: {
     eyebrow: "SEU RADAR DE VENDAS", welcome: "Bem-vindo", welcomeFallback: "vamos começar",
@@ -656,6 +659,9 @@ export const messages: Record<Lang, Messages> = {
       noCreditsT: "You're out of credits",
       noCreditsP: "Buy a top-up to keep going now or wait for your plan to renew.",
       noCreditsCta: "Buy credits",
+      trialDoneT: "Liked it? Subscribe to a plan!",
+      trialDoneP: "Your welcome credits are over. A plan keeps you searching for clients, generating sites and messages at your pace.",
+      trialDoneCta: "See plans and subscribe",
     },
     dash: {
       eyebrow: "YOUR SALES RADAR", welcome: "Welcome", welcomeFallback: "let's get started",
@@ -1159,6 +1165,9 @@ export const messages: Record<Lang, Messages> = {
       noCreditsT: "Se acabaron tus créditos",
       noCreditsP: "Compra una recarga para seguir ahora o espera la renovación de tu plan.",
       noCreditsCta: "Comprar créditos",
+      trialDoneT: "¿Te gustó? ¡Suscríbete a un plan!",
+      trialDoneP: "Se acabaron tus créditos de bienvenida. Con un plan sigues buscando clientes, generando sitios y mensajes a tu ritmo.",
+      trialDoneCta: "Ver planes y suscribirme",
     },
     dash: {
       eyebrow: "TU RADAR DE VENTAS", welcome: "Bienvenido", welcomeFallback: "empecemos",
@@ -1662,6 +1671,9 @@ export const messages: Record<Lang, Messages> = {
       noCreditsT: "Vos crédits sont épuisés",
       noCreditsP: "Achetez une recharge pour continuer maintenant ou attendez le renouvellement de votre offre.",
       noCreditsCta: "Acheter des crédits",
+      trialDoneT: "Ça vous a plu ? Abonnez-vous à une offre !",
+      trialDoneP: "Vos crédits de bienvenue sont épuisés. Une offre débloque recherches, sites et messages à votre rythme.",
+      trialDoneCta: "Voir les offres",
     },
     dash: {
       eyebrow: "VOTRE RADAR COMMERCIAL", welcome: "Bienvenue", welcomeFallback: "commençons",
@@ -2164,6 +2176,9 @@ export const messages: Record<Lang, Messages> = {
       noCreditsT: "Ihre Credits sind aufgebraucht",
       noCreditsP: "Kaufen Sie ein Aufladepaket, um sofort weiterzumachen, oder warten Sie auf die Tarifverlängerung.",
       noCreditsCta: "Credits kaufen",
+      trialDoneT: "Gefällt's? Abo abschließen!",
+      trialDoneP: "Deine Willkommens-Credits sind aufgebraucht. Mit einem Tarif suchst du weiter nach Kunden, Sites und Nachrichten in deinem Tempo.",
+      trialDoneCta: "Tarife ansehen",
     },
     dash: {
       eyebrow: "DEIN VERTRIEBS-RADAR", welcome: "Willkommen", welcomeFallback: "leg los",
@@ -2666,6 +2681,9 @@ export const messages: Record<Lang, Messages> = {
       noCreditsT: "I tuoi crediti sono finiti",
       noCreditsP: "Compra una ricarica per continuare subito o attendi il rinnovo del piano.",
       noCreditsCta: "Compra crediti",
+      trialDoneT: "Ti è piaciuto? Abbonati a un piano!",
+      trialDoneP: "I tuoi crediti di benvenuto sono finiti. Con un piano continui con ricerche, siti e messaggi al tuo ritmo.",
+      trialDoneCta: "Vedi i piani",
     },
     dash: {
       eyebrow: "IL TUO RADAR DI VENDITA", welcome: "Benvenuto", welcomeFallback: "iniziamo",

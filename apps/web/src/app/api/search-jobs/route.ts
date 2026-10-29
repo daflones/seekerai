@@ -95,16 +95,22 @@ export async function POST(request: NextRequest) {
   if (!profile?.consentimento_em || !profile.onboarding_concluido) {
     return NextResponse.json({ error: "Conclua seu cadastro antes." }, { status: 403 });
   }
-  // Busca real exige assinatura ativa — plano grátis não busca.
+  // Busca real: assinatura ativa ou saldo (créditos de boas-vindas
+  // liberam o trial). Sem saldo a edge nem é chamada — aqui já devolve
+  // erro de créditos pra UI mostrar o upsell "Gostou? Assine!".
   // Admin burla (replay/testes).
   if (profile.role !== "admin") {
     const { data: sub } = await session.supabase.from("subscriptions").select("status")
       .eq("user_id", session.user.id).eq("status", "active").maybeSingle();
     if (!sub) {
-      return NextResponse.json(
-        { error: "Assine um plano para usar o radar de oportunidades." },
-        { status: 403 },
-      );
+      const { data: wallet } = await session.supabase.from("credit_wallets")
+        .select("saldo").eq("user_id", session.user.id).maybeSingle();
+      if (!wallet || wallet.saldo <= 0) {
+        return NextResponse.json(
+          { error: "Créditos insuficientes — seus créditos grátis acabaram. Assine um plano para continuar usando o radar." },
+          { status: 403 },
+        );
+      }
     }
   }
 

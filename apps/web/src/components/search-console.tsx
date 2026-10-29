@@ -61,12 +61,14 @@ function siteCheckBadge(check: NonNullable<PlaceResult["siteCheck"]>, t: Message
 export function SearchConsole({
   services,
   canSearch = true,
+  subscribed = true,
   freeSearchesLeft = null,
   t = getMessages("pt").seek,
   loc,
 }: {
   services: { slug: string; nome: string; categoria: string }[];
   canSearch?: boolean;
+  subscribed?: boolean;
   freeSearchesLeft?: number | null;
   t?: Messages["seek"];
   loc?: Locale;
@@ -475,7 +477,7 @@ export function SearchConsole({
     </div>}
 
     {error && (isCreditsError(error)
-      ? <OutOfCredits lang={locale.lang} />
+      ? <OutOfCredits lang={locale.lang} trial={!subscribed} />
       : <p role="alert" className="auth-error">{error}</p>)}
 
     {meta && results !== null && !busy && <p className="seek-meta">

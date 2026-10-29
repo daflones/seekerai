@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Busca real: 2 grátis no plano gratuito; depois exige assinatura ativa.
+  // Busca real: assinatura ativa ou saldo (créditos de boas-vindas
+  // liberam o trial — a edge cobra 4 créditos por busca).
   // Admin (donos) burla para replay/testes.
   if (parsed.data.funcao === "places-search" && profile.role !== "admin") {
     const { data: sub } = await session.supabase
@@ -61,15 +62,14 @@ export async function POST(request: NextRequest) {
       .in("status", ["active"])
       .maybeSingle();
     if (!sub) {
-      const { count } = await session.supabase
-        .from("credit_operations")
-        .select("id", { count: "exact", head: true })
+      const { data: wallet } = await session.supabase
+        .from("credit_wallets")
+        .select("saldo")
         .eq("user_id", session.user.id)
-        .eq("action", "search")
-        .in("status", ["reserved", "completed"]);
-      if ((count ?? 0) >= 2) {
+        .maybeSingle();
+      if (!wallet || wallet.saldo <= 0) {
         return NextResponse.json(
-          { error: "Suas 2 buscas gratuitas acabaram. Assine um plano para continuar usando o radar." },
+          { error: "Créditos insuficientes — seus créditos grátis acabaram. Assine um plano para continuar usando o radar." },
           { status: 403 },
         );
       }
