@@ -139,7 +139,7 @@ const pt = {
   shell: {
     dashboard: "Painel", seek: "Buscar clientes", leads: "Meus leads",
     portfolio: "Portfólio", studio: "Estúdio", plans: "Planos e créditos", support: "Suporte",
-    creations: "Minhas criações",
+    creations: "Minhas criações", domains: "Domínios",
     credits: "Créditos", myAccount: "Minha conta", adminPanel: "Painel admin",
     backToApp: "Voltar ao app", logout: "Sair da conta", adminTag: "Administração",
     navAria: "Plataforma", mobileAria: "Navegação móvel",
@@ -643,7 +643,7 @@ export const messages: Record<Lang, Messages> = {
     shell: {
       dashboard: "Dashboard", seek: "Find clients", leads: "My leads",
       portfolio: "Portfolio", studio: "Studio", plans: "Plans & credits", support: "Support",
-      creations: "My creations",
+      creations: "My creations", domains: "Domains",
       credits: "Credits", myAccount: "My account", adminPanel: "Admin panel",
       backToApp: "Back to app", logout: "Sign out", adminTag: "Administration",
       navAria: "Platform", mobileAria: "Mobile navigation",
@@ -1142,7 +1142,7 @@ export const messages: Record<Lang, Messages> = {
     shell: {
       dashboard: "Panel", seek: "Buscar clientes", leads: "Mis leads",
       portfolio: "Portafolio", studio: "Estudio", plans: "Planes y créditos", support: "Soporte",
-      creations: "Mis creaciones",
+      creations: "Mis creaciones", domains: "Dominios",
       credits: "Créditos", myAccount: "Mi cuenta", adminPanel: "Panel admin",
       backToApp: "Volver a la app", logout: "Cerrar sesión", adminTag: "Administración",
       navAria: "Plataforma", mobileAria: "Navegación móvil",
@@ -1641,7 +1641,7 @@ export const messages: Record<Lang, Messages> = {
     shell: {
       dashboard: "Tableau de bord", seek: "Trouver des clients", leads: "Mes leads",
       portfolio: "Portfolio", studio: "Studio", plans: "Offres et crédits", support: "Support",
-      creations: "Mes créations",
+      creations: "Mes créations", domains: "Domaines",
       credits: "Crédits", myAccount: "Mon compte", adminPanel: "Panneau admin",
       backToApp: "Retour à l'app", logout: "Se déconnecter", adminTag: "Administration",
       navAria: "Plateforme", mobileAria: "Navigation mobile",
@@ -2139,7 +2139,7 @@ export const messages: Record<Lang, Messages> = {
     shell: {
       dashboard: "Übersicht", seek: "Kunden finden", leads: "Meine Leads",
       portfolio: "Portfolio", studio: "Studio", plans: "Tarife & Credits", support: "Support",
-      creations: "Meine Kreationen",
+      creations: "Meine Kreationen", domains: "Domains",
       credits: "Credits", myAccount: "Mein Konto", adminPanel: "Admin-Bereich",
       backToApp: "Zurück zur App", logout: "Abmelden", adminTag: "Verwaltung",
       navAria: "Plattform", mobileAria: "Mobile Navigation",
@@ -2637,7 +2637,7 @@ export const messages: Record<Lang, Messages> = {
     shell: {
       dashboard: "Pannello", seek: "Trova clienti", leads: "I miei lead",
       portfolio: "Portfolio", studio: "Studio", plans: "Piani e crediti", support: "Supporto",
-      creations: "Le mie creazioni",
+      creations: "Le mie creazioni", domains: "Domini",
       credits: "Crediti", myAccount: "Il mio account", adminPanel: "Pannello admin",
       backToApp: "Torna all'app", logout: "Esci", adminTag: "Amministrazione",
       navAria: "Piattaforma", mobileAria: "Navigazione mobile",

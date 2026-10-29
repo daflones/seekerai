@@ -19,7 +19,7 @@ async function doLogout() {
 const DEFAULT_T: Messages["shell"] = {
   dashboard: "Painel", seek: "Buscar clientes", leads: "Meus leads",
   portfolio: "Portfólio", studio: "Estúdio", plans: "Planos e créditos", support: "Suporte",
-  creations: "Minhas criações",
+  creations: "Minhas criações", domains: "Domínios",
   credits: "Créditos", myAccount: "Minha conta", adminPanel: "Painel admin",
   backToApp: "Voltar ao app", logout: "Sair da conta", adminTag: "Administração",
   navAria: "Plataforma", mobileAria: "Navegação móvel",
@@ -65,6 +65,7 @@ export function PrivateShell({
     { href: "/app/criar", label: t.studio, icon: Sparkles },
     { href: "/app/criacoes", label: t.creations, icon: Shapes },
     { href: "/app/portfolio", label: t.portfolio, icon: Images },
+    { href: "/app/dominios", label: t.domains, icon: Globe },
     { href: "/app/planos", label: t.plans, icon: CircleDollarSign },
     { href: "/app/suporte", label: t.support, icon: Headset },
   ];
