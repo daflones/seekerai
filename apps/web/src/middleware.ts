@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { authCookieOptions, supabasePublicConfig } from "./lib/auth/config";
+import { verifyAccessToken } from "./lib/auth/jwt";
 import { callbackOrigin } from "./lib/auth/validation";
 
 // Hosts que servem a própria plataforma — todo o resto é tratado como
@@ -67,8 +68,19 @@ export async function middleware(request: NextRequest) {
       },
     },
   });
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !user.email_confirmed_at) {
+  // Fast path: sessão do cookie + assinatura JWT local (sem rede na Auth API).
+  // getSession() refresha quando o token expirou — e aqui é o único lugar que
+  // consegue gravar os cookies novos na resposta.
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  let verified = false;
+  if (token && (await verifyAccessToken(token))) {
+    verified = !!session?.user?.email_confirmed_at;
+  } else {
+    const { data: { user } } = await supabase.auth.getUser();
+    verified = !!user?.email_confirmed_at;
+  }
+  if (!verified) {
     const incomingOrigin = `${request.nextUrl.protocol}//${request.headers.get("host") || request.nextUrl.host}`;
     const url = new URL("/login", callbackOrigin(incomingOrigin));
     if (path.startsWith("/app") || path.startsWith("/admin")) url.searchParams.set("next", path);
