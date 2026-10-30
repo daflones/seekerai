@@ -42,5 +42,5 @@ export async function POST(request: NextRequest) {
     revalidatePath("/cadastro");
     revalidatePath("/admin/planos");
     return NextResponse.json({ revision: plan.revision + 1, message: "Plano e card atualizados." }, { headers: { "Cache-Control": "no-store" } });
-  } catch { return NextResponse.json({ error: "Serviço indisponível. Tente novamente." }, { status: 503 }); }
+  } catch { return NextResponse.json({ error: "Serviço indisponível. Tente novamente." }, { status: 500 }); }
 }

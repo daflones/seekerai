@@ -12,15 +12,15 @@ export async function GET(request: NextRequest) {
   }
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "Fotos indisponíveis." }, { status: 503 });
+  if (!apiKey) return NextResponse.json({ error: "Fotos indisponíveis." }, { status: 500 });
 
   const res = await fetch(
     `https://places.googleapis.com/v1/${ref}/media?maxWidthPx=640&skipHttpRedirect=true&key=${apiKey}`,
     { signal: AbortSignal.timeout(15_000) },
   ).catch(() => null);
-  if (!res?.ok) return NextResponse.json({ error: "Foto indisponível." }, { status: 502 });
+  if (!res?.ok) return NextResponse.json({ error: "Foto indisponível." }, { status: 500 });
   const data = (await res.json().catch(() => null)) as { photoUri?: string } | null;
-  if (!data?.photoUri) return NextResponse.json({ error: "Foto indisponível." }, { status: 502 });
+  if (!data?.photoUri) return NextResponse.json({ error: "Foto indisponível." }, { status: 500 });
   return NextResponse.redirect(data.photoUri, {
     status: 302,
     headers: { "Cache-Control": "public, max-age=86400" },

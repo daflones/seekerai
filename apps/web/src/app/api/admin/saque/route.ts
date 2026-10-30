@@ -251,6 +251,6 @@ export async function POST(request: NextRequest) {
       : "MercosulPay indisponível no momento.";
     await admin.from("admin_withdrawals")
       .update({ status: "falhou", erro: msg }).eq("id", withdrawal.id);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

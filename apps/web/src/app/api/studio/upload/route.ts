@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     contentType: file.type, upsert: false,
   });
   if (error) {
-    return NextResponse.json({ error: "Falha no upload." }, { status: 502 });
+    return NextResponse.json({ error: "Falha no upload." }, { status: 500 });
   }
   const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
   return NextResponse.json({ url: data.publicUrl, kind: isVideo ? "video" : "image" });

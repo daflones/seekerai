@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
   if (!request.headers.get("content-type")?.includes("application/json")) return reply({ error: "Formato inválido." }, 415);
   const { action } = await context.params;
   if (!["login", "signup", "recover", "password", "onboarding", "logout"].includes(action)) return reply({ error: "Ação não encontrada." }, 404);
-  if (!authReady() && action !== "logout") return reply({ error: "A autenticação aguarda configuração segura do servidor. Tente novamente mais tarde." }, 503);
+  if (!authReady() && action !== "logout") return reply({ error: "A autenticação aguarda configuração segura do servidor. Tente novamente mais tarde." }, 500);
   try {
     const reader = request.body?.getReader();
     const decoder = new TextDecoder();
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       if (error || !data.user?.email_confirmed_at) return authError(error?.code);
       const { data: profile, error: profileError } = await supabase.from("profiles")
         .select("role,consentimento_em,onboarding_concluido").eq("id", data.user.id).single();
-      if (profileError || !profile) return reply({ error: "Conta autenticada, mas o perfil aguarda provisionamento. Contate o suporte." }, 503);
+      if (profileError || !profile) return reply({ error: "Conta autenticada, mas o perfil aguarda provisionamento. Contate o suporte." }, 500);
       let next = safeNext(input.next);
       if (profile.role === "admin" && next === "/app") next = "/admin";
       if (profile.role !== "admin" && (next === "/admin" || next.startsWith("/admin/"))) next = "/app";
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     if (error || !user?.email_confirmed_at) return reply({ error: "Sua sessão expirou. Entre novamente." }, 401);
     if (action === "logout") {
       const { error: logoutError } = await supabase.auth.signOut({ scope: "local" });
-      return logoutError ? reply({ error: "Não foi possível encerrar a sessão. Tente novamente." }, 503) : reply({ redirect: "/login" });
+      return logoutError ? reply({ error: "Não foi possível encerrar a sessão. Tente novamente." }, 500) : reply({ redirect: "/login" });
     }
 
     const input = action === "password" ? passwordSchema.parse(body) : onboardingSchema.parse(body);
@@ -126,10 +126,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     const { error: profileError } = await supabase.rpc("complete_own_profile", {
       p_name: input.name, p_phone: input.phone, p_accept_terms: input.terms, p_marketing: input.marketing,
     });
-    if (profileError) return reply({ error: "Não foi possível concluir o perfil. Tente novamente." }, 503);
+    if (profileError) return reply({ error: "Não foi possível concluir o perfil. Tente novamente." }, 500);
     return reply({ redirect: safeNext(input.next) });
   } catch (error) {
     if (error instanceof ZodError) return reply({ error: error.issues[0]?.message || "Confira os dados informados." }, 400);
-    return reply({ error: "Serviço temporariamente indisponível. Nenhuma informação sensível foi registrada." }, 503);
+    return reply({ error: "Serviço temporariamente indisponível. Nenhuma informação sensível foi registrada." }, 500);
   }
 }

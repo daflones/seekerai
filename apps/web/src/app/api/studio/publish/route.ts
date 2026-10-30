@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     config: buildConfig(project, session.user.id),
     publicado: true,
   });
-  if (error) return NextResponse.json({ error: "Falha ao publicar." }, { status: 502 });
+  if (error) return NextResponse.json({ error: "Falha ao publicar." }, { status: 500 });
 
   await admin.from("studio_projects")
     .update({ site_slug: slug, updated_at: new Date().toISOString() })

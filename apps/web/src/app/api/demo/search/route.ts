@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
   const admin = createSupabaseAdminClient();
   const sample = await cachedOrFresh(admin, SAMPLE_QUERY, "BR").catch(() => null);
   const site = await randomSite(admin).catch(() => null);
-  if (!sample) return NextResponse.json({ error: "Indisponível." }, { status: 503 });
+  if (!sample) return NextResponse.json({ error: "Indisponível." }, { status: 500 });
   return respond(sample.resultados.slice(0, 9), MAX_BUSCAS - readCount(request), site);
 }
 
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     .catch(() => null);
   const site = await randomSite(admin).catch(() => null);
   if (!found) {
-    return NextResponse.json({ error: "Busca indisponível agora. Tente mais tarde." }, { status: 503 });
+    return NextResponse.json({ error: "Busca indisponível agora. Tente mais tarde." }, { status: 500 });
   }
   const restante = MAX_BUSCAS - usado - 1;
   return respond(found.resultados.slice(0, 9), restante, site);

@@ -87,7 +87,7 @@ export async function GET(
   // renderizado pra virar base editável. O header interno libera o gate.
   const doc = await captureSiteDoc(slug, _request.nextUrl.origin)
     .then((d) => d?.replace(/<script[\s\S]*?<\/script>/gi, "") ?? null);
-  if (!doc) return NextResponse.json({ error: "Falha ao carregar o site." }, { status: 502 });
+  if (!doc) return NextResponse.json({ error: "Falha ao carregar o site." }, { status: 500 });
   if (doc.length > MAX_DOC) {
     return NextResponse.json({ error: "Site grande demais pra editar." }, { status: 413 });
   }
@@ -137,7 +137,7 @@ export async function POST(
       publicado: true,
       sem_expiracao: true,
     });
-    if (error) return NextResponse.json({ error: "Falha ao salvar." }, { status: 502 });
+    if (error) return NextResponse.json({ error: "Falha ao salvar." }, { status: 500 });
     return NextResponse.json({ ok: true, canRestore: true });
   }
 
@@ -150,7 +150,7 @@ export async function POST(
       updated_at: now,
     })
     .eq("slug", slug);
-  if (error) return NextResponse.json({ error: "Falha ao salvar." }, { status: 502 });
+  if (error) return NextResponse.json({ error: "Falha ao salvar." }, { status: 500 });
   return NextResponse.json({ ok: true, canRestore: true });
 }
 
@@ -178,6 +178,6 @@ export async function DELETE(
   const { error } = await admin.from("sites")
     .update({ tipo: orig.tipo, config: orig.config, updated_at: new Date().toISOString() })
     .eq("slug", slug);
-  if (error) return NextResponse.json({ error: "Falha ao restaurar." }, { status: 502 });
+  if (error) return NextResponse.json({ error: "Falha ao restaurar." }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

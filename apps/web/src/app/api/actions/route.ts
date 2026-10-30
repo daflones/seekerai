@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     if (chargeable) {
       await refundCreditAction(createSupabaseAdminClient(), session.user.id, requestRef);
     }
-    return NextResponse.json({ error: "Serviço indisponível no momento." }, { status: 502 });
+    return NextResponse.json({ error: "Serviço indisponível no momento." }, { status: 500 });
   }
 
   const text = await upstream.text();
@@ -135,7 +135,9 @@ export async function POST(request: NextRequest) {
     const obj = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
     const raw = obj?.error ?? obj?.erro;
     const message = typeof raw === "string" && raw ? raw : "A ação não pôde ser concluída.";
-    return NextResponse.json({ error: message }, { status: upstream.status });
+    // Cloudflare mascara respostas 502/504 do origin com a página HTML dele —
+    // respostas >=500 saem como 500 para o JSON de erro sempre chegar ao cliente.
+    return NextResponse.json({ error: message }, { status: upstream.status >= 500 ? 500 : upstream.status });
   }
   return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
 }
