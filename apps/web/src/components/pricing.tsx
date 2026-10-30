@@ -36,7 +36,7 @@ export function Pricing({ plans, source, locale, t, discountPct = 0 }: { plans: 
           </button>)}
         </div>
         {locale.isBrazil && (
-          <div className="payment-toggle" role="group" aria-label={t.payGroup}>{[["pix", t.pix], ["card", `${t.card} (${t.soon})`]].map(([id, label]) => <button key={id} aria-pressed={method === id} disabled={id === "card"} onClick={() => setMethod(id)}>{id === "pix" ? <QrCode size={15} /> : <CreditCard size={15} />}{label}</button>)}</div>
+          <div className="payment-toggle" role="group" aria-label={t.payGroup}>{[["pix", t.pix], ["card", t.card]].map(([id, label]) => <button key={id} aria-pressed={method === id} onClick={() => setMethod(id)}>{id === "pix" ? <QrCode size={15} /> : <CreditCard size={15} />}{label}</button>)}</div>
         )}
       </div>
       {plans.length > 0 ? <div className="plans-grid">{plans.map((plan) => <PlanCardView key={plan.slug} plan={plan} method={method} period={period} billedCaption={billedCaption(plan)} locale={locale} freeSuffix={t.freeSuffix} perMonth={t.perMonth} freeNote={t.freeNote} paidNote={t.paidNote} discountPct={discountPct} firstBuy={t.firstBuy} />)}</div>

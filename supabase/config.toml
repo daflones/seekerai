@@ -43,6 +43,9 @@ verify_jwt = false
 [functions.mercosulpay-webhook]
 verify_jwt = false
 
+[functions.mercadopago-webhook]
+verify_jwt = false
+
 # Chamadas do app: exigem JWT do usuário autenticado.
 [functions.billing-checkout]
 verify_jwt = true
