@@ -714,6 +714,34 @@ a.lead-action { text-decoration: none; }
 .credit-pack { margin-top: 18px; max-width: 420px; border-color: #e8c98a44; }
 .credit-pack h3 { color: var(--warn); }
 
+/* Planos — visão de assinante */
+.plan-now { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  border: 1px solid #6fe3b344; border-radius: 15px; padding: 18px 22px; margin-bottom: 22px;
+  background: linear-gradient(135deg, #6fe3b30f, #a879d10a); }
+.plan-now-info { display: flex; flex-direction: column; gap: 3px; }
+.plan-now-info small { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.plan-now-info strong { font-size: 22px; color: var(--white); }
+.plan-now-info span { font-size: 12.5px; color: var(--muted); }
+.plan-now-check { color: #6fe3b3; flex-shrink: 0; }
+.plan-grid-upgrades { margin-top: 12px; }
+.pack-section { margin-top: 26px; }
+.pack-section-title { font-size: 16px; color: var(--white); margin: 0 0 4px; }
+.pack-section-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+.pack-rows { display: flex; flex-direction: column; gap: 10px; }
+.pack-row { display: flex; align-items: center; gap: 18px; padding: 14px 20px;
+  border: 1px solid #e8c98a33; border-radius: 13px;
+  background: linear-gradient(135deg, #e8c98a08, #a879d106); }
+.pack-amount { display: flex; flex-direction: column; min-width: 90px; }
+.pack-amount strong { font-size: 24px; color: var(--warn); line-height: 1.1; }
+.pack-amount small, .pack-price small { font-size: 11px; color: var(--muted); }
+.pack-price { display: flex; flex-direction: column; }
+.pack-price strong { font-size: 16px; color: var(--white); }
+.pack-row .plan-actions { margin-left: auto; }
+@media (max-width: 640px) {
+  .pack-row { flex-wrap: wrap; gap: 10px; }
+  .pack-row .plan-actions { margin-left: 0; width: 100%; }
+}
+
 /* Admin: gestão de usuários */
 .admin-users-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .admin-users-search { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; max-width: 380px; background: var(--panel); border: 1px solid #ab7bcd33; border-radius: 11px; padding: 9px 12px; color: var(--muted); }

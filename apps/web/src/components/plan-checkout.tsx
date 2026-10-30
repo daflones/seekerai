@@ -14,6 +14,7 @@ interface PlanItem {
   name: string;
   priceCents: number;
   featured: boolean;
+  order: number;
   content: {
     description?: string;
     features?: { id: string; text: string; visible: boolean }[];
@@ -28,13 +29,17 @@ interface PixResult {
   error?: string;
 }
 
-export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t }: {
+export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t,
+  subEnd = null, subMonths = 1, planCredits = {} }: {
   plans: PlanItem[];
   hasSubscription: boolean;
   currentPlanSlug: string | null;
   discountPct?: number;
   locale: Locale;
   t: Messages["plansPage"];
+  subEnd?: string | null;
+  subMonths?: number;
+  planCredits?: Record<string, number>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -96,69 +101,110 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
     setTimeout(() => setCopied(false), 2500);
   }
 
+  const current = plans.find((p) => p.slug === currentPlanSlug) ?? null;
+  const upgrades = current
+    ? plans.filter((p) => p.order > current.order)
+    : [];
+  const renewDate = subEnd
+    ? new Date(subEnd).toLocaleDateString(locale.lang === "pt" ? "pt-BR" : locale.lang)
+    : null;
+
+  function planActions(plan: PlanItem) {
+    return <div className="plan-actions">
+      <button type="button" className="button button-primary button-small" disabled={busy !== null}
+        onClick={() => void checkout(plan.slug, "card")}>
+        {busy === `${plan.slug}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
+        {t.card}
+      </button>
+      {!isIntl && <button type="button" className="button button-glass button-small" disabled={busy !== null}
+        onClick={() => void checkout(plan.slug, "pix")}>
+        {busy === `${plan.slug}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
+        PIX
+      </button>}
+    </div>;
+  }
+
+  function planCard(plan: PlanItem, flag?: string | null) {
+    const isFree = plan.priceCents === 0;
+    return <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}`}>
+      {flag && <span className="plan-flag">{flag}</span>}
+      <h3>{plan.name}</h3>
+      <p className="plan-price">
+        {!isFree && discountPct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}
+        {isFree ? money(0) : money(disc(priceFor(plan)))}
+        {!isFree && <small>{t.perMonth}</small>}
+      </p>
+      {!isFree && discountPct > 0 && <span className="plan-off-tag">-{discountPct}% {t.firstBuy}</span>}
+      {!isFree && def.months > 1 && (
+        <p className="plan-billed-caption">
+          {money(disc(totalFor(plan)))} {period === "trimestral" ? t.billedTri : t.billedYear}
+        </p>
+      )}
+      {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
+      {plan.content.features && <ul className="plan-features">
+        {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}
+      </ul>}
+      {isFree ? <p className="plan-current-note">{t.freeNote}</p> : planActions(plan)}
+    </article>;
+  }
+
   return <>
     {canceled && <p className="seek-meta" role="status">{t.cancelNote}</p>}
-    {hasSubscription && <p className="auth-success" role="status">
-      <CheckCircle2 size={18} /> {t.hasSub}
-    </p>}
 
-    <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
-      {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
-        <CalendarClock size={14} />{periodLabel[p.id]}
-        {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
-      </button>)}
-    </div>
+    {hasSubscription && current && <section className="plan-now">
+      <div className="plan-now-info">
+        <small>{t.yourPlan}</small>
+        <strong>{current.name}</strong>
+        <span>
+          {subMonths > 1 ? `${money(disc(totalFor(current)))} ${subMonths === 3 ? t.billedTri : t.billedYear}`
+            : `${money(priceFor(current))}${t.perMonth}`}
+          {planCredits[current.slug] ? ` · ${planCredits[current.slug]} ${t.creditsCycle}` : ""}
+          {renewDate ? ` · ${t.renewsIn} ${renewDate}` : ""}
+        </span>
+      </div>
+      <CheckCircle2 size={22} className="plan-now-check" />
+    </section>}
 
-    <div className="plan-grid">
-      {plans.map((plan) => {
-        const isCurrent = plan.slug === currentPlanSlug;
-        const isFree = plan.priceCents === 0;
-        return <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}${isCurrent ? " current" : ""}`}>
-          {isCurrent && <span className="plan-flag plan-flag-current">{t.current}</span>}
-          {!isCurrent && plan.featured && <span className="plan-flag">{t.featured}</span>}
-          <h3>{plan.name}</h3>
-          <p className="plan-price">
-            {!isFree && discountPct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}
-            {isFree ? money(0) : money(disc(priceFor(plan)))}
-            {!isFree && <small>{t.perMonth}</small>}
-          </p>
-          {!isFree && discountPct > 0 && <span className="plan-off-tag">-{discountPct}% {t.firstBuy}</span>}
-          {!isFree && def.months > 1 && (
-            <p className="plan-billed-caption">
-              {money(disc(totalFor(plan)))} {period === "trimestral" ? t.billedTri : t.billedYear}
-            </p>
-          )}
-          {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
-          {plan.content.features && <ul className="plan-features">
-            {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}
-          </ul>}
-          {isCurrent
-            ? <p className="plan-current-note">{t.currentNote}</p>
-            : isFree
-              ? <p className="plan-current-note">{t.freeNote}</p>
-              : <div className="plan-actions">
-                <button type="button" className="button button-primary button-small" disabled={busy !== null}
-                  onClick={() => void checkout(plan.slug, "card")}>
-                  {busy === `${plan.slug}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-                  {t.card}
-                </button>
-                {!isIntl && <button type="button" className="button button-glass button-small" disabled={busy !== null}
-                  onClick={() => void checkout(plan.slug, "pix")}>
-                  {busy === `${plan.slug}:pix` ? <Loader2 size={14} className="spin" /> : <QrCode size={14} />}
-                  PIX
-                </button>}
-              </div>}
-        </article>;
-      })}
-    </div>
+    {hasSubscription && upgrades.length > 0 && <section>
+      <h3 className="pack-section-title">{t.upTitle}</h3>
+      <p className="pack-section-sub">{t.upSub}</p>
+      <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
+        {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
+          <CalendarClock size={14} />{periodLabel[p.id]}
+          {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
+        </button>)}
+      </div>
+      <div className="plan-grid plan-grid-upgrades">
+        {upgrades.map((plan) => planCard(plan, t.upgradeFlag))}
+      </div>
+    </section>}
+
+    {hasSubscription && upgrades.length === 0 && current && (
+      <p className="auth-success" role="status"><CheckCircle2 size={18} /> {t.topPlan}</p>
+    )}
+
+    {!hasSubscription && <>
+      <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
+        {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
+          <CalendarClock size={14} />{periodLabel[p.id]}
+          {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
+        </button>)}
+      </div>
+      <div className="plan-grid">
+        {plans.map((plan) => planCard(plan, plan.featured ? t.featured : null))}
+      </div>
+    </>}
 
     {hasSubscription && <section id="creditos" className="pack-section">
       <h3 className="pack-section-title">{t.packTitle}</h3>
       <p className="pack-section-sub">{t.packSub}</p>
-      <div className="pack-grid">
-        {CREDIT_PACKS.map((pack) => <article key={pack.id} className="plan-card-checkout credit-pack">
-          <h3>+{pack.credits}</h3>
-          <p className="plan-price">{money(packCents(pack))}</p>
+      <div className="pack-rows">
+        {CREDIT_PACKS.map((pack) => <article key={pack.id} className="pack-row">
+          <div className="pack-amount"><strong>+{pack.credits}</strong><small>{t.packCredits}</small></div>
+          <div className="pack-price">
+            <strong>{money(packCents(pack))}</strong>
+            <small>{money(Math.round(packCents(pack) / pack.credits))}{t.perCredit}</small>
+          </div>
           <div className="plan-actions">
             <button type="button" className="button button-primary button-small" disabled={busy !== null}
               onClick={() => void checkout(pack.id, "card", pack)}>

@@ -282,6 +282,7 @@ const pt = {
     pixPay: "PIX —", pixHint: "Abra o app do seu banco, pague com o QR Code ou o código copia-e-cola.",
     pixValid: "Válido até", pixAuto: "Assim que o pagamento confirmar, o plano ativa sozinho.",
     pixCopy: "Copiar código", pixCopied: "Copiado",
+    yourPlan: "Seu plano", renewsIn: "renova em", creditsCycle: "créditos/ciclo", upTitle: "Quer mais poder?", upSub: "Upgrade libera editor de sites, apps e domínio personalizado — e mais créditos por ciclo.", topPlan: "Você já está no plano máximo — tudo liberado.", packCredits: "créditos", perCredit: "/crédito", upgradeFlag: "UPGRADE",
   },
   lead: {
     actReply: "Mensagem de abordagem", actStrategy: "Estratégia",
@@ -826,6 +827,7 @@ export const messages: Record<Lang, Messages> = {
       pixPay: "PIX —", pixHint: "Open your bank app, pay with the QR Code or copy-paste code.",
       pixValid: "Valid until", pixAuto: "Once payment confirms, the plan activates by itself.",
       pixCopy: "Copy code", pixCopied: "Copied",
+    yourPlan: "Your plan", renewsIn: "renews on", creditsCycle: "credits/cycle", upTitle: "Want more power?", upSub: "Upgrading unlocks the site editor, apps and custom domains — plus more credits per cycle.", topPlan: "You are on the top plan — everything unlocked.", packCredits: "credits", perCredit: "/credit", upgradeFlag: "UPGRADE",
     },
     lead: {
       actReply: "Outreach message", actStrategy: "Strategy",
@@ -1366,6 +1368,7 @@ export const messages: Record<Lang, Messages> = {
       pixPay: "PIX —", pixHint: "Abre la app de tu banco, paga con el QR o el código copia y pega.",
       pixValid: "Válido hasta", pixAuto: "Apenas se confirme el pago, el plan se activa solo.",
       pixCopy: "Copiar código", pixCopied: "Copiado",
+    yourPlan: "Tu plan", renewsIn: "renueva el", creditsCycle: "créditos/ciclo", upTitle: "¿Quieres más poder?", upSub: "El upgrade desbloquea editor de sitios, apps y dominio personalizado — y más créditos por ciclo.", topPlan: "Ya estás en el plan máximo — todo desbloqueado.", packCredits: "créditos", perCredit: "/crédito", upgradeFlag: "UPGRADE",
     },
     lead: {
       actReply: "Mensaje de acercamiento", actStrategy: "Estrategia",
@@ -1906,6 +1909,7 @@ export const messages: Record<Lang, Messages> = {
       pixPay: "PIX —", pixHint: "Ouvrez l'app de votre banque, payez avec le QR Code ou le code copier-coller.",
       pixValid: "Valide jusqu'au", pixAuto: "Dès confirmation du paiement, l'offre s'active toute seule.",
       pixCopy: "Copier le code", pixCopied: "Copié",
+    yourPlan: "Votre formule", renewsIn: "renouvelé le", creditsCycle: "crédits/cycle", upTitle: "Envie de plus ?", upSub: "Le surclassement débloque l’éditeur de sites, les apps et le domaine personnalisé — plus de crédits par cycle.", topPlan: "Vous êtes déjà sur l’offre maximale — tout est débloqué.", packCredits: "crédits", perCredit: "/crédit", upgradeFlag: "UPGRADE",
     },
     lead: {
       actReply: "Message d'approche", actStrategy: "Stratégie",
@@ -2445,6 +2449,7 @@ export const messages: Record<Lang, Messages> = {
       pixPay: "PIX —", pixHint: "Öffne deine Bank-App, zahl mit QR-Code oder Copy-Paste-Code.",
       pixValid: "Gültig bis", pixAuto: "Sobald die Zahlung bestätigt ist, aktiviert sich der Tarif von selbst.",
       pixCopy: "Code kopieren", pixCopied: "Kopiert",
+    yourPlan: "Dein Tarif", renewsIn: "verlängert am", creditsCycle: "Credits/Zyklus", upTitle: "Mehr Power?", upSub: "Ein Upgrade schaltet Site-Editor, Apps und eigene Domains frei — plus mehr Credits pro Zyklus.", topPlan: "Du bist im Top-Tarif — alles freigeschaltet.", packCredits: "Credits", perCredit: "/Credit", upgradeFlag: "UPGRADE",
     },
     lead: {
       actReply: "Ansprache", actStrategy: "Strategie",
@@ -2984,6 +2989,7 @@ export const messages: Record<Lang, Messages> = {
       pixPay: "PIX —", pixHint: "Apri l'app della tua banca, paga con QR Code o codice copia-e-incolla.",
       pixValid: "Valido fino al", pixAuto: "Appena il pagamento conferma, il piano si attiva da solo.",
       pixCopy: "Copia codice", pixCopied: "Copiato",
+    yourPlan: "Il tuo piano", renewsIn: "rinnova il", creditsCycle: "crediti/ciclo", upTitle: "Vuoi più potenza?", upSub: "L’upgrade sblocca editor di siti, app e dominio personalizzato — più crediti per ciclo.", topPlan: "Sei già sul piano massimo — tutto sbloccato.", packCredits: "crediti", perCredit: "/credito", upgradeFlag: "UPGRADE",
     },
     lead: {
       actReply: "Messaggio di approccio", actStrategy: "Strategia",
