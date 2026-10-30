@@ -110,8 +110,7 @@ export async function POST(request: NextRequest) {
       { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
   }
 
-  const { data: { session: authSession } } = await session.supabase.auth.getSession();
-  const token = authSession?.access_token;
+  const token = session.accessToken;
   if (!token || !supabasePublicConfig()) {
     return NextResponse.json({ error: "Sessão expirada. Entre novamente." }, { status: 401 });
   }

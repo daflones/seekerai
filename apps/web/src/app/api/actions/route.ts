@@ -97,8 +97,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: { session: authSession } } = await session.supabase.auth.getSession();
-  const token = authSession?.access_token;
+  const token = session.accessToken;
   const config = supabasePublicConfig();
   if (!token || !config) {
     return NextResponse.json({ error: "Sessão expirada. Entre novamente." }, { status: 401 });

@@ -151,8 +151,7 @@ export async function POST(request: NextRequest) {
     .select("id").eq("id", parsed.data.leadId).eq("user_id", session.user.id).maybeSingle();
   if (!lead) return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
 
-  const { data: { session: authSession } } = await session.supabase.auth.getSession();
-  const token = authSession?.access_token;
+  const token = session.accessToken;
   if (!token || !supabasePublicConfig()) {
     return NextResponse.json({ error: "Sessão expirada. Entre novamente." }, { status: 401 });
   }
