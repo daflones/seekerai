@@ -315,6 +315,8 @@ a.lead-action { text-decoration: none; }
 .pay-banner-text span { color: var(--muted); font-size: 12px; }
 .pay-banner-close { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; flex-shrink: 0; display: grid; place-items: center; }
 .pay-banner-close:hover { color: var(--cyan); }
+.pay-banner-warn { background: #f5a62314; border-color: #f5a62333; }
+.pay-banner-warn .pay-banner-icon, .pay-banner-warn .pay-banner-text strong { color: #f5b35e; }
 @media (max-width: 640px) { .pay-banner { flex-wrap: wrap; } .pay-banner-text { flex-basis: calc(100% - 40px); } }
 
 /* ── Dashboard stats ── */

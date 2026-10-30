@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, CircleDollarSign, Compass, Images, Radar, ShieldCheck, Sparkles, TrendingUp, Users } from "lucide-react";
+import { ArrowUpRight, CircleDollarSign, Compass, Images, Radar, ShieldCheck, Sparkles, TrendingUp, Users, Zap } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getLocale, formatMoney } from "@/lib/i18n";
@@ -72,6 +72,16 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
     )}
     {retryAttempt && <PayRetryBanner attemptId={retryAttempt.id} createdAt={retryAttempt.created_at}
       title={t.payRetryT} sub={t.payRetryS} cta={t.payRetryCta} />}
+    {assinatura && (wallet?.saldo ?? 0) <= 0 && (
+      <div className="pay-banner pay-banner-warn" role="status">
+        <Zap size={18} className="pay-banner-icon" />
+        <div className="pay-banner-text">
+          <strong>{t.noCreditsT}</strong>
+          <span>{t.noCreditsS}</span>
+        </div>
+        <Link href="/app/planos#creditos" className="button button-primary button-small">{t.noCreditsCta}</Link>
+      </div>
+    )}
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.welcome}, {profile.nome || t.welcomeFallback}<span className="gradient-text">.</span></h1>
     <p className="private-intro">{t.intro}</p>
