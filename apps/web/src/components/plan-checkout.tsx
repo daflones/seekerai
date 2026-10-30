@@ -111,10 +111,8 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
 
   function planActions(plan: PlanItem) {
     return <div className="plan-actions">
-      <button type="button" className="button button-primary button-small" disabled={busy !== null}
-        onClick={() => void checkout(plan.slug, "card")}>
-        {busy === `${plan.slug}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-        {t.card}
+      <button type="button" className="button button-primary button-small" disabled>
+        <CreditCard size={14} />{t.card} ({t.soon})
       </button>
       {!isIntl && <button type="button" className="button button-glass button-small" disabled={busy !== null}
         onClick={() => void checkout(plan.slug, "pix")}>
@@ -206,10 +204,8 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
             <small>{money(Math.round(packCents(pack) / pack.credits))}{t.perCredit}</small>
           </div>
           <div className="plan-actions">
-            <button type="button" className="button button-primary button-small" disabled={busy !== null}
-              onClick={() => void checkout(pack.id, "card", pack)}>
-              {busy === `${pack.id}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-              {t.card}
+            <button type="button" className="button button-primary button-small" disabled>
+              <CreditCard size={14} />{t.card} ({t.soon})
             </button>
             {!isIntl && <button type="button" className="button button-glass button-small" disabled={busy !== null}
               onClick={() => void checkout(pack.id, "pix", pack)}>

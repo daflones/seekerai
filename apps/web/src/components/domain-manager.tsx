@@ -181,10 +181,9 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
         {check?.state === "taken" && <p className="domain-check is-taken"><XCircle size={14} /> Já registrado — você pode tentar outro</p>}
         {check?.state === "unknown" && <p className="domain-check"><SearchCheck size={14} /> Não conseguimos verificar — nossa equipe confere na ativação</p>}
         <div className="domain-pay">
-          <button type="button" className="button button-primary" disabled={busy !== null}
-            onClick={() => void buy(selected, "card")}>
-            {busy === `${selected}:card` ? <Loader2 size={14} className="spin" /> : <CreditCard size={14} />}
-            Cartão · {money(priceCents)}/ano
+          <button type="button" className="button button-primary" disabled>
+            <CreditCard size={14} />
+            Cartão (em breve)
           </button>
           <button type="button" className="button button-glass" disabled={busy !== null}
             onClick={() => void buy(selected, "pix")}>
