@@ -157,7 +157,7 @@ const pt = {
   dash: {
     eyebrow: "SEU RADAR DE VENDAS", welcome: "Bem-vindo", welcomeFallback: "vamos começar",
     intro: "Encontre estabelecimentos que precisam do que você vende, salve os leads e deixe a IA preparar a abordagem.",
-    success: "Pagamento confirmado — quando o provedor concluir, seus créditos entram sozinhos.",
+    success: "Pagamento confirmado — quando o provedor concluir, seus créditos entram sozinhos.", payRetryT: "Pagamentos normalizados", payRetryS: "Sua tentativa de pagamento não foi concluída por instabilidade do provedor — o PIX já está funcionando. Tente de novo agora.", payRetryCta: "Ir para os planos",
     s1l: "CRÉDITOS DISPONÍVEIS",
     s1subOn: "Assinatura ativa — créditos renovam todo mês",
     s1subOff: "Créditos grátis renovam todo dia — assine pra mais",
@@ -703,7 +703,7 @@ export const messages: Record<Lang, Messages> = {
     dash: {
       eyebrow: "YOUR SALES RADAR", welcome: "Welcome", welcomeFallback: "let's get started",
       intro: "Find businesses that need what you sell, save leads and let AI prepare the outreach.",
-      success: "Payment confirmed — once the provider completes, your credits arrive automatically.",
+      success: "Payment confirmed — once the provider completes, your credits arrive automatically.", payRetryT: "Payments restored", payRetryS: "Your payment attempt failed due to a provider outage — PIX is working again. Try now.", payRetryCta: "Go to plans",
       s1l: "AVAILABLE CREDITS",
       s1subOn: "Active subscription — credits renew every month",
       s1subOff: "Free credits renew daily — subscribe for more",
@@ -1244,7 +1244,7 @@ export const messages: Record<Lang, Messages> = {
     dash: {
       eyebrow: "TU RADAR DE VENTAS", welcome: "Bienvenido", welcomeFallback: "empecemos",
       intro: "Encuentra establecimientos que necesitan lo que vendes, guarda los leads y deja que la IA prepare el acercamiento.",
-      success: "Pago confirmado — cuando el proveedor concluya, tus créditos llegan solos.",
+      success: "Pago confirmado — cuando el proveedor concluya, tus créditos llegan solos.", payRetryT: "Pagos normalizados", payRetryS: "Tu intento de pago no se completó por una inestabilidad del proveedor — el PIX ya funciona. Inténtalo ahora.", payRetryCta: "Ir a los planes",
       s1l: "CRÉDITOS DISPONIBLES",
       s1subOn: "Suscripción activa — los créditos se renuevan cada mes",
       s1subOff: "Créditos gratis renuevan cada día — suscríbete para más",
@@ -1785,7 +1785,7 @@ export const messages: Record<Lang, Messages> = {
     dash: {
       eyebrow: "VOTRE RADAR COMMERCIAL", welcome: "Bienvenue", welcomeFallback: "commençons",
       intro: "Trouvez des établissements qui ont besoin de ce que vous vendez, enregistrez les leads et laissez l'IA préparer l'approche.",
-      success: "Paiement confirmé — dès validation du prestataire, vos crédits arrivent tout seuls.",
+      success: "Paiement confirmé — dès validation du prestataire, vos crédits arrivent tout seuls.", payRetryT: "Paiements rétablis", payRetryS: "Votre tentative de paiement a échoué à cause d'une instabilité du prestataire — le PIX fonctionne à nouveau. Réessayez maintenant.", payRetryCta: "Voir les offres",
       s1l: "CRÉDITS DISPONIBLES",
       s1subOn: "Abonnement actif — les crédits se renouvellent chaque mois",
       s1subOff: "Crédits gratuits renouvelés chaque jour — abonnez-vous pour plus",
@@ -2325,7 +2325,7 @@ export const messages: Record<Lang, Messages> = {
     dash: {
       eyebrow: "DEIN VERTRIEBS-RADAR", welcome: "Willkommen", welcomeFallback: "leg los",
       intro: "Finde Betriebe, die brauchen, was du verkaufst, speichere die Leads und lass die KI die Ansprache vorbereiten.",
-      success: "Zahlung bestätigt — sobald der Anbieter abschließt, kommen deine Credits von allein.",
+      success: "Zahlung bestätigt — sobald der Anbieter abschließt, kommen deine Credits von allein.", payRetryT: "Zahlungen wieder normal", payRetryS: "Dein Zahlungsversuch ist wegen einer Störung des Anbieters fehlgeschlagen — PIX funktioniert wieder. Versuch es jetzt.", payRetryCta: "Zu den Plänen",
       s1l: "VERFÜGBARE CREDITS",
       s1subOn: "Abo aktiv — Credits erneuern sich jeden Monat",
       s1subOff: "Gratis-Credits erneuern sich täglich — Abo für mehr",
@@ -2865,7 +2865,7 @@ export const messages: Record<Lang, Messages> = {
     dash: {
       eyebrow: "IL TUO RADAR DI VENDITA", welcome: "Benvenuto", welcomeFallback: "iniziamo",
       intro: "Trova attività che hanno bisogno di ciò che vendi, salva i lead e lascia che l'IA prepari l'approccio.",
-      success: "Pagamento confermato — quando il provider conclude, i tuoi crediti arrivano da soli.",
+      success: "Pagamento confermato — quando il provider conclude, i tuoi crediti arrivano da soli.", payRetryT: "Pagamenti ripristinati", payRetryS: "Il tuo tentativo di pagamento non è andato a buon fine per un'instabilità del provider — il PIX funziona di nuovo. Riprova ora.", payRetryCta: "Vai ai piani",
       s1l: "CREDITI DISPONIBILI",
       s1subOn: "Abbonamento attivo — i crediti si rinnovano ogni mese",
       s1subOff: "Crediti gratis si rinnovano ogni giorno — abbonati per più",

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, CircleDollarSign, Compass, Images, Radar, ShieldCheck, Sparkles, TrendingUp, Users } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getLocale, formatMoney } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
+import { PayRetryBanner } from "@/components/pay-retry-banner";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
   const [params, loc, { supabase, user, profile }] = await Promise.all([
@@ -20,7 +22,9 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   // janela de 7 dias. 'ativo' diz se a renovação ainda está valendo.
   const { data: daily } = await supabase.rpc("claim_daily_credits");
   const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
-  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }] = await Promise.all([
+  const admin = createSupabaseAdminClient();
+  const since48 = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }, { data: lastAttempt }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "novo"),
@@ -30,7 +34,20 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
       .eq("status", "completed").order("created_at", { ascending: false }).limit(30),
     supabase.from("leads").select("id,nome,valor_fechado,updated_at")
       .eq("status", "ganho").order("updated_at", { ascending: false }).limit(20),
+    admin.from("payments").select("id,status,created_at")
+      .eq("user_id", user.id).in("status", ["failed", "expired", "pending"])
+      .gt("created_at", since48).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
+
+  // Aviso "pagamentos normalizados" só para quem teve tentativa recente
+  // sem concluir e ainda não converteu depois dela.
+  let retryAttempt = lastAttempt;
+  if (lastAttempt) {
+    const { data: paidAfter } = await admin.from("payments").select("id")
+      .eq("user_id", user.id).eq("status", "paid").gt("created_at", lastAttempt.created_at)
+      .limit(1).maybeSingle();
+    if (paidAfter) retryAttempt = null;
+  }
 
   type Op = { action: string; cost: number; status: string; created_at: string };
   const operacoes = (ops ?? []) as Op[];
@@ -53,6 +70,8 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
     {params.checkout === "sucesso" && (
       <p className="shell-notice" role="status">{t.success}</p>
     )}
+    {retryAttempt && <PayRetryBanner attemptId={retryAttempt.id} createdAt={retryAttempt.created_at}
+      title={t.payRetryT} sub={t.payRetryS} cta={t.payRetryCta} />}
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.welcome}, {profile.nome || t.welcomeFallback}<span className="gradient-text">.</span></h1>
     <p className="private-intro">{t.intro}</p>
