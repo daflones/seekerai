@@ -53,7 +53,7 @@ async function runJob(projectId: string, userId: string, token: string, payload:
     if (!upstream.ok || !html) {
       const erro = typeof data.erro === "string" ? data.erro
         : typeof data.error === "string" ? data.error
-        : "A geração não pôde ser concluída. Tente novamente.";
+        : `A geração não pôde ser concluída (HTTP ${upstream.status}). Tente novamente.`;
       await admin.from("studio_projects")
         .update({ status: "error", erro, updated_at: new Date().toISOString() })
         .eq("id", projectId);

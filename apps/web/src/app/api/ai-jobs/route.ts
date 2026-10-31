@@ -56,7 +56,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
     if (!upstream.ok || typeof data.conteudo !== "string" || !data.conteudo) {
       const erro = typeof data.erro === "string" ? data.erro
         : typeof data.error === "string" ? data.error
-        : "A geração não pôde ser concluída. Tente novamente.";
+        : `A geração não pôde ser concluída (HTTP ${upstream.status}). Tente novamente.`;
       await admin.from("ai_jobs")
         .update({ status: "error", erro, updated_at: new Date().toISOString() })
         .eq("id", jobId);

@@ -1983,6 +1983,7 @@ async function configPatchFromAi(
   // OpenRouter primeiro; NVIDIA gratuita se falhar ou não houver chave.
   let content: unknown = null;
   let modelo = SITE_MODEL;
+  let orStatus = 0;
   if (apiKey) {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -2001,16 +2002,19 @@ async function configPatchFromAi(
       }),
       signal: AbortSignal.timeout(90_000),
     }).catch(() => null);
+    orStatus = res?.status ?? 0;
     if (res?.ok) {
       const data = await res.json().catch(() => null) as Record<string, unknown> | null;
       const choices = data && Array.isArray(data.choices) ? data.choices : [];
       content = isRecord(choices[0]) && isRecord(choices[0].message)
         ? choices[0].message.content : null;
     } else {
-      console.error("[site-config] openrouter falhou:", res?.status ?? "network");
+      console.error("[site-config] openrouter falhou:", orStatus || "network");
     }
   }
-  if (typeof content !== "string" || !content.trim()) {
+  // Em 402 (conta sem créditos) a NVIDIA também não entrega a tempo —
+  // pula direto pro template base em vez de queimar 2×60s à toa.
+  if ((typeof content !== "string" || !content.trim()) && orStatus !== 402) {
     // Uma falha transitória não deve derrubar o patch — uma retentativa.
     for (let t = 0; t < 2; t++) {
       const nv = await nvidiaChat(system, userContent, 3000, 60_000);
@@ -2461,6 +2465,7 @@ async function generateAppHtml(
 
   let html: string | null = null;
   let modelo = SITE_MODEL;
+  let orStatus = 0;
   if (apiKey) {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -2469,31 +2474,38 @@ async function generateAppHtml(
         "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi Studio",
       },
       body: JSON.stringify({
-        model: SITE_MODEL, max_tokens: 32000, temperature: 0.7,
+        model: SITE_MODEL, max_tokens: 24000, temperature: 0.7,
         messages: [
           { role: "system", content: APP_SYSTEM },
           { role: "user", content: user },
         ],
       }),
-      signal: AbortSignal.timeout(240_000),
+      signal: AbortSignal.timeout(210_000),
     }).catch(() => null);
+    orStatus = res?.status ?? 0;
     if (res?.ok) {
       const data = await res.json().catch(() => null) as Record<string, unknown> | null;
       const ch = data && Array.isArray(data.choices) ? data.choices : [];
       const content = isRecord(ch[0]) && isRecord(ch[0].message) ? ch[0].message.content : null;
       if (typeof content === "string") html = extractHtml(content);
+    } else {
+      console.error("[app] openrouter falhou:", orStatus || "network");
     }
   }
-  // Fallback gratuito NVIDIA. nemotron-3-ultra-550b estoura o compute
-  // do worker em apps longos — gpt-oss-20b é o único que fecha a tempo.
-  if (!html) {
+  // Fallback gratuito NVIDIA — só quando o OpenRouter falha por rede/5xx.
+  // Em 402 (conta sem créditos) o modelo gratuito é lento demais pra
+  // escrever um app inteiro dentro do budget do worker; falha rápido.
+  if (!html && orStatus !== 402) {
     modelo = NVIDIA_TEXT_MODEL;
-    const nv = await nvidiaChat(APP_SYSTEM, user, 32000, 240_000);
+    const nv = await nvidiaChat(APP_SYSTEM, user, 24000, 90_000);
     const ch = nv && Array.isArray(nv.choices) ? nv.choices : [];
     const content = isRecord(ch[0]) && isRecord(ch[0].message) ? ch[0].message.content : null;
     if (typeof content === "string") html = extractHtml(content);
   }
-  if (!html) throw httpError(502, "A IA não devolveu o app desta vez — tente novamente.");
+  if (!html) {
+    if (orStatus === 402) throw httpError(503, "Geração de IA temporariamente indisponível");
+    throw httpError(502, "A IA não devolveu o app desta vez — tente novamente.");
+  }
   return { html, modelo };
 }
 
@@ -2676,9 +2688,10 @@ Deno.serve(async (req) => {
           }
         }
       } else if (!data) {
-        // Sem orçamento pra NVIDIA se o OpenRouter já comeu o tempo da function.
+        // Sem orçamento pra NVIDIA se o OpenRouter já comeu o tempo da
+        // function — e em 402 (sem créditos) o fallback lento não resolve.
         const elapsed = Date.now() - t0;
-        const nv = elapsed < 120_000
+        const nv = elapsed < 120_000 && orStatus !== 402
           ? await nvidiaChat(
             systemPrompt,
             userContent,
