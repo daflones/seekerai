@@ -50,7 +50,7 @@ export default async function Home() {
         operatingSystem: "Web",
         inLanguage: { pt: "pt-BR", en: "en", es: "es", fr: "fr", de: "de", it: "it" }[loc.lang],
         description: `${h.heroDesc1} ${h.heroDesc2}`,
-        offers: { "@type": "Offer", price: "0", priceCurrency: loc.currency.toUpperCase(), description: h.re1 },
+        offers: { "@type": "Offer", price: "0", priceCurrency: loc.currency.toUpperCase(), description: h.re2 },
       },
       {
         "@type": "FAQPage",
@@ -75,7 +75,7 @@ export default async function Home() {
             <h1>{h.heroA}<br />{h.heroB} <span className="hero-word">{h.heroWord}<svg viewBox="0 0 420 18" fill="none" aria-hidden="true"><path d="M3 13C100 0 296 0 416 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></span><span className="hero-period">.</span></h1>
             <p className="hero-description">{h.heroDesc1}<br className="desktop-break" /> {h.heroDesc2}</p>
             <div className="hero-ctas"><Link href="/cadastro" className="button button-primary">{h.cta1} <ArrowUpRight size={17} /></Link><a href="#demonstracao" className="button button-glass"><span className="play-circle"><Play size={10} fill="currentColor" /></span>{h.cta2}</a></div>
-            <div className="hero-reassurance"><span><Check size={13} />{h.re1}</span><span><Check size={13} />{h.re2}</span><span><Check size={13} />{h.re3}</span></div>
+            <div className="hero-reassurance"><span><Check size={13} />{h.re2}</span><span><Check size={13} />{h.re3}</span></div>
           </div>
           <div className="hero-product container" id="demonstracao">
             <div className="product-caption"><span><span className="status-dot" /> {h.captionL}</span><span>{h.captionR} <ArrowDown size={12} /></span></div>
@@ -136,7 +136,7 @@ export default async function Home() {
           <span className="eyebrow">{h.ctaeyebrow}</span>
           <h2>{h.ctatitleA}<br /><span className="gradient-text">{h.ctatitleB}</span></h2>
           <p>{h.ctap}</p>
-          <ul className="cta-benefits"><li><Check size={13} />{h.re1}</li><li><Check size={13} />{h.re2}</li><li><Check size={13} />{h.re3}</li></ul>
+          <ul className="cta-benefits"><li><Check size={13} />{h.re2}</li><li><Check size={13} />{h.re3}</li></ul>
           {SHOW_LANDING_PRICES && pricing.plans.length > 0
             ? <div className="cta-plans">{pricing.plans.map((plan) => (
                 <Link key={plan.slug} href={`/cadastro?plano=${plan.slug}`}

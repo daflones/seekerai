@@ -267,7 +267,6 @@ export function ProductDemo({ full = false, loc, t }: {
             <Dialog.Description>{tt.upsellP}</Dialog.Description>
             <div className="dialog-actions">
               <Link className="button button-primary" href="/cadastro">{tt.upsellA} <ArrowUpRight size={15} /></Link>
-              <Link className="button button-glass" href="/planos">{tt.upsellB}</Link>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
