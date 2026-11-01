@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Clapperboard, Copy, Check, Download, FilePlus2, Image as ImageIcon,
-  Loader2, Monitor, Plus, RotateCcw, Smartphone, Globe, X,
+  Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, X,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
@@ -268,43 +268,60 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
         : <p className="st-err" role="alert">{error}</p>)}
     </div>
 
-    {/* Resultado */}
+    {/* Resultado: toolbar + moldura de dispositivo */}
     {project?.status === "done" && project.html && <div className="st-result">
-      <div className="st-result-head">
-        <h3>{t.preview} — {project.nome}</h3>
-        <div className="st-view-switch">
+      <div className="st-result-toolbar">
+        <div className="st-view-switch" role="group" aria-label={t.preview}>
           <button type="button" className={viewTarget === "web" ? "on" : ""}
-            onClick={() => setPreview("web")}><Monitor size={14} /> {t.webView}</button>
+            onClick={() => setPreview("web")} title={t.webView}><Monitor size={14} /> {t.webView}</button>
           <button type="button" className={viewTarget === "mobile" ? "on" : ""}
-            onClick={() => setPreview("mobile")}><Smartphone size={14} /> {t.mobileView}</button>
+            onClick={() => setPreview("mobile")} title={t.mobileView}><Smartphone size={14} /> {t.mobileView}</button>
+        </div>
+        <span className="st-result-title" title={project.nome}>{project.nome}</span>
+        <div className="st-actions">
+          {project.site_slug
+            ? <>
+              <a className="st-btn" href={`/site/${project.site_slug}`} target="_blank" rel="noreferrer" title={`/site/${project.site_slug}`}>
+                <Globe size={14} /><span>{t.openSite}</span>
+              </a>
+              <a className="st-btn st-btn-edit" href={`/app/sites/${project.site_slug}/editar`} title={t.editSite}>
+                <Paintbrush size={14} /><span>{t.editSite}</span>
+              </a>
+              <button type="button" className="st-btn" onClick={() => void copyLink()} title={t.copyLink}>
+                {copied ? <Check size={14} /> : <Copy size={14} />}<span>{copied ? t.copied : t.copyLink}</span>
+              </button>
+              <a className="st-btn" href={`/app/dominios?site=${project.site_slug}`} title={t.ownDomain}>
+                <Globe size={14} /><span>{t.ownDomain}</span>
+              </a>
+            </>
+            : <button type="button" className="st-btn st-btn-primary" onClick={() => void publish()} disabled={publishing}>
+              {publishing ? <Loader2 size={14} className="spin" /> : <Globe size={14} />}
+              <span>{publishing ? t.publishing : t.publish}</span>
+            </button>}
+          <button type="button" className="st-btn" onClick={download} title={t.download}>
+            <Download size={14} /><span>{t.download}</span>
+          </button>
+          <button type="button" className="st-btn" onClick={() => void generate()} disabled={running} title={t.regenerate}>
+            <RotateCcw size={14} /><span>{t.regenerate}</span>
+          </button>
+          <button type="button" className="st-btn" onClick={reset} title={t.newApp}>
+            <FilePlus2 size={14} /><span>{t.newApp}</span>
+          </button>
         </div>
       </div>
-      <div className={`st-frame st-frame-${viewTarget}`}>
-        <iframe title={project.nome} sandbox="allow-scripts allow-same-origin"
-          srcDoc={project.html} />
-      </div>
-      <div className="st-actions">
-        {project.site_slug
-          ? <>
-            <a className="st-btn st-btn-primary" href={`/site/${project.site_slug}`} target="_blank" rel="noreferrer">
-              <Globe size={15} /> /site/{project.site_slug}
-            </a>
-            <a className="st-btn" href={`/app/dominios?site=${project.site_slug}`}>
-              <Globe size={15} /> Domínio próprio
-            </a>
-            <button type="button" className="st-btn" onClick={() => void copyLink()}>
-              {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? t.copied : t.copyLink}
-            </button>
-          </>
-          : <button type="button" className="st-btn st-btn-primary" onClick={() => void publish()} disabled={publishing}>
-            {publishing ? <Loader2 size={15} className="spin" /> : <Globe size={15} />}
-            {publishing ? t.publishing : t.publish}
-          </button>}
-        <button type="button" className="st-btn" onClick={download}><Download size={15} /> {t.download}</button>
-        <button type="button" className="st-btn" onClick={() => void generate()} disabled={running}>
-          <RotateCcw size={15} /> {t.regenerate}
-        </button>
-        <button type="button" className="st-btn" onClick={reset}><FilePlus2 size={15} /> {t.newApp}</button>
+      <div className={`st-stage st-stage-${viewTarget}`}>
+        {viewTarget === "mobile"
+          ? <div className="st-device st-device-phone">
+            <span className="st-phone-notch" />
+            <iframe title={project.nome} sandbox="allow-scripts allow-same-origin" srcDoc={project.html} />
+          </div>
+          : <div className="st-device st-device-browser">
+            <div className="st-device-bar">
+              <i /><i /><i />
+              <span className="st-device-url">{project.site_slug ? `seekerai.digital/site/${project.site_slug}` : t.previewUrl}</span>
+            </div>
+            <iframe title={project.nome} sandbox="allow-scripts allow-same-origin" srcDoc={project.html} />
+          </div>}
       </div>
     </div>}
 

@@ -449,6 +449,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           {hasSite && siteHref ? <div className="lead-site-done">
             {siteOn ? <>
               <a className="lead-site-frame" href={siteHref} target="_blank" rel="noopener noreferrer">
+                <span className="lead-site-chrome"><i /><i /><i /><em>/site/{siteSlug}</em></span>
                 <iframe src={siteHref} title={`${t.openSite} — ${lead.nome}`} loading="lazy" tabIndex={-1} />
                 <span className="lead-site-open"><ExternalLink size={15} />{t.openSite}</span>
               </a>

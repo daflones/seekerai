@@ -58,6 +58,8 @@ export function PrivateShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  // O editor visual de sites ocupa a tela inteira — sem header nem nav.
+  if (pathname.endsWith("/editar")) return <>{children}</>;
   const nav = [
     { href: "/app", label: t.dashboard, icon: LayoutDashboard, exact: true },
     { href: "/app/buscar", label: t.seek, icon: Compass },

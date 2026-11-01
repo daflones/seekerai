@@ -522,6 +522,8 @@ const pt = {
     soon: "Planos Pro e King",
     soonText: "O editor visual de sites está disponível a partir do plano Pro. Faça upgrade pra liberar.",
     plansB: "Ver planos",
+    blocks: "Blocos", layers: "Camadas", styles: "Estilo", settings: "Configurações", selectHint: "Selecione um elemento no site pra editar o estilo dele.", noSel: "Nada selecionado", desktop: "Desktop", tablet: "Tablet", mobile: "Celular", zoomIn: "Aproximar", zoomOut: "Afastar", zoomFit: "Ajustar (100%)", outlines: "Mostrar contornos", code: "Ver código", codeTitle: "Código do site", copy: "Copiar", copied: "Copiado!", close: "Fechar", parent: "Selecionar elemento pai", duplicate: "Duplicar", remove: "Apagar", unsaved: "Alterações não salvas", allSaved: "Tudo salvo", catBasic: "Básicos", catSeeker: "Seções prontas", sLayout: "Layout", sSize: "Tamanho", sSpacing: "Espaçamento", sType: "Tipografia", sFill: "Fundo", sBorder: "Borda", sEffects: "Efeitos", bCard: "Card", bQuote: "Depoimento", bPrice: "Preço", bCta: "Chamada", bSpacer: "Espaço", searchBlocks: "Buscar blocos…",
+    blCol1: "1 coluna", blCol2: "2 colunas", blCol3: "3 colunas", blCol37: "2 colunas 3/7", blText: "Texto", blLink: "Link", blImage: "Imagem", blVideo: "Vídeo", blMap: "Mapa",
   },
   studio: {
     eyebrow: "ESTÚDIO DE CRIAÇÃO", title: "Crie um site ou app sob medida", dot: ".",
@@ -546,6 +548,8 @@ const pt = {
     regenerate: "Gerar de novo", download: "Baixar HTML", newApp: "Novo projeto",
     historyTitle: "Projetos recentes", empty: "Nenhum projeto ainda — descreva o primeiro acima.",
     untitled: "Projeto sem título",
+    openSite: "Abrir site", editSite: "Editar visual", ownDomain: "Domínio próprio",
+    previewUrl: "pré-visualização do projeto",
   },
 };
 
@@ -1066,6 +1070,8 @@ export const messages: Record<Lang, Messages> = {
       soon: "Pro and King plans",
       soonText: "The visual site editor is available from the Pro plan. Upgrade to unlock.",
       plansB: "See plans",
+      blocks: "Blocks", layers: "Layers", styles: "Style", settings: "Settings", selectHint: "Select an element on the site to edit its style.", noSel: "Nothing selected", desktop: "Desktop", tablet: "Tablet", mobile: "Mobile", zoomIn: "Zoom in", zoomOut: "Zoom out", zoomFit: "Fit (100%)", outlines: "Show outlines", code: "View code", codeTitle: "Site code", copy: "Copy", copied: "Copied!", close: "Close", parent: "Select parent element", duplicate: "Duplicate", remove: "Delete", unsaved: "Unsaved changes", allSaved: "All saved", catBasic: "Basics", catSeeker: "Ready sections", sLayout: "Layout", sSize: "Size", sSpacing: "Spacing", sType: "Typography", sFill: "Background", sBorder: "Border", sEffects: "Effects", bCard: "Card", bQuote: "Testimonial", bPrice: "Price", bCta: "Call to action", bSpacer: "Spacer", searchBlocks: "Search blocks…",
+      blCol1: "1 column", blCol2: "2 columns", blCol3: "3 columns", blCol37: "2 columns 3/7", blText: "Text", blLink: "Link", blImage: "Image", blVideo: "Video", blMap: "Map",
     },
     studio: {
       eyebrow: "CREATION STUDIO", title: "Build a custom site or app", dot: ".",
@@ -1090,6 +1096,8 @@ export const messages: Record<Lang, Messages> = {
       regenerate: "Regenerate", download: "Download HTML", newApp: "New project",
       historyTitle: "Recent projects", empty: "No projects yet — describe the first one above.",
       untitled: "Untitled project",
+      openSite: "Open site", editSite: "Visual editor", ownDomain: "Custom domain",
+      previewUrl: "project preview",
     },
   },
 
@@ -1607,6 +1615,8 @@ export const messages: Record<Lang, Messages> = {
       soon: "Planes Pro y King",
       soonText: "El editor visual de sitios está disponible desde el plan Pro. Mejora tu plan para desbloquearlo.",
       plansB: "Ver planes",
+      blocks: "Bloques", layers: "Capas", styles: "Estilo", settings: "Ajustes", selectHint: "Selecciona un elemento del sitio para editar su estilo.", noSel: "Nada seleccionado", desktop: "Escritorio", tablet: "Tablet", mobile: "Móvil", zoomIn: "Acercar", zoomOut: "Alejar", zoomFit: "Ajustar (100%)", outlines: "Mostrar contornos", code: "Ver código", codeTitle: "Código del sitio", copy: "Copiar", copied: "¡Copiado!", close: "Cerrar", parent: "Seleccionar elemento padre", duplicate: "Duplicar", remove: "Eliminar", unsaved: "Cambios sin guardar", allSaved: "Todo guardado", catBasic: "Básicos", catSeeker: "Secciones listas", sLayout: "Diseño", sSize: "Tamaño", sSpacing: "Espaciado", sType: "Tipografía", sFill: "Fondo", sBorder: "Borde", sEffects: "Efectos", bCard: "Tarjeta", bQuote: "Testimonio", bPrice: "Precio", bCta: "Llamada", bSpacer: "Espacio", searchBlocks: "Buscar bloques…",
+      blCol1: "1 columna", blCol2: "2 columnas", blCol3: "3 columnas", blCol37: "2 columnas 3/7", blText: "Texto", blLink: "Enlace", blImage: "Imagen", blVideo: "Vídeo", blMap: "Mapa",
     },
     studio: {
       eyebrow: "ESTUDIO DE CREACIÓN", title: "Crea un sitio o app a medida", dot: ".",
@@ -1631,6 +1641,8 @@ export const messages: Record<Lang, Messages> = {
       regenerate: "Generar de nuevo", download: "Descargar HTML", newApp: "Nuevo proyecto",
       historyTitle: "Proyectos recientes", empty: "Aún no hay proyectos — describe el primero arriba.",
       untitled: "Proyecto sin título",
+      openSite: "Abrir sitio", editSite: "Editor visual", ownDomain: "Dominio propio",
+      previewUrl: "vista previa del proyecto",
     },
   },
 
@@ -2147,6 +2159,8 @@ export const messages: Record<Lang, Messages> = {
       soon: "Plans Pro et King",
       soonText: "L'éditeur visuel de sites est disponible dès le plan Pro. Passez au plan supérieur pour débloquer.",
       plansB: "Voir les plans",
+      blocks: "Blocs", layers: "Calques", styles: "Style", settings: "Réglages", selectHint: "Sélectionnez un élément du site pour modifier son style.", noSel: "Aucune sélection", desktop: "Ordinateur", tablet: "Tablette", mobile: "Mobile", zoomIn: "Zoom avant", zoomOut: "Zoom arrière", zoomFit: "Ajuster (100 %)", outlines: "Afficher les contours", code: "Voir le code", codeTitle: "Code du site", copy: "Copier", copied: "Copié !", close: "Fermer", parent: "Sélectionner l’élément parent", duplicate: "Dupliquer", remove: "Supprimer", unsaved: "Modifications non enregistrées", allSaved: "Tout est enregistré", catBasic: "Basiques", catSeeker: "Sections prêtes", sLayout: "Mise en page", sSize: "Taille", sSpacing: "Espacement", sType: "Typographie", sFill: "Fond", sBorder: "Bordure", sEffects: "Effets", bCard: "Carte", bQuote: "Témoignage", bPrice: "Prix", bCta: "Appel à l’action", bSpacer: "Espace", searchBlocks: "Rechercher des blocs…",
+      blCol1: "1 colonne", blCol2: "2 colonnes", blCol3: "3 colonnes", blCol37: "2 colonnes 3/7", blText: "Texte", blLink: "Lien", blImage: "Image", blVideo: "Vidéo", blMap: "Carte",
     },
     studio: {
       eyebrow: "STUDIO DE CRÉATION", title: "Créez un site ou une app sur mesure", dot: ".",
@@ -2171,6 +2185,8 @@ export const messages: Record<Lang, Messages> = {
       regenerate: "Régénérer", download: "Télécharger le HTML", newApp: "Nouveau projet",
       historyTitle: "Projets récents", empty: "Aucun projet — décrivez le premier ci-dessus.",
       untitled: "Projet sans titre",
+      openSite: "Ouvrir le site", editSite: "Éditeur visuel", ownDomain: "Domaine perso",
+      previewUrl: "aperçu du projet",
     },
   },
 
@@ -2687,6 +2703,8 @@ export const messages: Record<Lang, Messages> = {
       soon: "Pro- und King-Pläne",
       soonText: "Der visuelle Site-Editor ist ab dem Pro-Plan verfügbar. Upgrade zum Freischalten.",
       plansB: "Pläne ansehen",
+      blocks: "Blöcke", layers: "Ebenen", styles: "Stil", settings: "Einstellungen", selectHint: "Wähle ein Element der Seite, um seinen Stil zu bearbeiten.", noSel: "Nichts ausgewählt", desktop: "Desktop", tablet: "Tablet", mobile: "Handy", zoomIn: "Vergrößern", zoomOut: "Verkleinern", zoomFit: "Anpassen (100 %)", outlines: "Umrisse anzeigen", code: "Code ansehen", codeTitle: "Code der Seite", copy: "Kopieren", copied: "Kopiert!", close: "Schließen", parent: "Übergeordnetes Element wählen", duplicate: "Duplizieren", remove: "Löschen", unsaved: "Ungespeicherte Änderungen", allSaved: "Alles gespeichert", catBasic: "Basis", catSeeker: "Fertige Abschnitte", sLayout: "Layout", sSize: "Größe", sSpacing: "Abstände", sType: "Typografie", sFill: "Hintergrund", sBorder: "Rahmen", sEffects: "Effekte", bCard: "Karte", bQuote: "Kundenstimme", bPrice: "Preis", bCta: "Handlungsaufruf", bSpacer: "Abstand", searchBlocks: "Blöcke suchen…",
+      blCol1: "1 Spalte", blCol2: "2 Spalten", blCol3: "3 Spalten", blCol37: "2 Spalten 3/7", blText: "Text", blLink: "Link", blImage: "Bild", blVideo: "Video", blMap: "Karte",
     },
     studio: {
       eyebrow: "CREATION STUDIO", title: "Erstelle eine Website oder App nach Maß", dot: ".",
@@ -2711,6 +2729,8 @@ export const messages: Record<Lang, Messages> = {
       regenerate: "Neu generieren", download: "HTML herunterladen", newApp: "Neues Projekt",
       historyTitle: "Letzte Projekte", empty: "Noch keine Projekte — beschreibe oben das erste.",
       untitled: "Unbenanntes Projekt",
+      openSite: "Site öffnen", editSite: "Visueller Editor", ownDomain: "Eigene Domain",
+      previewUrl: "Projektvorschau",
     },
   },
 
@@ -3227,6 +3247,8 @@ export const messages: Record<Lang, Messages> = {
       soon: "Piani Pro e King",
       soonText: "L'editor visuale dei siti è disponibile dal piano Pro. Fai upgrade per sbloccarlo.",
       plansB: "Vedi i piani",
+      blocks: "Blocchi", layers: "Livelli", styles: "Stile", settings: "Impostazioni", selectHint: "Seleziona un elemento del sito per modificarne lo stile.", noSel: "Nessuna selezione", desktop: "Desktop", tablet: "Tablet", mobile: "Cellulare", zoomIn: "Ingrandisci", zoomOut: "Riduci", zoomFit: "Adatta (100%)", outlines: "Mostra contorni", code: "Vedi codice", codeTitle: "Codice del sito", copy: "Copia", copied: "Copiato!", close: "Chiudi", parent: "Seleziona elemento padre", duplicate: "Duplica", remove: "Elimina", unsaved: "Modifiche non salvate", allSaved: "Tutto salvato", catBasic: "Base", catSeeker: "Sezioni pronte", sLayout: "Layout", sSize: "Dimensioni", sSpacing: "Spaziatura", sType: "Tipografia", sFill: "Sfondo", sBorder: "Bordo", sEffects: "Effetti", bCard: "Card", bQuote: "Testimonianza", bPrice: "Prezzo", bCta: "Invito all’azione", bSpacer: "Spazio", searchBlocks: "Cerca blocchi…",
+      blCol1: "1 colonna", blCol2: "2 colonne", blCol3: "3 colonne", blCol37: "2 colonne 3/7", blText: "Testo", blLink: "Link", blImage: "Immagine", blVideo: "Video", blMap: "Mappa",
     },
     studio: {
       eyebrow: "STUDIO DI CREAZIONE", title: "Crea un sito o un'app su misura", dot: ".",
@@ -3251,6 +3273,8 @@ export const messages: Record<Lang, Messages> = {
       regenerate: "Rigenera", download: "Scarica HTML", newApp: "Nuovo progetto",
       historyTitle: "Progetti recenti", empty: "Nessun progetto — descrivi il primo qui sopra.",
       untitled: "Progetto senza titolo",
+      openSite: "Apri sito", editSite: "Editor visuale", ownDomain: "Dominio proprio",
+      previewUrl: "anteprima del progetto",
     },
   },
 };

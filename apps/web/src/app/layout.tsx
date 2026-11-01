@@ -11,6 +11,7 @@ import "./auth-ui.css";
 import "./pricing-ui.css";
 import "./workspace-ui.css";
 import "./public-ui.css";
+import "./editor-ui.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 const title = "SeekerAi — Encontre quem precisa do que você vende";
