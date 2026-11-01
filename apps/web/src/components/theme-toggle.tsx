@@ -1,12 +1,14 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
+import { useState } from "react";
 import { THEME_COOKIE, type Theme } from "@/lib/i18n/shared";
 
 // Alterna tema claro/escuro. Persiste em cookie (SSR sem flash) e aplica
 // direto no <html data-theme> pra troca instantânea.
 export function ThemeToggle({ theme }: { theme: Theme }) {
-  const next: Theme = theme === "dark" ? "light" : "dark";
+  const [current, setCurrent] = useState(theme);
+  const next: Theme = current === "dark" ? "light" : "dark";
   return (
     <button
       type="button"
@@ -16,9 +18,10 @@ export function ThemeToggle({ theme }: { theme: Theme }) {
       onClick={() => {
         document.cookie = `${THEME_COOKIE}=${next};path=/;max-age=31536000;samesite=lax`;
         document.documentElement.dataset.theme = next;
+        setCurrent(next);
       }}
     >
-      {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+      {current === "dark" ? <Sun size={14} /> : <Moon size={14} />}
     </button>
   );
 }

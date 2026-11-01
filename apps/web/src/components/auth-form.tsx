@@ -8,6 +8,10 @@ import { Turnstile } from "./turnstile";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 
 export type AuthMode = "login" | "signup" | "recover" | "password" | "onboarding";
+// next dev: Turnstile não funciona em 127.0.0.1 — o servidor também pula a
+// verificação só nesse modo (ver /api/auth/[action]).
+const DEV_NO_CAPTCHA = process.env.NODE_ENV === "development";
+const DEV_TOKEN = DEV_NO_CAPTCHA ? "dev-sem-captcha" : null;
 type Fields = { email: string; password: string; confirmPassword: string; name: string; phone: string; terms: boolean; marketing: boolean };
 
 function GoogleMark() {
@@ -27,7 +31,7 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
   const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm<Fields>({
     defaultValues: { email: email || "", terms: false, marketing: false },
   });
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(DEV_TOKEN);
   const [epoch, setEpoch] = useState(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -60,7 +64,7 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
       }
       else setMessage(data.message || tt.received);
     } catch { setError(tt.errConn); }
-    finally { setToken(null); setEpoch((value) => value + 1); }
+    finally { setToken(DEV_TOKEN); setEpoch((value) => value + 1); }
   }
 
   if (message) return <div className="auth-success" role="status"><CheckCircle2 size={30} /><h3>{tt.emailStep}</h3><p>{message}</p><Link href="/login" className="button button-primary">{tt.backLogin} <ArrowUpRight size={16} /></Link></div>;
@@ -98,7 +102,9 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
     </>}
     {mode === "login" && <Link href="/recuperar-senha" className="forgot-password">{tt.forgot}</Link>}
     {profileMode && <div className="auth-consents"><label><input type="checkbox" {...register("terms", { required: tt.termsReq })} /><span>{tt.termsPre} <Link href="/termos" target="_blank">{tt.termsLink}</Link> {tt.termsAnd} <Link href="/privacidade" target="_blank">{tt.privacyLink}</Link>.</span></label>{errors.terms && <span className="field-error">{errors.terms.message}</span>}<label><input type="checkbox" {...register("marketing")} /><span>{tt.marketing}</span></label></div>}
-    {available ? <Turnstile siteKey={siteKey} action={mode} epoch={epoch} onToken={setToken} /> : <div className="auth-notice"><LockKeyhole size={17} /><span>{tt.waitConfig}</span></div>}
+    {!available ? <div className="auth-notice"><LockKeyhole size={17} /><span>{tt.waitConfig}</span></div>
+      : DEV_NO_CAPTCHA ? <p className="auth-field-hint">Modo dev: verificação Turnstile desativada.</p>
+      : <Turnstile siteKey={siteKey} action={mode} epoch={epoch} onToken={setToken} />}
     {error && <p className="auth-error" role="alert">{error}</p>}
     <button className="button button-primary" disabled={!available || !token || isSubmitting}>{isSubmitting ? <LoaderCircle size={16} className="spin" /> : <LockKeyhole size={15} />}{isSubmitting ? tt.wait : labels[mode]}<ArrowUpRight size={15} /></button>
     <p className="auth-secure-note">{tt.secureNote}</p>

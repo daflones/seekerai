@@ -1,0 +1,287 @@
+/* Private workspace: neutral surfaces, violet accents, shared light/dark tokens.
+   Scoped to the customer shell so public sites and the visual-editor canvas
+   keep their own design systems. */
+.shell-workspace {
+  --workspace-shadow: var(--card-shadow);
+  --workspace-selected: var(--selected);
+  --workspace-selected-text: var(--selected-text);
+  display: block;
+  min-height: 100dvh;
+  padding: 0 40px;
+  background: var(--ink);
+  color: var(--white);
+}
+.shell-area-admin .workspace-nav a.active { background: var(--violet); color: #fff; }
+.workspace-area-tag { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--violet-light); border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent); padding: 4px 10px; border-radius: 999px; }
+.workspace-header { position: relative; z-index: 40; max-width: 1360px; margin: auto; }
+.workspace-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 96px; gap: 24px; }
+.workspace-brand { display: inline-flex; }
+.workspace-brand .brand { font-size: 26px; font-weight: 550; letter-spacing: -.065em; }
+.workspace-brand .brand-mark { width: 32px; height: 34px; }
+.workspace-tools { display: flex; align-items: center; gap: 18px; }
+.workspace-balance { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); }
+.workspace-balance svg { color: var(--violet-light); }
+.workspace-balance span { color: var(--muted); }
+.workspace-balance strong { font-variant-numeric: tabular-nums; font-weight: 600; }
+.shell-workspace .theme-toggle { width: 36px; height: 36px; border-color: var(--border); border-radius: 9px; }
+.workspace-account { position: relative; }
+.workspace-account summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.workspace-account summary::-webkit-details-marker { display: none; }
+.workspace-account summary > svg { color: var(--muted); transition: transform .2s; }
+.workspace-account[open] summary > svg { transform: rotate(180deg); }
+.shell-workspace .shell-avatar { border-radius: 50%; width: 36px; height: 36px; background: #b99bea; color: #281942; font-weight: 550; }
+.workspace-account-name { display: flex; flex-direction: column; max-width: 160px; }
+.workspace-account-name strong { font-size: 12px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.workspace-account-name small { font-size: 10px; color: var(--muted); }
+.workspace-account-popover { position: absolute; top: calc(100% + 14px); right: 0; width: 260px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); box-shadow: 0 16px 50px #0003; display: grid; gap: 12px; }
+.workspace-account-popover .shell-user-meta { padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.workspace-account-popover .locale-switcher select { width: 100%; min-height: 36px; }
+.workspace-account-popover .shell-admin-link, .workspace-account-popover .shell-logout { min-height: 36px; font-size: 13px; }
+.workspace-nav { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding: 4px 0 20px; scrollbar-width: thin; scrollbar-color: var(--panel-raised) transparent; }
+.workspace-nav a { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; min-height: 42px; border-radius: 9px; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--muted); transition: background .18s, color .18s; }
+.workspace-nav a:hover { background: var(--panel-raised); color: var(--white); }
+.workspace-nav a.active { background: var(--workspace-selected); color: var(--workspace-selected-text); }
+.workspace-nav svg { width: 15px; stroke-width: 1.6; }
+.shell-workspace .shell-main { margin: 0; }
+.shell-workspace .shell-content { max-width: 1360px; margin: 0 auto; padding: 46px 0 60px; animation: workspace-enter .35s ease both; }
+.shell-workspace .shell-content > h1, .dash-welcome h1 { font-size: clamp(32px, 3.4vw, 50px); font-weight: 400; letter-spacing: -.045em; line-height: 1.12; overflow-wrap: anywhere; }
+.shell-workspace .eyebrow { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: .1em; margin-bottom: 16px; }
+.shell-workspace .private-intro { font-size: 13px; max-width: 65ch; line-height: 1.8; margin-top: 17px; }
+.shell-workspace .button { min-height: 44px; border-radius: 9px; font-size: 12px; font-weight: 550; gap: 9px; box-shadow: none; }
+.shell-workspace .button-small { min-height: 36px; }
+.shell-workspace .button-primary { background: var(--violet); border-color: transparent; color: #fff; }
+[data-theme="dark"] .shell-workspace .button-primary { background: #b591fc; color: #211432; }
+.shell-workspace .button-primary:hover { box-shadow: 0 4px 16px color-mix(in srgb, var(--violet) 20%, transparent); }
+.shell-workspace .button-glass, .shell-workspace .button-outline { background: var(--panel); border-color: var(--border); }
+.shell-workspace :is(a, button, summary):focus-visible { outline: 2px solid var(--violet-light); outline-offset: 4px; }
+.shell-workspace .text-link { color: var(--violet-light); font-weight: 550; }
+
+/* Dashboard: an airy headline and a translucent, layered action card. */
+.dash-hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 70px; align-items: center; margin-bottom: 34px; }
+.dash-welcome { padding-block: 10px; }
+.dash-welcome h1 { max-width: 22ch; }
+.dash-welcome .private-intro { max-width: 52ch; }
+.dash-insight-stack { position: relative; isolation: isolate; width: min(100% - 50px, 400px); justify-self: end; margin-right: 50px; }
+.dash-insight-stack::before, .dash-insight-stack::after { content: ""; position: absolute; inset: 18px -26px 0 35px; border: 1px solid #c6a4ff2b; border-radius: 18px; background: linear-gradient(130deg, #c0a0ff55, #9667ff0b); transform: rotate(5deg); z-index: -1; }
+.dash-insight-stack::after { inset: 38px -48px 6px 75px; opacity: .5; transform: rotate(9deg); z-index: -2; }
+.dash-insight { display: flex; flex-direction: column; min-height: 232px; padding: 23px 26px 19px; border-radius: 17px; background: radial-gradient(ellipse at 74% 25%, #d7baff 0%, transparent 64%), linear-gradient(125deg, #eee4ff, #bda0f0 55%, #a88bdf); color: #291640; border: 1px solid #f6eaff80; box-shadow: inset 0 0 30px #ffffff40, 0 12px 40px #9667ff0a; transition: transform .25s, box-shadow .25s; }
+.dash-insight:hover { transform: translateY(-4px) rotate(-1deg); box-shadow: inset 0 0 30px #ffffff40, 0 16px 40px #9667ff20; }
+.dash-insight-top { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.dash-insight-top > svg:last-child { margin-left: auto; }
+.dash-insight > strong { display: block; margin: 24px 0; max-width: 25ch; font-family: var(--font-heading); font-size: 24px; font-weight: 400; line-height: 1.3; letter-spacing: -.025em; }
+.dash-insight-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; font-size: 11px; font-weight: 550; }
+.dash-insight-bottom > span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #2c1b4312; }
+.shell-workspace .dash-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 0 12px; }
+.shell-workspace :is(.stat-card, .dash-panel, .seek-form, .seek-card, .lead-card, .plan-card-checkout, .cre-card, .st-composer, .st-result, .pf-work, .pf-photo, .pf-theme) { background: var(--panel); border: 1px solid var(--border); box-shadow: var(--workspace-shadow); border-radius: 12px; }
+.shell-workspace .stat-card { position: relative; padding: 22px 24px; min-height: 180px; gap: 8px; }
+.shell-workspace .stat-icon { position: absolute; top: 22px; left: 22px; width: 16px; height: 16px; color: var(--muted); background: none; border: 0; margin: 0; }
+.shell-workspace .stat-icon svg { width: 15px; height: 15px; stroke-width: 1.6; }
+.shell-workspace .stat-card small { padding-left: 25px; font-size: 10px; letter-spacing: .025em; font-weight: 500; color: var(--muted); min-height: 24px; }
+.shell-workspace .stat-card > strong { font-family: var(--font-heading); font-size: clamp(32px, 3vw, 44px); line-height: 1.2; letter-spacing: -.045em; font-weight: 400; font-variant-numeric: tabular-nums; margin-top: 7px; }
+.shell-workspace .stat-sub { font-size: 11px; color: var(--muted); }
+.stat-meter { position: relative; display: block; height: 22px; margin-top: auto; border-radius: 4px; overflow: hidden; background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--muted) 30%, transparent) 0 1px, transparent 1px 4px); }
+.stat-meter i { position: absolute; inset: 0 auto 0 0; min-width: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--violet-light), var(--violet)); box-shadow: 4px 0 0 0 var(--white); transition: width 1.1s cubic-bezier(.22, 1, .36, 1); }
+.dash-overview { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 12px; align-items: start; }
+.shell-workspace .dash-panel { padding: 24px; min-width: 0; }
+.dash-overview > .dash-panel { min-height: 350px; }
+.dash-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 28px; min-height: 24px; }
+.shell-workspace .dash-panel h2 { font-family: var(--font-body); font-size: 12px; font-weight: 500; letter-spacing: 0; }
+.dash-panel-heading h2 { margin: 0; }
+.dash-icon-link { display: grid; place-items: center; color: var(--muted); width: 28px; height: 28px; border-radius: 7px; }
+.dash-icon-link:hover { background: var(--panel-raised); color: var(--white); }
+.dash-revenue-total { display: block; font-family: var(--font-heading); font-size: clamp(28px, 2.8vw, 40px); letter-spacing: -.04em; font-weight: 400; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.dash-list-title { padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--border); margin-bottom: 15px; font-family: var(--font-body); font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.shell-workspace .dash-empty { color: var(--muted); font-size: 12px; }
+.dash-overview .dash-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding-block: 20px; }
+.dash-overview .dash-empty > svg { color: var(--violet-light); stroke-width: 1.3; }
+.dash-overview .dash-empty .text-link { font-size: 12px; margin-top: 6px; }
+.shell-workspace .dash-usage li { padding: 12px 0; background: none; border: none; border-bottom: 1px solid var(--border); border-radius: 0; gap: 12px; font-size: 12px; }
+.shell-workspace .dash-usage strong { color: var(--white); font-weight: 500; white-space: nowrap; font-size: 12px; }
+.shell-workspace .dash-usage-bars li { display: block; padding-top: 0; padding-bottom: 14px; border: 0; }
+.dash-usage-bars li > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.dash-usage-track { display: block; height: 10px; background: repeating-linear-gradient(90deg, var(--panel-raised) 0 2px, transparent 2px 4px); overflow: hidden; }
+.dash-usage-track i { display: block; height: 100%; background: repeating-linear-gradient(90deg, var(--violet-light) 0 2px, transparent 2px 4px); }
+.shell-workspace .dash-ops { gap: 14px; border-color: var(--border); }
+.shell-workspace .dash-ops li { font-size: 11px; gap: 3px; }
+.shell-workspace .dash-op-meta { font-size: 10px; }
+.shell-workspace .dash-actions { gap: 6px; }
+.shell-workspace .dash-actions a { background: transparent; border: 0; border-radius: 9px; padding: 13px 0; gap: 12px; }
+.shell-workspace .dash-actions a:hover { background: var(--panel-raised); }
+.shell-workspace .dash-actions a > svg:first-child { background: var(--panel-raised); color: var(--violet-light); padding: 9px; width: 36px; height: 36px; border-radius: 10px; }
+.shell-workspace .dash-actions strong { font-size: 12px; font-weight: 550; }
+.shell-workspace .dash-actions small { font-size: 11px; margin-top: 4px; line-height: 1.6; }
+.shell-workspace .private-disclaimer { display: flex; gap: 7px; align-items: center; font-size: 10px; }
+
+/* Existing tools inherit the same card, field and selection treatments. */
+.shell-workspace .seek-form { padding: 26px; gap: 18px; }
+.shell-workspace .seek-field { flex: 1; min-width: 160px; }
+.shell-workspace .seek-field-grow { flex: 1.4; }
+.shell-workspace .seek-field > span, .shell-workspace .ticket-field > span { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; color: var(--muted); }
+.shell-workspace :is(.seek-field input, .seek-field select, .seek-field .fancy-trigger, .ticket-field input, .ticket-field select, .ticket-field textarea, .cre-search, .cre-leads, .editor-block-label input, .editor-block-label select, .pf-work input, .pf-proof input) { background: var(--ink); border-color: var(--border); border-radius: 9px; color: var(--white); font-size: 13px; }
+.shell-workspace :is(input, textarea, select):focus-visible { outline: 2px solid var(--violet-light); outline-offset: 2px; }
+.shell-workspace :is(.fancy-panel, .st-pop) { background: var(--panel); border-color: var(--border); box-shadow: 0 12px 35px #0002; }
+.shell-workspace :is(.seek-card, .lead-card, .cre-card, .pf-theme) { transition: border-color .2s, box-shadow .2s, transform .2s; }
+.shell-workspace :is(.seek-card, .lead-card, .cre-card):hover { border-color: color-mix(in srgb, var(--violet) 26%, transparent); box-shadow: 0 8px 25px #0000000c; transform: translateY(-2px); }
+.shell-workspace .seek-card.selected { border-color: var(--violet); }
+.shell-workspace :is(.lead-card-body, .seek-card-body) { padding: 20px; }
+.shell-workspace :is(.lead-card h3, .seek-card h3, .cre-title) { font-family: var(--font-heading); font-size: 19px; font-weight: 450; letter-spacing: -.025em; }
+.shell-workspace :is(.lead-tip, .seek-opportunity) { background: color-mix(in srgb, var(--violet) 5%, var(--panel)); border-color: var(--border); color: var(--fg2); }
+.shell-workspace :is(.lead-filters, .cre-filters, .st-targets) { gap: 6px; }
+.shell-workspace :is(.lead-filters button, .cre-chip, .seek-chip, .st-target) { border: 1px solid var(--border); background: var(--panel); border-radius: 9px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.shell-workspace :is(.lead-filters button.active, .cre-chip.on, .seek-chip.active, .st-target.on) { background: var(--workspace-selected); color: var(--workspace-selected-text); border-color: transparent; box-shadow: none; }
+.shell-workspace :is(.lead-action, .cre-btn, .st-btn) { border-color: var(--border); border-radius: 8px; background: var(--panel-raised); color: var(--fg2); }
+.shell-workspace .lead-action-done { color: var(--ok); }
+.shell-workspace :is(.lead-open, .cre-lead) { color: var(--violet-light); }
+.shell-workspace .plan-card-checkout { padding: 30px; }
+.shell-workspace .plan-card-checkout.featured { border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: linear-gradient(155deg, color-mix(in srgb, var(--violet) 9%, var(--panel)), var(--panel) 55%); box-shadow: var(--workspace-shadow); }
+.shell-workspace .plan-card-checkout.current { border-color: var(--ok); }
+.shell-workspace .plan-price { font-family: var(--font-heading); font-weight: 450; letter-spacing: -.04em; font-size: 38px; color: var(--white); }
+.shell-workspace .plan-features li { font-size: 12px; }
+.shell-workspace .st { max-width: none; margin: 28px 0 0; }
+.shell-workspace .st-targets { justify-content: flex-start; }
+.shell-workspace .st-composer { padding: 24px; border-radius: 16px; }
+.shell-workspace .st-composer textarea { color: var(--white); font-family: var(--font-body); font-size: 16px; line-height: 1.8; min-height: 210px; }
+.shell-workspace .st-bar { border-top: 1px solid var(--border); padding-top: 16px; }
+.shell-workspace :is(.st-go, .st-btn-primary) { background: var(--workspace-selected); color: var(--workspace-selected-text); border-radius: 9px; }
+.shell-workspace .st-target { min-height: 46px; padding: 11px 18px; }
+.shell-workspace .st-target.on span { color: inherit; }
+.shell-workspace :is(.st-history button, .ticket-list li) { background: var(--panel); border-color: var(--border); border-radius: 10px; }
+.shell-workspace .pf-wizard { padding: 30px; background: var(--panel); border-radius: 14px; border: 1px solid var(--border); max-width: none; }
+.shell-workspace .pf-progress { margin-top: 24px; }
+.shell-workspace .ticket-chat { background: var(--ink); border-color: var(--border); }
+.shell-workspace .pay-banner { border-radius: 12px; box-shadow: none; }
+.shell-workspace .pay-banner-warn :is(.pay-banner-icon, .pay-banner-text strong) { color: var(--warn); }
+.shell-workspace .site-editor { margin: -30px 0 -40px; height: calc(100dvh - 180px); min-height: 500px; }
+
+/* Números grandes encolhem com o card em vez de cortar (ex.: receita). */
+.shell-workspace .stat-card { container-type: inline-size; }
+.shell-workspace .stat-card > strong { font-size: min(44px, 17cqi); white-space: nowrap; }
+
+/* Busca: estado inicial com radar animado. */
+.seek-idle { display: flex; align-items: center; gap: 40px; margin-top: 12px; padding: 34px 40px; border: 1px dashed color-mix(in srgb, var(--violet) 28%, transparent); border-radius: 16px; background: radial-gradient(ellipse at 12% 50%, color-mix(in srgb, var(--violet) 9%, transparent), transparent 60%), var(--panel); }
+.seek-radar { position: relative; width: 150px; height: 150px; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, color-mix(in srgb, var(--violet) 12%, transparent), transparent 70%); }
+.seek-radar > span { position: absolute; inset: 0; margin: auto; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--violet) 30%, transparent); }
+.seek-radar > span:nth-child(1) { width: 34%; height: 34%; }
+.seek-radar > span:nth-child(2) { width: 67%; height: 67%; }
+.seek-radar > span:nth-child(3) { width: 99%; height: 99%; }
+.seek-radar > i { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, color-mix(in srgb, var(--violet) 45%, transparent), transparent 22%); animation: radar-sweep 3.2s linear infinite; }
+.seek-radar > b { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--violet-light); box-shadow: 0 0 0 5px color-mix(in srgb, var(--violet) 18%, transparent); animation: radar-ping 3.2s ease-in-out infinite; }
+.seek-radar > b:nth-of-type(1) { top: 26%; left: 62%; }
+.seek-radar > b:nth-of-type(2) { top: 64%; left: 26%; animation-delay: 1.1s; }
+.seek-radar > b:nth-of-type(3) { top: 70%; left: 70%; animation-delay: 2.1s; }
+.seek-idle-text strong { display: block; font-family: var(--font-heading); font-size: 24px; font-weight: 400; letter-spacing: -.03em; line-height: 1.3; }
+.seek-idle-text p { margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.7; max-width: 52ch; }
+@keyframes radar-sweep { to { transform: rotate(360deg); } }
+@keyframes radar-ping { 0%, 100% { opacity: .25; transform: scale(.8); } 45% { opacity: 1; transform: scale(1.15); } }
+
+/* Planos: seletor de período e preço riscado. */
+.shell-workspace .payment-toggle { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 4px; }
+.shell-workspace .payment-toggle button { border-radius: 9px; font-size: 12px; color: var(--muted); }
+.shell-workspace .payment-toggle button.active, .shell-workspace .payment-toggle button[aria-pressed="true"] { background: var(--selected); color: var(--selected-text); }
+.shell-workspace .plan-price-was { font-size: 14px; margin-right: 10px; letter-spacing: 0; font-family: var(--font-body); }
+.shell-workspace .plan-flag { border-radius: 8px; letter-spacing: .08em; }
+.shell-workspace .plan-off-tag { border-radius: 8px; }
+
+/* Estúdio: alvo selecionado herda o texto do estado ativo. */
+.shell-workspace .st-target { border-radius: 12px; }
+.shell-workspace .st-target.on :is(b, small, svg) { color: inherit; }
+.shell-workspace .st-target.on small { opacity: .7; }
+.shell-workspace .st-go:disabled { opacity: .45; }
+.shell-workspace .st-plus { border-color: var(--border); background: var(--panel-raised); color: var(--violet-light); }
+
+/* Suporte / formulários. */
+.shell-workspace .ticket-priorities button { border-color: var(--border); border-radius: 9px; background: var(--ink); }
+.shell-workspace .ticket-priorities button.selected { background: var(--selected); color: var(--selected-text); border-color: transparent; }
+.shell-workspace .support-mail { background: var(--ink); border-color: var(--border); border-radius: 11px; font-family: var(--font-body); }
+.shell-workspace .ticket-list li { padding: 16px 18px; }
+.shell-workspace .ticket-status { border-radius: 8px; }
+.shell-workspace .dash-links { flex-wrap: wrap; gap: 10px 18px; }
+
+/* Portfólio publicado: card com prévia, como um "perfil" em destaque. */
+.shell-workspace :is(.pf-existing, .pf-done) { margin-top: 30px; max-width: none; padding: 30px; display: grid; gap: 18px; justify-items: start; border: 1px solid var(--border); border-radius: 16px; background: radial-gradient(ellipse at 90% 0%, color-mix(in srgb, var(--violet) 10%, transparent), transparent 55%), var(--panel); box-shadow: var(--workspace-shadow); }
+.shell-workspace .pf-existing-head { display: flex; align-items: center; gap: 16px; }
+.shell-workspace .pf-existing-head h2, .shell-workspace .pf-existing-head strong { font-family: var(--font-heading); font-weight: 450; }
+.shell-workspace .pf-existing .pf-photo-avatar { border-radius: 50%; background: #b99bea; color: #281942; }
+.shell-workspace .pf-url { background: var(--ink); border: 1px solid var(--border); border-radius: 10px; font-size: 13px; }
+.shell-workspace .pf-existing-preview { width: 100%; border-radius: 14px; border-color: var(--border); overflow: hidden; }
+.shell-workspace .pf-done-actions { justify-content: flex-start; }
+
+/* Admin: filtros e lista de jobs/chamados no mesmo padrão de seleção. */
+.shell-workspace .chamados-filters button { border: 1px solid var(--border); border-radius: 9px; background: var(--panel); color: var(--muted); font-size: 12px; font-weight: 500; }
+.shell-workspace .chamados-filters button.active { background: var(--selected); color: var(--selected-text); border-color: transparent; }
+.shell-workspace :is(.adm-job, .chamado-item) { border-color: var(--border); border-radius: 12px; background: var(--panel); }
+.shell-workspace .adm-jobs-live { color: var(--muted); }
+
+/* Leads: selo de status mais compacto sobre a foto. */
+.shell-workspace .lead-card-media { margin: 0; }
+.shell-workspace .lead-card-media .lead-status { padding: 6px 12px; border-radius: 8px; border-color: var(--border); }
+
+@keyframes workspace-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (min-width: 1600px) { .shell-workspace .shell-content { padding-top: 64px; } }
+@media (max-width: 1150px) {
+  .shell-workspace { padding-inline: 28px; }
+  .workspace-nav a { padding-inline: 12px; font-size: 11px; gap: 6px; }
+  .dash-hero { gap: 35px; }
+  .dash-insight > strong { font-size: 22px; }
+  .dash-overview { grid-template-columns: 1fr 1fr; }
+  .dash-next { grid-column: 1 / -1; }
+  .dash-overview > .dash-next { min-height: 0; }
+  .dash-next .dash-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .shell-workspace .stat-card { padding: 20px; }
+  .shell-workspace .stat-icon { top: 20px; left: 20px; }
+}
+@media (max-width: 760px) {
+  .shell-workspace { padding-inline: 18px; }
+  .workspace-toolbar { min-height: 80px; gap: 12px; }
+  .workspace-brand .brand { font-size: 23px; }
+  .workspace-tools { gap: 10px; }
+  .workspace-account-name { display: none; }
+  .workspace-account summary { gap: 5px; }
+  .workspace-nav { padding-bottom: 14px; gap: 5px; }
+  .workspace-nav a { padding: 10px 13px; font-size: 12px; }
+  .shell-workspace .shell-content { padding: 28px 0 44px; }
+  .dash-hero { gap: 30px; grid-template-columns: 1fr; margin-bottom: 24px; }
+  .dash-welcome h1 { font-size: 40px; }
+  .dash-insight-stack { justify-self: start; width: calc(100% - 45px); max-width: 480px; margin-right: 45px; }
+  .dash-insight { min-height: 190px; padding: 20px; }
+  .dash-insight > strong { max-width: 30ch; margin-block: 18px; }
+  .dash-insight-stack::after { right: -35px; }
+  .shell-workspace .dash-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shell-workspace .stat-card { min-height: 165px; padding: 18px; }
+  .shell-workspace .stat-icon { top: 18px; left: 16px; }
+  .shell-workspace .stat-card small { font-size: 9px; min-height: 28px; }
+  .dash-overview { grid-template-columns: 1fr; }
+  .dash-next { grid-column: auto; }
+  .dash-next .dash-actions { grid-template-columns: 1fr; }
+  .dash-overview > .dash-panel { min-height: 0; }
+  .shell-workspace .dash-panel { padding: 22px; }
+  .shell-workspace .seek-form { padding: 20px; }
+  .shell-workspace .seek-field { min-width: 100%; }
+  .shell-workspace .seek-form > .button { width: 100%; }
+  .shell-workspace .pf-wizard { padding: 22px 18px; }
+  .shell-workspace .st-composer { padding: 18px; }
+  .shell-workspace .private-disclaimer { align-items: flex-start; }
+  .shell-workspace .private-disclaimer svg { margin-top: 2px; }
+  .shell-workspace .site-editor { margin: 0; height: calc(100dvh - 160px); }
+  .seek-idle { flex-direction: column; text-align: center; padding: 28px 20px; gap: 22px; }
+  .shell-workspace .stat-grid:not(.dash-metrics) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .shell-workspace .stat-grid:not(.dash-metrics) .stat-card { min-height: 150px; }
+  .seek-idle-text strong { font-size: 20px; }
+}
+@media (max-width: 420px) {
+  .workspace-balance { padding: 7px 9px; }
+  .workspace-balance span { display: none; }
+  .workspace-tools { gap: 8px; }
+  .workspace-account summary > svg { display: none; }
+  .workspace-brand .brand { font-size: 21px; }
+  .workspace-brand .brand-mark { width: 26px; }
+  .dash-welcome h1 { font-size: 35px; }
+  .shell-workspace .stat-card { padding: 16px; }
+  .shell-workspace .stat-icon { top: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-workspace .shell-content { animation: none; }
+  .seek-radar > i, .seek-radar > b { animation: none; }
+  .shell-workspace *, .shell-workspace *::before, .shell-workspace *::after { transition: none !important; scroll-behavior: auto; }
+  .shell-workspace :is(.dash-insight, .seek-card, .lead-card, .cre-card, .button):hover { transform: none; }
+}

@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-export function Brand({ light = false }: { light?: boolean }) {
+export function Brand({ light = false, href = "/" }: { light?: boolean; href?: string }) {
   return (
-    <Link href="/" className={`brand${light ? " brand-light" : ""}`} aria-label="SeekerAi, página inicial">
+    <Link href={href} className={`brand${light ? " brand-light" : ""}`} aria-label="SeekerAi, página inicial">
       <span className="brand-mark" aria-hidden="true">
         <svg viewBox="0 0 32 32" fill="none">
           <circle cx="14" cy="15" r="9" stroke="currentColor" strokeWidth="2.5" />

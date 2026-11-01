@@ -5,9 +5,12 @@ import { LOCALE_COOKIE, THEME_COOKIE } from "@/lib/i18n/shared";
 import { MetaPixel } from "@/components/meta-pixel";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/sora";
+import "@fontsource-variable/outfit";
 import "./globals.css";
 import "./auth-ui.css";
 import "./pricing-ui.css";
+import "./workspace-ui.css";
+import "./public-ui.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 const title = "SeekerAi — Encontre quem precisa do que você vende";

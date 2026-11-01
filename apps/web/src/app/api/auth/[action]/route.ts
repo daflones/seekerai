@@ -9,6 +9,16 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
+// Servidor local (next dev): o Turnstile não roda em 127.0.0.1, então as
+// chamadas de auth vão pelo client de serviço — o GoTrue dispensa CAPTCHA
+// para a service key. Em produção (NODE_ENV=production) nunca entra aqui.
+const DEV_NO_CAPTCHA = process.env.NODE_ENV === "development";
+
+type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+async function adoptSession(supabase: ServerClient, session: { access_token: string; refresh_token: string } | null) {
+  if (session) await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+}
+
 function reply(body: object, status = 200, extra: Record<string, string> = {}) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store", ...extra } });
 }
@@ -51,9 +61,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       const input = loginSchema.parse(body);
       const limit = await authRateLimit(action, input.email, request.headers);
       if (!limit.allowed) return reply({ error: "Muitas tentativas. Aguarde antes de tentar novamente." }, 429, { "Retry-After": String(limit.retryAfter) });
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: input.email, password: input.password, options: { captchaToken: input.captchaToken },
-      });
+      const { data, error } = DEV_NO_CAPTCHA
+        ? await createSupabaseAdminClient().auth.signInWithPassword({ email: input.email, password: input.password })
+        : await supabase.auth.signInWithPassword({
+          email: input.email, password: input.password, options: { captchaToken: input.captchaToken },
+        });
+      if (DEV_NO_CAPTCHA && !error) await adoptSession(supabase, data.session);
+      if (DEV_NO_CAPTCHA && error) console.warn("[auth dev] login falhou:", error.code, error.message);
       if (error || !data.user?.email_confirmed_at) return authError(error?.code);
       const { data: profile, error: profileError } = await supabase.from("profiles")
         .select("role,consentimento_em,onboarding_concluido").eq("id", data.user.id).single();
@@ -70,14 +84,15 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       const limit = await authRateLimit(action, input.email, request.headers);
       if (!limit.allowed) return reply({ error: "Muitas tentativas. Aguarde antes de tentar novamente." }, 429, { "Retry-After": String(limit.retryAfter) });
       const next = input.plan ? `/app?plano=${input.plan}` : "/app";
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await (DEV_NO_CAPTCHA ? createSupabaseAdminClient() : supabase).auth.signUp({
         email: input.email, password: input.password,
         options: {
-          captchaToken: input.captchaToken,
+          ...(DEV_NO_CAPTCHA ? {} : { captchaToken: input.captchaToken }),
           emailRedirectTo: `${callbackOrigin(origin)}/auth/callback?next=${encodeURIComponent(next)}`,
           data: { full_name: input.name },
         },
       });
+      if (DEV_NO_CAPTCHA && !error) await adoptSession(supabase, data.session);
       if (error && !["user_already_exists", "email_exists"].includes(error.code || "")) return authError(error.code);
       if (data.user?.identities?.length) {
         const admin = createSupabaseAdminClient();
@@ -98,8 +113,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       const input = recoverySchema.parse(body);
       const limit = await authRateLimit(action, input.email, request.headers);
       if (!limit.allowed) return reply({ error: "Aguarde antes de solicitar outro link." }, 429, { "Retry-After": String(limit.retryAfter) });
-      const { error } = await supabase.auth.resetPasswordForEmail(input.email, {
-        captchaToken: input.captchaToken,
+      const { error } = await (DEV_NO_CAPTCHA ? createSupabaseAdminClient() : supabase).auth.resetPasswordForEmail(input.email, {
+        ...(DEV_NO_CAPTCHA ? {} : { captchaToken: input.captchaToken }),
         redirectTo: `${callbackOrigin(origin)}/auth/callback?recovery=1`,
       });
       if (error?.code === "captcha_failed") return authError(error.code);
@@ -117,7 +132,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     const input = action === "password" ? passwordSchema.parse(body) : onboardingSchema.parse(body);
     const limit = await authRateLimit(action, user.id, request.headers);
     if (!limit.allowed) return reply({ error: "Aguarde antes de tentar novamente." }, 429, { "Retry-After": String(limit.retryAfter) });
-    if (!await verifyAuthenticatedCaptcha(input.captchaToken, action, origin)) return authError("captcha_failed");
+    if (!DEV_NO_CAPTCHA && !await verifyAuthenticatedCaptcha(input.captchaToken, action, origin)) return authError("captcha_failed");
     if ("password" in input) {
       const { error: passwordError } = await supabase.auth.updateUser({ password: input.password });
       if (passwordError) return authError(passwordError.code);

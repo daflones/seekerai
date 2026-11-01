@@ -484,6 +484,11 @@ export function SearchConsole({
       ? <OutOfCredits lang={locale.lang} trial={!subscribed} expired={!subscribed && !dailyActive} />
       : <p role="alert" className="auth-error">{error}</p>)}
 
+    {results === null && !busy && !error && <div className="seek-idle">
+      <div className="seek-radar" aria-hidden="true"><span /><span /><span /><i /><b /><b /><b /></div>
+      <div className="seek-idle-text"><strong>{t.tutS2}</strong><p>{t.tutS3}</p></div>
+    </div>}
+
     {meta && results !== null && !busy && <p className="seek-meta">
       {results.length} {results.length === 1 ? t.foundOne : t.found}
       {meta.replay && <strong className="seek-replay-tag">{t.replay}</strong>}

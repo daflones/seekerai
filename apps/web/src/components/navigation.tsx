@@ -24,7 +24,7 @@ export function Navigation({ t = getMessages("pt").nav, locale, theme }: { t?: M
           <Link href="/cadastro" className="button button-small">{t.start} <ArrowUpRight size={14} /></Link>
           <button className="mobile-menu-button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? t.closeMenu : t.openMenu}>{open ? <X size={20} /> : <Menu size={20} />}</button>
         </div>
-        {open && <div id="mobile-menu" className="mobile-menu">{links.map(([label, href]) => <a href={href} key={href} onClick={() => setOpen(false)}>{label}</a>)}<Link href="/login">{t.enter}</Link></div>}
+        {open && <div id="mobile-menu" className="mobile-menu">{links.map(([label, href]) => <a href={href} key={href} onClick={() => setOpen(false)}>{label}</a>)}<Link href="/login">{t.enter}</Link><div className="mobile-menu-locale"><LocaleSwitcher current={locale} /></div></div>}
       </nav>
     </header>
   );

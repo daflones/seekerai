@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getLocale, formatMoney } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { PayRetryBanner } from "@/components/pay-retry-banner";
+import { AnimatedNumber } from "@/components/animated-number";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
   const [params, loc, { supabase, user, profile }] = await Promise.all([
@@ -82,47 +83,63 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
         <Link href="/app/planos#creditos" className="button button-primary button-small">{t.noCreditsCta}</Link>
       </div>
     )}
-    <span className="eyebrow">{t.eyebrow}</span>
-    <h1>{t.welcome}, {profile.nome || t.welcomeFallback}<span className="gradient-text">.</span></h1>
-    <p className="private-intro">{t.intro}</p>
+    <div className="dash-hero">
+      <div className="dash-welcome">
+        <span className="eyebrow"><span className="status-dot" />{t.eyebrow}</span>
+        <h1>{t.welcome},<br />{profile.nome || t.welcomeFallback}<span className="gradient-text">.</span></h1>
+        <p className="private-intro">{t.intro}</p>
+      </div>
+      <div className="dash-insight-stack">
+        <Link href="/app/buscar" className="dash-insight">
+          <span className="dash-insight-top"><Radar size={16} />{t.n1t}<ArrowUpRight size={18} /></span>
+          <strong>{t.n1s}</strong>
+          <span className="dash-insight-bottom">{getMessages(loc.lang).shell.seek}<span><ArrowUpRight size={18} /></span></span>
+        </Link>
+      </div>
+    </div>
 
-    <div className="stat-grid">
+    <div className="stat-grid dash-metrics">
       <section className="stat-card">
         <span className="stat-icon"><CircleDollarSign size={18} /></span>
         <small>{t.s1l}</small>
-        <strong>{wallet?.saldo ?? 0}</strong>
+        <strong><AnimatedNumber value={wallet?.saldo ?? 0} locales={dateLocale} /></strong>
+        <span className="stat-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, (wallet?.saldo ?? 0) / Math.max(1, (wallet?.saldo ?? 0) + gastoMes) * 100)}%` }} /></span>
         <span className="stat-sub">{assinatura ? t.s1subOn : dailyActive ? t.s1subOff : t.s1subOffExp}</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><Users size={18} /></span>
         <small>{t.s2l}</small>
-        <strong>{leadsTotal ?? 0}</strong>
+        <strong><AnimatedNumber value={leadsTotal ?? 0} locales={dateLocale} /></strong>
+        <span className="stat-meter" aria-hidden="true"><i style={{ width: `${(leadsNovos ?? 0) / Math.max(1, leadsTotal ?? 0) * 100}%` }} /></span>
         <span className="stat-sub">{leadsNovos ? `${leadsNovos} ${t.s2subNew}` : t.s2subNone}</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><Radar size={18} /></span>
         <small>{t.s3l}</small>
-        <strong>{buscas}</strong>
+        <strong><AnimatedNumber value={buscas} locales={dateLocale} /></strong>
+        <span className="stat-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, buscas / 30 * 100)}%` }} /></span>
         <span className="stat-sub">{t.s3sub}</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><TrendingUp size={18} /></span>
         <small>{t.s4l}</small>
-        <strong>{gastoMes}</strong>
+        <strong><AnimatedNumber value={gastoMes} locales={dateLocale} /></strong>
+        <span className="stat-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, gastoMes / Math.max(1, (wallet?.saldo ?? 0) + gastoMes) * 100)}%` }} /></span>
         <span className="stat-sub">{t.s4sub}</span>
-      </section>
-      <section className="stat-card">
-        <span className="stat-icon"><CircleDollarSign size={18} /></span>
-        <small>{t.s5l}</small>
-        <strong>{formatMoney(Math.round(totalFechado * 100), loc.currency, loc.lang)}</strong>
-        <span className="stat-sub">{t.s5sub} · {ganhos.length}</span>
       </section>
     </div>
 
-    <section className="dash-panel">
-      <h2><CircleDollarSign size={16} /> {t.wonTitle}</h2>
+    <div className="dash-overview">
+    <section className="dash-panel dash-revenue">
+      <div className="dash-panel-heading">
+        <h2><TrendingUp size={16} /> {t.s5l}</h2>
+        <Link href="/app/leads" aria-label={t.n2t} className="dash-icon-link"><ArrowUpRight size={18} /></Link>
+      </div>
+      <strong className="dash-revenue-total">{formatMoney(Math.round(totalFechado * 100), loc.currency, loc.lang)}</strong>
+      <span className="stat-sub">{t.s5sub} · {ganhos.length}</span>
+      <h3 className="dash-list-title">{t.wonTitle}</h3>
       {ganhos.length === 0
-        ? <p className="dash-empty">{t.wonEmpty}</p>
+        ? <div className="dash-empty"><Users size={23} /><p>{t.wonEmpty}</p><Link className="text-link" href="/app/leads">{t.n2t}<ArrowUpRight size={14} /></Link></div>
         : <ul className="dash-usage">
             {ganhos.map((l) => (
               <li key={l.id}>
@@ -133,17 +150,19 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
           </ul>}
     </section>
 
-    <div className="dash-grid">
-      <section className="dash-panel">
-        <h2><Sparkles size={16} /> {t.opsTitle}</h2>
+      <section className="dash-panel dash-activity">
+        <div className="dash-panel-heading"><h2><Sparkles size={16} /> {t.opsTitle}</h2></div>
         {porAcao.length === 0
-          ? <p className="dash-empty">{t.opsEmpty}</p>
+          ? <div className="dash-empty"><Radar size={23} /><p>{t.opsEmpty}</p><Link className="text-link" href="/app/buscar">{t.n1t}<ArrowUpRight size={14} /></Link></div>
           : <>
-              <ul className="dash-usage">
+              <ul className="dash-usage dash-usage-bars">
                 {porAcao.map(([action, total]) => (
                   <li key={action}>
-                    <span>{t.actionLabels[action] ?? action}</span>
-                    <strong>{total} {total === 1 ? t.credit : t.credits}</strong>
+                    <div><span>{t.actionLabels[action] ?? action}</span>
+                    <strong>{total} {total === 1 ? t.credit : t.credits}</strong></div>
+                    <span className="dash-usage-track" aria-hidden="true">
+                      <i style={{ width: `${total / Math.max(1, porAcao[0][1]) * 100}%` }} />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -160,8 +179,8 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
             </>}
       </section>
 
-      <section className="dash-panel">
-        <h2><Compass size={16} /> {t.nextTitle}</h2>
+      <section className="dash-panel dash-next">
+        <div className="dash-panel-heading"><h2><Compass size={16} /> {t.nextTitle}</h2></div>
         <ul className="dash-actions">
           <li><Link href="/app/buscar"><Radar size={16} /><div><strong>{t.n1t}</strong><small>{t.n1s}</small></div><ArrowUpRight size={15} /></Link></li>
           <li><Link href="/app/leads"><Users size={16} /><div><strong>{t.n2t}</strong><small>{t.n2s}</small></div><ArrowUpRight size={15} /></Link></li>

@@ -9,22 +9,26 @@
 
 :root {
   color-scheme: dark;
-  --ink: #090711; --panel: #12101e; --panel-raised: #191526;
-  --white: #f5f2fc; --fg2: #d8bcec; --muted: #aaa3bc;
+  --ink: #100e16; --panel: #1a1722; --panel-raised: #221e2b;
+  --white: #f5f2fa; --fg2: #d4cede; --muted: #a7a0b5;
   --violet: #9667ff; --violet-light: #c4a7ff; --cyan: #69e8cc;
   --ok: #6fe3b3; --info: #9fc6e8; --warn: #d8b56a; --warn2: #e8a87e; --danger: #f0a1a1;
-  --amber: #f4c779; --paper: #f7f6fa; --paper-ink: #211b32;
-  --border: #ffffff12; --radius: 18px;
-  --font-body: "DM Sans Variable", sans-serif; --font-heading: "Sora Variable", sans-serif;
+  --amber: #f4c779; --paper: #16131d; --paper-ink: #f5f2fa;
+  --border: #ffffff0e; --radius: 14px;
+  --selected: #eee7fa; --selected-text: #241a35;
+  --card-shadow: 0 2px 3px #00000010, 0 12px 28px #00000018;
+  --font-body: "DM Sans Variable", sans-serif; --font-heading: "Outfit Variable", sans-serif;
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --ink: #f4f1fa; --panel: #ffffff; --panel-raised: #eee9f7;
-  --white: #211a33; --fg2: #3c3153; --muted: #6b5f83;
-  --violet: #7b3ff2; --violet-light: #8f5fd8; --cyan: #0d9488;
+  --ink: #f5f4f7; --panel: #ffffff; --panel-raised: #eeecf2;
+  --white: #211b2b; --fg2: #494253; --muted: #736b7d;
+  --violet: #7b3ff2; --violet-light: #7341c8; --cyan: #0d9488;
   --ok: #14805a; --info: #2563a8; --warn: #96700f; --warn2: #b35a1f; --danger: #c23030;
-  --border: #7b3ff222; --paper: #ffffff; --paper-ink: #211b32;
+  --border: #2920330f; --paper: #ffffff; --paper-ink: #211b2b;
+  --selected: #241b31; --selected-text: #ffffff;
+  --card-shadow: 0 2px 3px #241b3104, 0 10px 26px #241b3108;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 110px; }
@@ -42,7 +46,7 @@ svg { flex-shrink: 0; }
 ::selection { background: #9365ff55; }
 :focus-visible { outline: 3px solid #51b9a7; outline-offset: 5px; }
 h1, h2, h3, h4, p { margin: 0; }
-h1, h2, h3, h4 { font-family: var(--font-heading); line-height: 1.25; letter-spacing: -.045em; font-weight: 550; }
+h1, h2, h3, h4 { font-family: var(--font-heading); line-height: 1.2; letter-spacing: -.035em; font-weight: 450; }
 .container { width: min(1120px, calc(100% - 64px)); margin-inline: auto; }
 
 /* Seletor de idioma e alternador de tema */

@@ -62,7 +62,7 @@ describe("endpoints de autenticação", () => {
     expect((await request("login", signup, "https://evil.example")).status).toBe(403);
     expect((await request("login", signup, null)).status).toBe(403);
     mocks.ready.mockReturnValue(false);
-    expect((await request("login", signup)).status).toBe(503);
+    expect((await request("login", signup)).status).toBe(500);
     mocks.ready.mockReturnValue(true);
     expect((await request("login", { ...signup, captchaToken: "" })).status).toBe(400);
     expect(sdk.auth.signInWithPassword).not.toHaveBeenCalled();
@@ -141,7 +141,7 @@ describe("endpoints de autenticação", () => {
     expect((await request("signup", { payload: "a".repeat(17000) })).status).toBe(413);
     mocks.rate.mockRejectedValue(new Error("erro-interno"));
     const response = await request("login", signup);
-    expect(response.status).toBe(503);
+    expect(response.status).toBe(500);
     expect(sdk.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });

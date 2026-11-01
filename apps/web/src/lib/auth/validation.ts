@@ -36,8 +36,9 @@ export function allowedOrigin(origin: string | null): boolean {
     const candidate = new URL(origin);
     const canonical = process.env.NEXT_PUBLIC_APP_URL;
     if (canonical && candidate.origin === new URL(canonical).origin) return true;
-    return process.env.NODE_ENV !== "production" &&
-      ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3100", "http://127.0.0.1:3100"].includes(candidate.origin);
+    if (process.env.NODE_ENV === "production") return false;
+    // Fora de produção: qualquer porta de loopback (dev server, previews/proxies locais).
+    return candidate.protocol === "http:" && ["localhost", "127.0.0.1"].includes(candidate.hostname);
   } catch { return false; }
 }
 
