@@ -239,7 +239,13 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       <section className="pix-panel pix-modal" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="pix-close" aria-label="×" onClick={() => setPix(null)}>×</button>
         <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : plans.find((p) => p.slug === pix.plan)?.name}</h2>
-        <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : priceFor(plans.find((p) => p.slug === pix.plan)!))}{!pix.pack && <small>{t.perMonth}</small>}</p>
+        <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : disc(priceFor(plans.find((p) => p.slug === pix.plan)!)))}{!pix.pack && <small>{t.perMonth}</small>}</p>
+        {!pix.pack && def.months > 1 && (
+          <p className="plan-billed-caption">
+            {money(disc(totalFor(plans.find((p) => p.slug === pix.plan)!)))}
+            {" "}{period === "trimestral" ? t.billedTri : t.billedYear}
+          </p>
+        )}
         {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code PIX" width={210} height={210} unoptimized />}
         {pix.qrCode && <div className="pix-code">
           <code>{pix.qrCode}</code>

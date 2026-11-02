@@ -742,6 +742,12 @@ select option { background: var(--panel); color: var(--white); }
   .pix-overlay { align-items: flex-end; padding: 0; }
   .pix-modal { width: 100%; max-height: 88dvh; border-radius: 20px 20px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
   .fancy-panel { max-height: 50dvh; }
+  /* Landing: campos ≥16px evitam o zoom automático do iOS; alvos de toque ≥40px */
+  .select-wrap input, .select-wrap select { font-size: 16px; }
+  .locale-switcher select { font-size: 16px; }
+  .mobile-menu-button { padding: 10px; }
+  .mobile-menu a { min-height: 40px; display: flex; align-items: center; }
+  .footer-links a { min-height: 40px; }
   .auth-layout { grid-template-columns: 1fr; gap: 35px; padding-block: 45px; }
   .auth-story h1 { font-size: 37px; }
   .auth-story > p { font-size: 13px; }
