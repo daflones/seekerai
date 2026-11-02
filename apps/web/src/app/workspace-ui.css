@@ -362,6 +362,78 @@
   .shell-workspace .st-device-browser iframe { height: 480px; }
   .shell-workspace .st-device-phone { border-width: 7px; border-radius: 30px; }
   .shell-workspace .st-device-phone iframe { height: 560px; border-radius: 23px; }
+  .shell-workspace .st-btn { min-height: 40px; }
+  .shell-workspace .lead-status { min-height: 40px; padding-block: 8px; }
+}
+/* Benefícios do plano: lista sempre visível no desktop; no mobile vira accordion. */
+.plan-more > summary { display: none; }
+/* ── Mobile denso: mais conteúdo por tela, alvos de toque ≥40px mantidos ── */
+@media (max-width: 760px) {
+  .shell-workspace { padding-inline: 14px; }
+  .workspace-header { position: sticky; top: 0; z-index: 50; margin: 0 -14px; padding: 0 14px; background: var(--ink); border-bottom: 1px solid var(--border); }
+  .workspace-toolbar { min-height: 54px; gap: 10px; }
+  .workspace-brand .brand { font-size: 20px; }
+  .workspace-brand .brand-mark { width: 24px; height: 26px; }
+  .workspace-balance { min-height: 34px; padding: 5px 10px; font-size: 11.5px; }
+  .workspace-account summary { min-height: 40px; }
+  .workspace-nav { padding-bottom: 8px; gap: 4px; scrollbar-width: none; }
+  .workspace-nav::-webkit-scrollbar { display: none; }
+  .workspace-nav a { padding: 8px 12px; min-height: 40px; font-size: 11.5px; gap: 6px; border-radius: 8px; }
+  .shell-workspace .shell-content { padding: 20px 0 44px; }
+  .shell-workspace .shell-content > h1, .dash-welcome h1 { font-size: clamp(22px, 6.4vw, 26px); }
+  .shell-workspace .eyebrow { margin-bottom: 9px; font-size: 9px; }
+  .shell-workspace .private-intro { font-size: 12.5px; line-height: 1.6; margin-top: 9px; }
+  /* Painel */
+  .dash-hero { gap: 18px; margin-bottom: 20px; }
+  .dash-welcome .private-intro { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dash-insight-stack { width: 100%; margin-right: 0; }
+  .dash-insight-stack::before, .dash-insight-stack::after { display: none; }
+  .dash-insight { min-height: 0; padding: 15px 16px; }
+  .dash-insight > strong { font-size: 16px; margin-block: 9px; max-width: none; }
+  .shell-workspace .stat-card { min-height: 112px; padding: 13px; }
+  .shell-workspace .stat-icon { top: 13px; left: 13px; }
+  .shell-workspace .stat-card small { min-height: 0; }
+  .shell-workspace .dash-metrics { gap: 10px; }
+  .shell-workspace .dash-panel { padding: 16px; }
+  /* Campos: ≥16px nos inputs evita o zoom automático do iOS ao focar */
+  .shell-workspace :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 16px; }
+  .shell-workspace .seek-form { padding: 14px; gap: 12px; }
+  .shell-workspace .seek-field { gap: 5px; }
+  .seek-idle { padding: 24px 16px; gap: 14px; }
+  .seek-idle-text strong { font-size: 16px; }
+  .shell-workspace .seek-results { margin-top: 16px; }
+  /* Planos — 3 cards devem caber na primeira tela de 390x700 */
+  .shell-workspace .plan-period-toggle { width: 100%; margin: 0 0 12px; }
+  .shell-workspace .plan-period-toggle button { flex: 1; min-height: 40px; padding: 6px 6px; font-size: 11px; gap: 5px; }
+  .shell-workspace .plan-grid { margin-top: 12px; gap: 10px; }
+  .shell-workspace .plan-card-checkout { padding: 12px 14px; gap: 6px; border-radius: 12px; }
+  .shell-workspace .plan-card-checkout h3 { font-size: 15.5px; padding-right: 92px; }
+  .shell-workspace .plan-flag { top: -8px; left: 14px; font-size: 7px; padding: 3px 9px; }
+  .shell-workspace .plan-price { font-size: 25px; margin-block: 4px; }
+  .shell-workspace .plan-price-was { font-size: 12px; margin-right: 5px; }
+  .shell-workspace .plan-off-tag { position: absolute; top: 14px; right: 14px; font-size: 9px; padding: 3px 8px; margin-top: 0; }
+  .shell-workspace .plan-billed-caption { margin-top: 0; }
+  .shell-workspace .plan-tagline { display: none; }
+  .shell-workspace .plan-actions { display: flex; gap: 8px; }
+  .shell-workspace .plan-actions .button { flex: 1; min-height: 40px; font-size: 12px; padding: 8px 10px; }
+  .shell-workspace .plan-more > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; padding: 6px 10px; margin-top: 4px; border: 1px dashed var(--border); border-radius: 9px; font-size: 11.5px; font-weight: 550; color: var(--violet-light); cursor: pointer; list-style: none; }
+  .shell-workspace .plan-more > summary::-webkit-details-marker { display: none; }
+  .shell-workspace .plan-more > summary svg { transition: transform .2s; flex-shrink: 0; }
+  .shell-workspace .plan-more[open] > summary svg { transform: rotate(180deg); }
+  .shell-workspace .plan-more .plan-features { padding: 8px 2px 2px; }
+  .shell-workspace .plan-more .plan-features li { font-size: 11px; line-height: 1.6; }
+  .shell-workspace .plan-now { padding: 14px; }
+  .shell-workspace .pack-row { padding: 12px 14px; gap: 12px; }
+  /* Leads */
+  .shell-workspace .lead-filters { margin-top: 14px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+  .shell-workspace .lead-filters::-webkit-scrollbar { display: none; }
+  .shell-workspace .lead-filters button { flex-shrink: 0; min-height: 40px; padding: 8px 14px; }
+  .shell-workspace .lead-grid { gap: 10px; margin-top: 14px; }
+  .shell-workspace .lead-card-media { height: 104px; }
+  .shell-workspace .lead-card-body { padding: 11px 13px 12px; gap: 6px; }
+  .shell-workspace .lead-tip { font-size: 11px; padding: 7px 9px; }
+  .shell-workspace .lead-action { min-height: 40px; }
+  .shell-workspace .lead-pager { margin-top: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .shell-workspace .shell-content { animation: none; }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { CalendarClock, CheckCircle2, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
+import { CalendarClock, CheckCircle2, ChevronDown, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
 import { callAction } from "@/lib/app-client";
 import { metaCookies, trackMeta } from "@/lib/meta";
 import { CREDIT_PACKS, formatMoney, INTL_PRICES, type CreditPack, type Locale } from "@/lib/i18n/shared";
@@ -53,6 +53,13 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
     if (new URLSearchParams(window.location.search).get("checkout") === "cancelado") {
       setCanceled(true);
     }
+  }, []);
+
+  // Benefícios do card: no mobile começam recolhidos (accordion no próprio card).
+  const moreRefs = useRef<(HTMLDetailsElement | null)[]>([]);
+  useLayoutEffect(() => {
+    if (!matchMedia("(max-width: 760px)").matches) return;
+    for (const el of moreRefs.current) el?.removeAttribute("open");
   }, []);
 
   const isIntl = !locale.isBrazil;
@@ -134,16 +141,20 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
         {isFree ? money(0) : money(disc(priceFor(plan)))}
         {!isFree && <small>{t.perMonth}</small>}
       </p>
-      {!isFree && discountPct > 0 && <span className="plan-off-tag">-{discountPct}% {t.firstBuy}</span>}
+      {!isFree && discountPct > 0 && <span className="plan-off-tag">{discountPct}% {t.firstBuy}</span>}
       {!isFree && def.months > 1 && (
         <p className="plan-billed-caption">
           {money(disc(totalFor(plan)))} {period === "trimestral" ? t.billedTri : t.billedYear}
         </p>
       )}
       {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
-      {plan.content.features && <ul className="plan-features">
-        {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}
-      </ul>}
+      {plan.content.features && <details className="plan-more" open
+          ref={(el) => { moreRefs.current[plans.indexOf(plan)] = el; }}>
+        <summary>{t.seeBenefits}<ChevronDown size={13} /></summary>
+        <ul className="plan-features">
+          {plan.content.features.filter((f) => f.visible).slice(0, 6).map((f) => <li key={f.id}>{f.text}</li>)}
+        </ul>
+      </details>}
       {isFree ? <p className="plan-current-note">{t.freeNote}</p> : planActions(plan)}
     </article>;
   }
@@ -171,7 +182,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
         {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
           <CalendarClock size={14} />{periodLabel[p.id]}
-          {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
+          {p.discountPct > 0 && <em className="toggle-off">{p.discountPct}%</em>}
         </button>)}
       </div>
       <div className="plan-grid plan-grid-upgrades">
@@ -187,7 +198,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
         {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
           <CalendarClock size={14} />{periodLabel[p.id]}
-          {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
+          {p.discountPct > 0 && <em className="toggle-off">{p.discountPct}%</em>}
         </button>)}
       </div>
       <div className="plan-grid">

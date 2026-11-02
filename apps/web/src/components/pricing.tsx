@@ -32,7 +32,7 @@ export function Pricing({ plans, source, locale, t, discountPct = 0 }: { plans: 
         <div className="payment-toggle" role="group" aria-label={t.periodGroup}>
           {BILLING_PERIODS.map((p) => <button key={p.id} aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
             <CalendarClock size={15} />{periodLabel[p.id]}
-            {p.discountPct > 0 && <em className="toggle-off">-{p.discountPct}%</em>}
+            {p.discountPct > 0 && <em className="toggle-off">{p.discountPct}%</em>}
           </button>)}
         </div>
         {locale.isBrazil && (

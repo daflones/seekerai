@@ -54,7 +54,7 @@ export function PlanCardView({
           ? <>{showDisc && <s className="plan-price-was">{formatMoney(monthly, locale.currency, locale.lang)}</s>}{formatMoney(disc(monthly), locale.currency, locale.lang)}<small>{perMonth}</small></>
           : <>{formatMoney(0, locale.currency, locale.lang)}<small>{freeSuffix}</small></>}</div>
       : <div className="plan-price"><span>R$</span>{showDisc && <s className="plan-price-was">{formatPlanPrice(monthly)}</s>}{formatPlanPrice(disc(monthly))}<small>{plan.slug === "gratis" ? freeSuffix : perMonth}</small></div>}
-    {showDisc && <span className="plan-off-tag">-{discountPct}% {firstBuy}</span>}
+    {showDisc && <span className="plan-off-tag">{discountPct}% {firstBuy}</span>}
     {billedCaption && <span className="plan-billed-note">{billedCaption}</span>}
     <p className="plan-description">{L(content.description)}</p>
     <span className="plan-divider" />

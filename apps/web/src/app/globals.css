@@ -735,8 +735,13 @@ select option { background: var(--panel); color: var(--white); }
   .explore-content { padding-top: 45px; }
   .explore-content > p { font-size: 13px; }
   .explore-note { font-size: 11px; padding: 16px; }
-  .lead-dialog { padding: 28px 22px; }
+  .lead-dialog { top: auto; bottom: 0; left: 0; right: 0; transform: none; width: 100%; max-height: 88dvh; border-radius: 20px 20px 0 0; padding: 24px 20px calc(20px + env(safe-area-inset-bottom)); }
   .lead-dialog .button { white-space: normal; font-size: 12px; width: 100%; }
+  .lead-dialog .dialog-actions { flex-direction: column; }
+  .lead-dialog .dialog-actions .button { width: 100%; }
+  .pix-overlay { align-items: flex-end; padding: 0; }
+  .pix-modal { width: 100%; max-height: 88dvh; border-radius: 20px 20px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .fancy-panel { max-height: 50dvh; }
   .auth-layout { grid-template-columns: 1fr; gap: 35px; padding-block: 45px; }
   .auth-story h1 { font-size: 37px; }
   .auth-story > p { font-size: 13px; }
