@@ -85,8 +85,10 @@ export async function GET(
 
   // Site renderizado por config (barbearia/beleza): captura o HTML
   // renderizado pra virar base editável. O header interno libera o gate.
+  // Scripts do Next morrem na captura, mas os marcados com data-keep
+  // (ilha #skr-cfg + site-runtime.js) sobrevivem e reanimam o doc.
   const doc = await captureSiteDoc(slug, _request.nextUrl.origin)
-    .then((d) => d?.replace(/<script[\s\S]*?<\/script>/gi, "") ?? null);
+    .then((d) => d?.replace(/<script(?![^>]*\bdata-keep\b)[\s\S]*?<\/script>/gi, "") ?? null);
   if (!doc) return NextResponse.json({ error: "Falha ao carregar o site." }, { status: 500 });
   if (doc.length > MAX_DOC) {
     return NextResponse.json({ error: "Site grande demais pra editar." }, { status: 413 });

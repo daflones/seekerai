@@ -20,6 +20,7 @@ import {
   useBooking, useOverlayLock, VideoCard,
 } from "./primitives";
 import { conjLugar, conjNoLugar, siteLocale, siteMoney, siteStrings } from "./site-i18n";
+import { siteRuntimeJson } from "./runtime-payload";
 import "./beauty.css";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
@@ -207,21 +208,17 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </nav>
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div className="bbeauty-mobile-menu"
-            initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.25, ease: EASE }}>
-            {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
-            <a href="#servicos" onClick={anchor("#servicos")}>{servicosLabel}</a>
-            {temOfertas && <a href="#ofertas" onClick={anchor("#ofertas")}>{ofertasNav}</a>}
-            <a href="#portfolio" onClick={anchor("#portfolio")}>{S.navPortfolio}</a>
-            {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>{S.navDuvidas}</a>}
-            <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
-            <CtaButton className="bbeauty-mobile-cta" onClick={() => setMenuOpen(false)}>{ctaLabel}</CtaButton>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Menu sempre no DOM (display via .open) — o doc capturado pelo
+          editor precisa do markup pro runtime estático reanimar. */}
+      <div className={`bbeauty-mobile-menu${menuOpen ? " open" : ""}`}>
+        {cfg.historia && <a href="#espaco" onClick={anchor("#espaco")}>{deLugar.charAt(0).toUpperCase()+deLugar.slice(1)}</a>}
+        <a href="#servicos" onClick={anchor("#servicos")}>{servicosLabel}</a>
+        {temOfertas && <a href="#ofertas" onClick={anchor("#ofertas")}>{ofertasNav}</a>}
+        <a href="#portfolio" onClick={anchor("#portfolio")}>{S.navPortfolio}</a>
+        {(cfg.faq?.length ?? 0) > 0 && <a href="#duvidas" onClick={anchor("#duvidas")}>{S.navDuvidas}</a>}
+        <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
+        <CtaButton className="bbeauty-mobile-cta" onClick={() => setMenuOpen(false)}>{ctaLabel}</CtaButton>
+      </div>
 
       {/* ---------- HERO editorial ---------- */}
       <header className="bbeauty-hero" id="top">
@@ -635,18 +632,9 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                     <button onClick={() => setFaqOpen(faqOpen === i ? null : i)} aria-expanded={faqOpen === i}>
                       {f.q}<span className="faq-icon">+</span>
                     </button>
-                    <AnimatePresence initial={false}>
-                      {faqOpen === i && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.35, ease: EASE }}
-                          style={{ overflow: "hidden" }}>
-                          <p>{f.a}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {/* Resposta sempre no DOM (abre via .open) — sem ela o
+                        site editado não teria o texto pra exibir. */}
+                    <div className="bbeauty-faq-answer"><p>{f.a}</p></div>
                   </div>
                 ))}
               </div>
@@ -936,6 +924,14 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         </AnimatePresence>,
         document.body,
       )}
+
+      {/* Ilha de dados + runtime estático (data-keep): reanimam o doc
+          editado sem o React — menu, FAQ, lightbox e agendamento. */}
+      <script
+        type="application/json" id="skr-cfg" data-keep
+        dangerouslySetInnerHTML={{ __html: siteRuntimeJson(cfg, "bbeauty") }}
+      />
+      <script src="/site-runtime.js" data-keep defer />
     </div>
   );
 }

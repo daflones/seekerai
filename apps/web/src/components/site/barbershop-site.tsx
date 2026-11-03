@@ -20,6 +20,7 @@ import {
   useBooking, useOverlayLock, VideoCard,
 } from "./primitives";
 import { siteLocale, siteMoney, siteStrings } from "./site-i18n";
+import { siteRuntimeJson } from "./runtime-payload";
 import "./site.css";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
@@ -153,21 +154,17 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </nav>
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.div className="bshop-mobile-menu"
-            initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.25, ease: EASE }}>
-            {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>{S.navHistoria}</a>}
-            <a href="#galeria" onClick={anchor("#galeria")}>{S.navGaleria}</a>
-            <a href="#servicos" onClick={anchor("#servicos")}>{S.navServicos}</a>
-            <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
-            {bookingEnabled
-              ? <button className="bshop-mobile-cta" onClick={() => { setMenuOpen(false); openBook(); }}>{S.ctaAgendarHorario}</button>
-              : waNumber && <a className="bshop-mobile-cta" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>WhatsApp</a>}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Menu sempre no DOM (display via .open) — o doc capturado pelo
+          editor precisa do markup pro runtime estático reanimar. */}
+      <div className={`bshop-mobile-menu${menuOpen ? " open" : ""}`}>
+        {cfg.historia && <a href="#historia" onClick={anchor("#historia")}>{S.navHistoria}</a>}
+        <a href="#galeria" onClick={anchor("#galeria")}>{S.navGaleria}</a>
+        <a href="#servicos" onClick={anchor("#servicos")}>{S.navServicos}</a>
+        <a href="#contato" onClick={anchor("#contato")}>{S.navContato}</a>
+        {bookingEnabled
+          ? <button className="bshop-mobile-cta" onClick={() => { setMenuOpen(false); openBook(); }}>{S.ctaAgendarHorario}</button>
+          : waNumber && <a className="bshop-mobile-cta" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener" onClick={() => setMenuOpen(false)}>WhatsApp</a>}
+      </div>
 
       {/* ---------- HERO ---------- */}
       <header className="bshop-hero" id="top">
@@ -478,18 +475,9 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                     <button onClick={() => setFaqOpen(faqOpen === i ? null : i)} aria-expanded={faqOpen === i}>
                       {f.q}<span className="faq-icon">+</span>
                     </button>
-                    <AnimatePresence initial={false}>
-                      {faqOpen === i && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.35, ease: EASE }}
-                          style={{ overflow: "hidden" }}>
-                          <p>{f.a}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {/* Resposta sempre no DOM (abre via .open + CSS grid) —
+                        sem ela o site editado não teria o texto pra exibir. */}
+                    <div className="bshop-faq-answer"><p>{f.a}</p></div>
                   </div>
                 ))}
               </div>
@@ -729,6 +717,16 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </AnimatePresence>,
         document.body,
       )}
+
+      {/* Ilha de dados + runtime estático: sobrevivem à captura do editor
+          (data-keep) e reanimam o doc salvo — menu, FAQ, lightbox e o
+          wizard de agendamento funcionam sem o React. Na página viva o
+          runtime sai cedo porque os scripts do Next existem. */}
+      <script
+        type="application/json" id="skr-cfg" data-keep
+        dangerouslySetInnerHTML={{ __html: siteRuntimeJson(cfg, "bshop") }}
+      />
+      <script src="/site-runtime.js" data-keep defer />
     </div>
   );
 }

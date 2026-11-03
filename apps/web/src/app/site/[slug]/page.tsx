@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { loadSite } from "@/lib/sites";
+import { loadSite, type SiteConfig } from "@/lib/sites";
+import { injectSiteRuntime } from "@/components/site/runtime-payload";
 import { EDITOR_HEADER, editorToken } from "@/lib/site-editor";
 import { siteStrings } from "@/components/site/site-i18n";
 import { BarbershopSite } from "@/components/site/barbershop-site";
@@ -133,11 +134,15 @@ export default async function SitePage({ params }: Props) {
     // target=mobile veste moldura de telefone.
     if (site.tipo === "custom" && site.config.html) {
       const isMobile = (site.config as { target?: string }).target === "mobile";
+      // Docs capturados antes do runtime: injeta ilha (com o config
+      // original) + script na hora de servir — reanima menu/FAQ/agenda.
+      const origCfg = (site.config as { orig?: { config?: SiteConfig } }).orig?.config ?? null;
+      const doc = injectSiteRuntime(site.config.html, origCfg);
       const frame = (
         <iframe
-          srcDoc={site.config.html}
+          srcDoc={doc}
           title={site.nome}
-          sandbox="allow-scripts allow-forms"
+          sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
           style={{ width: "100%", height: "100%", border: 0, display: "block" }}
         />
       );
@@ -170,7 +175,7 @@ export default async function SitePage({ params }: Props) {
     <iframe
       srcDoc={output.conteudo}
       title="Site do estabelecimento"
-      sandbox="allow-scripts allow-forms"
+      sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
       style={{ width: "100%", height: "100dvh", border: 0, display: "block" }}
     />
   );

@@ -276,7 +276,7 @@
 @media (max-width: 860px) {
   .bbeauty-nav-links { display: none; }
   .bbeauty-nav-burger { display: block; }
-  .bbeauty-mobile-menu {
+  .bbeauty-mobile-menu.open {
     display: flex; flex-direction: column; gap: 4px;
     position: fixed; top: 68px; left: 12px; right: 12px; z-index: 49;
     background: var(--bb-panel); border: 1px solid var(--bb-line-2);
@@ -674,6 +674,8 @@ a.bbeauty-nav-cta, a.bbeauty-mobile-cta { text-decoration: none; display: inline
 }
 .bbeauty-faq-item.open .faq-icon { transform: rotate(45deg); }
 .bbeauty-faq-item p { color: var(--bb-muted); font-size: 14.5px; line-height: 1.75; padding: 0 30px 22px 4px; margin: 0; max-width: 640px; }
+.bbeauty-faq-answer { display: none; }
+.bbeauty-faq-item.open .bbeauty-faq-answer { display: block; }
 
 /* ---------- Contato ---------- */
 .bbeauty-contact { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
