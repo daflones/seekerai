@@ -89,13 +89,16 @@ export async function GET() {
   ]);
 
   let saldo: number | null = null;
+  let saldoAt: string | null = null;
   try {
     const res = await mpFetch("/balance");
     if (res.ok) {
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      const raw = data.balance ?? data.available ?? data.amount;
+      // API v1 devolve {"brl":147.5,"btc":0,"usdt":0,"updated_at":…}
+      const raw = data.brl ?? data.balance ?? data.available ?? data.amount;
       if (typeof raw === "number") saldo = raw;
       else if (typeof raw === "string" && !Number.isNaN(Number(raw))) saldo = Number(raw);
+      if (typeof data.updated_at === "string") saldoAt = data.updated_at;
     }
   } catch { /* saldo indisponível sem a chave */ }
 
@@ -115,6 +118,7 @@ export async function GET() {
 
   return NextResponse.json({
     saldo,
+    saldoAt,
     receita: { cartao: receita.stripe / 100, pix: receita.mercosulpay / 100 },
     previsao: { proximoMes: mrr / 100, trimestre: (mrr * 3) / 100, assinaturas: subs.data?.length ?? 0 },
     chaves: (keys.data ?? []).map((k) => ({

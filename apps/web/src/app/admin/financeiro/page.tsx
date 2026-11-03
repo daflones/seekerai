@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AdminFinanceiro } from "@/components/admin-financeiro";
 import { AdminDiscount } from "@/components/admin-discount";
+import { FinList } from "@/components/fin-list";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Financeiro", robots: { index: false } };
@@ -207,8 +208,8 @@ export default async function AdminFinanceiroPage() {
     paid.map((p) => ({ date: p.created_at, amount: p.amount_cents })), 30,
   );
 
-  // Nomes: últimos 50 pagamentos + assinaturas + follow-ups
-  const lastPayments = pays.slice(0, 50);
+  // Nomes: últimos pagamentos + assinaturas + follow-ups
+  const lastPayments = pays.slice(0, 200);
   const followUps = (() => {
     const recent = pays.filter((p) => ["pending", "expired", "failed"].includes(p.status)
       && inWin(p.created_at, 14));
@@ -220,16 +221,22 @@ export default async function AdminFinanceiroPage() {
     return [...byUser.entries()]
       .map(([uid, rows]) => ({ uid, rows: rows.sort((a, b) => b.created_at.localeCompare(a.created_at)) }))
       .sort((a, b) => b.rows[0].created_at.localeCompare(a.rows[0].created_at))
-      .slice(0, 10);
+      .slice(0, 25);
   })();
 
   const nameIds = new Set<string>();
   lastPayments.forEach((p) => p.user_id && nameIds.add(p.user_id));
   followUps.forEach((f) => nameIds.add(f.uid));
   (subs ?? []).forEach((s) => s.user_id && nameIds.add(s.user_id));
+  // Busca perfis em lotes pra não estourar o limite de URL do PostgREST.
+  const idChunks: string[][] = [];
+  const allIds = [...nameIds];
+  for (let i = 0; i < allIds.length; i += 80) idChunks.push(allIds.slice(i, i + 80));
   const [{ data: profs }, authUsers] = await Promise.all([
-    nameIds.size
-      ? supabase.from("profiles").select("id,nome").in("id", [...nameIds])
+    idChunks.length
+      ? Promise.all(idChunks.map((ids) =>
+          supabase.from("profiles").select("id,nome").in("id", ids),
+        )).then((rs) => ({ data: rs.flatMap((r) => r.data ?? []) }))
       : Promise.resolve({ data: [] as { id: string; nome: string | null }[] }),
     nameIds.size
       ? createSupabaseAdminClient().auth.admin.listUsers({ perPage: 1000 })
@@ -252,6 +259,8 @@ export default async function AdminFinanceiroPage() {
       Receita, conversão de pagamento, assinaturas, follow-up de quem não concluiu
       e saque PIX do saldo MercosulPay.
     </p>
+
+    <AdminFinanceiro />
 
     <div className="stat-grid">
       <section className="stat-card fin-saldo">
@@ -348,7 +357,7 @@ export default async function AdminFinanceiroPage() {
           Pendente = QR aberto · Expirado = trocou de cobrança ou QR venceu · Falhou = erro ao gerar.</p>
         {followUps.length === 0
           ? <p className="dash-empty">Nenhuma tentativa pendente/expirada.</p>
-          : <ul className="adm-feed">
+          : <FinList className="adm-feed" pageSize={8}>
               {followUps.map(({ uid, rows }) => {
                 const last = rows[0];
                 const meta = (last.metadata ?? {}) as Record<string, unknown>;
@@ -379,7 +388,7 @@ export default async function AdminFinanceiroPage() {
                   </li>
                 );
               })}
-            </ul>}
+            </FinList>}
       </section>
     </div>
 
@@ -387,7 +396,7 @@ export default async function AdminFinanceiroPage() {
       <h2><CalendarClock size={16} /> Assinaturas ativas · próximas renovações</h2>
       {subsRows.length === 0
         ? <p className="dash-empty">Nenhuma assinatura ativa.</p>
-        : <ul className="adm-feed">
+        : <FinList className="adm-feed" pageSize={15}>
             {subsRows.map((s, i) => (
               <li key={i} className="adm-feed-row">
                 <span className="adm-tag adm-tag-paid">{s.provider}</span>
@@ -395,14 +404,14 @@ export default async function AdminFinanceiroPage() {
                 <small title={String(s.current_period_end ?? "")}>renova {s.current_period_end ? fmtDia(s.current_period_end) : "—"}</small>
               </li>
             ))}
-          </ul>}
+          </FinList>}
     </section>
 
     <section className="dash-panel">
       <h2><ReceiptText size={16} /> Todos os pagamentos</h2>
       {lastPayments.length === 0
         ? <p className="dash-empty">Nenhum pagamento registrado.</p>
-        : <ul className="adm-feed">
+        : <FinList className="adm-feed" pageSize={20}>
             {lastPayments.map((p) => (
               <li key={p.id} className="adm-feed-row">
                 <span className={`adm-tag adm-tag-${p.status}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
@@ -414,9 +423,7 @@ export default async function AdminFinanceiroPage() {
                 <small>{fmtHora(p.created_at)}</small>
               </li>
             ))}
-          </ul>}
+          </FinList>}
     </section>
-
-    <AdminFinanceiro />
   </>;
 }
