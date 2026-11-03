@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
-  Lock, MapPin, MessageSquareText, Pencil, Phone, Sparkles, Star, Trash2, Globe, Users,
+  Lock, MapPin, MessageSquareText, Pencil, Phone, Plus, RotateCcw, Sparkles, Star, Trash2, Globe, Users,
   MessageCircle, FileText, MonitorSmartphone, Power,
 } from "lucide-react";
 import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
@@ -65,6 +65,12 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   }
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Imagens de referência anexadas pelo usuário (até 5) — viram fotos
+  // reais no pipeline do site junto com Maps/Instagram.
+  const [refImgs, setRefImgs] = useState<string[]>([]);
+  const [refBusy, setRefBusy] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
+  const refInput = useRef<HTMLInputElement>(null);
   const [siteOn, setSiteOn] = useState(siteActive !== false);
   const [offMotivo, setOffMotivo] = useState(siteOffMotivo);
   const [siteToggleBusy, setSiteToggleBusy] = useState(false);
@@ -140,7 +146,46 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function generateSite() {
+  async function uploadRefs(files: FileList | File[]) {
+    const list = [...files].filter((f) => f.type.startsWith("image/"));
+    if (!list.length) return;
+    if (refImgs.length + list.length > 5) { setError(t.refImgLimit); return; }
+    setRefBusy(true);
+    setError("");
+    for (const f of list) {
+      const form = new FormData();
+      form.append("file", f);
+      const res = await fetch("/api/sites/refs", { method: "POST", body: form }).catch(() => null);
+      const data = res ? (await res.json().catch(() => null)) as { url?: string; error?: string } | null : null;
+      if (res?.ok && data?.url) setRefImgs((cur) => [...cur.slice(0, 4), data.url!]);
+      else { setError(data?.error ?? t.refImgErr); break; }
+    }
+    setRefBusy(false);
+    if (refInput.current) refInput.current.value = "";
+  }
+
+  const refPicker = (compact = false) => <div className={`lead-refs${compact ? " is-compact" : ""}`}>
+    <div className="lead-refs-head">
+      <strong><ImagePlus size={13} />{t.refImgs}</strong>
+      {!compact && <small>{t.refImgsHint}</small>}
+    </div>
+    <div className="lead-refs-row">
+      {refImgs.map((u) => <span key={u} className="lead-ref-thumb">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={u} alt="" />
+        <button type="button" aria-label="×" onClick={() => setRefImgs((cur) => cur.filter((x) => x !== u))}>×</button>
+      </span>)}
+      {refImgs.length < 5 && <button type="button" className="lead-ref-add" disabled={refBusy}
+        onClick={() => refInput.current?.click()}>
+        {refBusy ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
+        <span>{t.refImgAdd}</span>
+      </button>}
+    </div>
+    <input ref={refInput} type="file" accept="image/*" multiple hidden
+      onChange={(e) => { if (e.target.files?.length) void uploadRefs(e.target.files); }} />
+  </div>;
+
+  async function generateSite(regen = false) {
     if (isBusy("generate_site")) return;
     setBusyKey("generate_site", true);
     setError("");
@@ -167,6 +212,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           totalAvaliacoes: lead.total_avaliacoes,
           imagem: lead.imagem,
           mapsUrl: lead.maps_url,
+          // Referências do usuário entram como fotos reais do pipeline.
+          ...(refImgs.length ? { imagens: refImgs } : {}),
+          // Regeneração: rota a variante de layout — outro design, mesmo link.
+          ...(regen ? { variantSeed: (outputs.filter((o) => o.tipo === "generate_site").length % 3) + 1 } : {}),
         },
       }),
     }).catch(() => null);
@@ -176,6 +225,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setError(data?.error ?? t.errNoContent);
       return;
     }
+    setRegenOpen(false);
     pollSiteJob(data.jobId);
   }
 
@@ -475,7 +525,26 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
                   {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
                   {t.deactivateSite}
                 </button>
+                <button type="button" className="button button-glass button-small"
+                  disabled={isBusy("generate_site")}
+                  onClick={() => setRegenOpen((v) => !v)}>
+                  <RotateCcw size={14} />{t.regenSite}
+                </button>
               </div>
+              {regenOpen && <div className="lead-regen">
+                <small>{t.regenHint}</small>
+                {refPicker(true)}
+                <div className="lead-output-actions">
+                  <button type="button" className="button button-primary button-small"
+                    disabled={isBusy("generate_site")} onClick={() => void generateSite(true)}>
+                    {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+                    {isBusy("generate_site") ? t.actSiteBusy : t.regenGo}
+                  </button>
+                  <button type="button" className="button button-glass button-small"
+                    onClick={() => setRegenOpen(false)}>{t.regenCancel}</button>
+                </div>
+                {isBusy("generate_site") && <small className="lead-step-wait">{t.siteRunning}</small>}
+              </div>}
               <div className="lead-domain-cta">
                 <div className="lead-domain-cta-copy">
                   <strong><Globe size={13} />{t.domTitle}</strong>
@@ -499,6 +568,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               </button>
             </div>}
           </div> : <div className="lead-step-body">
+            {refPicker()}
             <button type="button" className="button button-primary button-small" disabled={isBusy("generate_site")}
               onClick={() => void generateSite()}>
               {isBusy("generate_site") ? <Loader2 size={14} className="spin" /> : <MonitorSmartphone size={14} />}

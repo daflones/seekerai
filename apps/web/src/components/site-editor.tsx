@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowUpToLine, Check, Code2, Copy, CopyPlus, ExternalLink, Eye, Layers, LayoutGrid,
+  ArrowLeft, ArrowUpToLine, Check, Code2, Copy, CopyPlus, ExternalLink, Eye, ImagePlus, Layers, LayoutGrid,
   Loader2, Minus, Monitor, PanelLeft, PanelRight, Plus, Redo2, RotateCcw, Save, ScanLine,
-  Search, Settings2, Smartphone, Tablet, Trash2, Undo2, X, Paintbrush,
+  Search, Send, Settings2, Smartphone, Sparkles, Tablet, Trash2, Undo2, X, Paintbrush,
 } from "lucide-react";
+import { callAction } from "@/lib/app-client";
 import type grapesjs from "grapesjs";
 import type { Component } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
@@ -130,7 +131,7 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
   const [notice, setNotice] = useState("");
   const [fail, setFail] = useState("");
   const [left, setLeft] = useState<"blocks" | "layers">("blocks");
-  const [right, setRight] = useState<"styles" | "settings">("styles");
+  const [right, setRight] = useState<"styles" | "settings" | "ai">("styles");
   const [drawer, setDrawer] = useState<"left" | "right" | null>(null);
   const [device, setDevice] = useState<Device>("Desktop");
   const [zoom, setZoom] = useState(100);
@@ -141,6 +142,14 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
   const [code, setCode] = useState<{ html: string; css: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [query, setQuery] = useState("");
+  // Assistente de IA do editor: chat que aplica edições no HTML — com
+  // elemento selecionado edita só ele; sem seleção, a página inteira.
+  const [aiMsgs, setAiMsgs] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiImgs, setAiImgs] = useState<string[]>([]);
+  const [aiBusy, setAiBusy] = useState(false);
+  const aiFileRef = useRef<HTMLInputElement>(null);
+  const aiScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let destroyed = false;
@@ -452,6 +461,111 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
     if (ed && p && p !== ed.DomComponents.getWrapper()) ed.select(p);
   };
 
+  // Chat da IA: scroll sempre no fim.
+  useEffect(() => {
+    aiScrollRef.current?.scrollTo({ top: aiScrollRef.current.scrollHeight });
+  }, [aiMsgs, aiBusy]);
+
+  const uploadAiImg = async (files: FileList | File[]) => {
+    const list = [...files].filter((f) => f.type.startsWith("image/"));
+    if (!list.length || aiImgs.length >= 5) return;
+    for (const f of list.slice(0, 5 - aiImgs.length)) {
+      const form = new FormData();
+      form.append("file", f);
+      const d = await fetch("/api/sites/refs", { method: "POST", body: form })
+        .then((r) => r.json()).catch(() => ({}));
+      if (d.url) setAiImgs((cur) => [...cur.slice(0, 4), d.url as string]);
+    }
+    if (aiFileRef.current) aiFileRef.current.value = "";
+  };
+
+  // Insere a imagem gerada: troca o src se o selecionado é <img>, senão
+  // anexa uma figura dentro do selecionado (ou no fim da página).
+  const insertAiImage = (ed: GjsEditor, url: string) => {
+    const comp = ed.getSelected();
+    const tag = (comp?.get("tagName") ?? "").toLowerCase();
+    if (comp && tag === "img") { comp.addAttributes({ src: url }); return; }
+    const figure = `<figure style="margin:24px auto;max-width:720px;"><img src="${url}" alt="" style="width:100%;border-radius:14px;display:block;"></figure>`;
+    if (comp && comp.get("droppable") !== false) comp.append(figure);
+    else ed.DomComponents.getWrapper()?.append(figure);
+  };
+
+  const sendAi = async () => {
+    const ed = editorRef.current;
+    const instr = aiInput.trim();
+    if (!ed || !instr || aiBusy) return;
+    const comp = ed.getSelected();
+    const targetHtml = comp ? comp.toHTML() : ed.getHtml();
+    if (!targetHtml || targetHtml.length > 240_000) {
+      setAiMsgs((cur) => [...cur, { role: "ai", text: t.aiTooBig }]);
+      return;
+    }
+    setAiBusy(true);
+    setAiMsgs((cur) => [...cur, { role: "user", text: instr }]);
+    setAiInput("");
+    const reply = (text: string) => setAiMsgs((cur) => [...cur, { role: "ai", text }]);
+    const res = await callAction<{ conteudo?: string }>("ai-generate", {
+      action: "editor_assist",
+      serviceSlug: "_editor",
+      businessRef: `site:${slug}`,
+      requestRef: crypto.randomUUID(),
+      lang,
+      prompt: instr,
+      context: {
+        html: targetHtml,
+        alvo: comp ? `${comp.getName()} <${(comp.get("tagName") ?? "").toLowerCase()}>` : null,
+        nome,
+        imagens: aiImgs,
+      },
+    });
+    const raw = res.ok ? res.data.conteudo : null;
+    const cleaned = (raw ?? "").replace(/```(?:json)?|```/g, "").trim();
+    const s = cleaned.indexOf("{");
+    const e = cleaned.lastIndexOf("}");
+    let dec: { reply?: string; html?: string; imagePrompt?: string } | null = null;
+    try { if (s >= 0 && e > s) dec = JSON.parse(cleaned.slice(s, e + 1)); } catch { /* malformado */ }
+    if (!dec) { reply(t.aiFail); setAiBusy(false); return; }
+
+    // Pedido de imagem nova: a IA pede e o app gera pela ação normal (2cr).
+    if (dec.imagePrompt && !dec.html) {
+      const img = await callAction<{ imagens?: string[] }>("ai-generate", {
+        action: "generate_image",
+        serviceSlug: "_editor",
+        businessRef: `site:${slug}`,
+        requestRef: crypto.randomUUID(),
+        lang,
+        prompt: dec.imagePrompt,
+        context: { nome },
+      });
+      const url = img.ok ? img.data.imagens?.[0] : null;
+      if (url) {
+        insertAiImage(ed, url);
+        ed.DomComponents.getWrapper()?.components().forEach(unlockTree);
+        setDirty(true);
+        reply(dec.reply ? `${dec.reply} ${t.aiImgDone}` : t.aiImgDone);
+      } else {
+        reply(dec.reply ?? t.aiFail);
+      }
+      setAiImgs([]);
+      setAiBusy(false);
+      return;
+    }
+
+    if (dec.html) {
+      try {
+        if (comp) comp.replaceWith(dec.html);
+        else ed.setComponents(dec.html);
+        ed.DomComponents.getWrapper()?.components().forEach(unlockTree);
+        setDirty(true);
+      } catch { /* HTML inválido — só avisa */ }
+      reply(dec.reply ? `${dec.reply} ${t.aiApplied}` : t.aiApplied);
+    } else {
+      reply(dec.reply ?? t.aiFail);
+    }
+    setAiImgs([]);
+    setAiBusy(false);
+  };
+
   return <div className={`site-editor${drawer ? ` drawer-${drawer}` : ""}`}>
     <header className="se-top">
       <div className="se-top-left">
@@ -541,13 +655,46 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
             onClick={() => setRight("styles")}><Paintbrush size={14} />{t.styles}</button>
           <button type="button" role="tab" aria-selected={right === "settings"} className={right === "settings" ? "on" : ""}
             onClick={() => setRight("settings")}><Settings2 size={14} />{t.settings}</button>
+          <button type="button" role="tab" aria-selected={right === "ai"} className={right === "ai" ? "on" : ""}
+            onClick={() => setRight("ai")}><Sparkles size={14} />{t.ai}</button>
         </div>
-        {!sel && <div className="se-empty"><Paintbrush size={22} /><p>{t.selectHint}</p></div>}
+        {!sel && right !== "ai" && <div className="se-empty"><Paintbrush size={22} /><p>{t.selectHint}</p></div>}
         <div className="se-panel-scroll" hidden={right !== "styles" || !sel}>
           <div ref={selectorsRef} className="se-selectors" />
           <div ref={stylesRef} />
         </div>
         <div className="se-panel-scroll" hidden={right !== "settings" || !sel}><div ref={traitsRef} /></div>
+        <div className="se-panel-scroll se-ai" hidden={right !== "ai"}>
+          <p className="se-ai-hint">{t.aiHint}</p>
+          <div className="se-ai-target"><Sparkles size={12} />{t.aiSel}<strong>{sel ? sel.name : t.aiPage}</strong></div>
+          <div className="se-ai-msgs" ref={aiScrollRef}>
+            {!aiMsgs.length && !aiBusy && <div className="se-ai-empty"><Sparkles size={18} /><span>{t.aiPh}</span></div>}
+            {aiMsgs.map((m, i) => <div key={i} className={`se-ai-msg is-${m.role}`}>{m.text}</div>)}
+            {aiBusy && <div className="se-ai-msg is-ai"><Loader2 size={13} className="spin" /></div>}
+          </div>
+          {aiImgs.length > 0 && <div className="se-ai-imgs">
+            {aiImgs.map((u) => <span key={u} className="se-ai-thumb">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={u} alt="" />
+              <button type="button" aria-label="×" onClick={() => setAiImgs((cur) => cur.filter((x) => x !== u))}>×</button>
+            </span>)}
+          </div>}
+          <div className="se-ai-input">
+            <button type="button" className="se-ai-icon" title={t.aiAttach}
+              disabled={aiBusy || aiImgs.length >= 5} onClick={() => aiFileRef.current?.click()}>
+              <ImagePlus size={16} />
+            </button>
+            <textarea value={aiInput} placeholder={t.aiPh} rows={2} maxLength={2000}
+              onChange={(e) => setAiInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendAi(); } }} />
+            <button type="button" className="se-ai-send" title={t.aiSend}
+              disabled={aiBusy || !aiInput.trim()} onClick={() => void sendAi()}>
+              {aiBusy ? <Loader2 size={15} className="spin" /> : <Send size={15} />}
+            </button>
+          </div>
+          <input ref={aiFileRef} type="file" accept="image/*" multiple hidden
+            onChange={(e) => { if (e.target.files?.length) void uploadAiImg(e.target.files); }} />
+        </div>
       </aside>
     </div>
 

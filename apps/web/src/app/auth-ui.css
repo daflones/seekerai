@@ -699,6 +699,21 @@ a.lead-action { text-decoration: none; }
 .lead-step-image { margin-top: 4px; }
 .lead-step-body > .button { align-self: flex-start; }
 
+/* Imagens de referência da geração + regeneração do site */
+.lead-refs { border: 1px solid #ab7bcd22; border-radius: 12px; padding: 10px 12px; background: #9667ff08; }
+.lead-refs-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.lead-refs-head strong { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--white); }
+.lead-refs-head small { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.lead-refs-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.lead-ref-thumb { position: relative; width: 52px; height: 52px; border-radius: 9px; overflow: hidden; border: 1px solid #ab7bcd33; }
+.lead-ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lead-ref-thumb button { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; border: 0; background: #10081cd9; color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.lead-ref-add { width: 52px; height: 52px; border-radius: 9px; border: 1.5px dashed #ab7bcd55; background: transparent; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 9px; transition: border-color .2s, color .2s; }
+.lead-ref-add:hover:not(:disabled) { border-color: var(--primary); color: var(--white); }
+.lead-ref-add:disabled { opacity: .5; cursor: default; }
+.lead-regen { margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid #ab7bcd2e; background: #9667ff0a; display: flex; flex-direction: column; gap: 10px; }
+.lead-regen > small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
 /* Preview real do site no passo 1 — iframe escalonado, clique abre a página */
 .lead-site-frame { position: relative; display: block; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; border: 1px solid #ab7bcd33; margin-bottom: 10px; background: var(--panel); }
 .lead-site-frame iframe { position: absolute; top: 0; left: 0; width: 250%; height: 250%; transform: scale(.4); transform-origin: 0 0; border: 0; pointer-events: none; }

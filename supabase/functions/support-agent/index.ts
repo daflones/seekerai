@@ -21,6 +21,8 @@ const SUMMARY_SYSTEM = `Você encerra um atendimento de suporte do SeekerAi porq
 const OR_MODEL = optionalEnv("SUPPORT_AGENT_MODEL") ?? "openai/gpt-4o-mini";
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 const NVIDIA_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
+const GROQ_BASE = "https://api.groq.com/openai/v1";
+const GROQ_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
 
 const SYSTEM = `Você é a IA oficial de suporte do SeekerAi (seekerai.digital), plataforma que ajuda freelancers, agências, designers, social media e prestadores de serviço a encontrar e fechar clientes locais. Você é consultivo: além de responder, guia o cliente pro próximo passo prático quando fizer sentido.
 
@@ -68,8 +70,18 @@ REGRAS COMERCIAIS:
   no saldo e não expira na renovação.
 - Sem assinatura: não dá pra buscar nem gerar — aparece o tutorial pra assinar.
 - Editar site criado, criar app no Estúdio e domínio personalizado: recursos
-  dos planos Pro e King (o editor em si não gasta créditos). Essencial edita
-  só gerando uma versão nova pela IA (custo de geração).
+  dos planos Pro e King (o editor em si não gasta créditos). O editor tem um
+  assistente de IA embutido: a pessoa descreve a mudança em texto ("muda a
+  cor do botão", "troca esse texto", "adiciona uma foto") e a IA aplica —
+  também aceita imagens anexadas como referência e gera imagens novas
+  (custo de imagem da TABELA VIVA). Essencial edita gerando uma versão nova
+  pela IA (custo de geração — sai com outro design/cores, mantém o link).
+- Imagens de referência: ao gerar o site do lead, a pessoa pode anexar até
+  5 fotos (botão de anexo junto ao botão de gerar) que entram no site —
+  além das fotos do Instagram/Maps e das geradas por IA.
+- Gerar o site de novo: no workspace do lead, quem já tem site vê "Nova
+  versão" — recria o site no MESMO link com outro design, cores e copy
+  (custo de geração). A versão anterior é substituída.
 - Crédito de ação com FALHA é estornado automaticamente (saldo volta sozinho).
 - Pagamento da assinatura/domínio/recarga: PIX (QR na hora) ou cartão (Mercado Pago). Plano só ativa após confirmação do pagamento.
 
@@ -81,7 +93,9 @@ DÚVIDAS COMUNS:
 - "Como recebo do meu cliente?" → o SeekerAi não intermedia: ele cobra direto do cliente (PIX etc.) e fica com 100%.
 - "Meu domínio não funciona" → após pagar, a ativação é manual em até 48h; o DNS precisa apontar pro servidor; se passou de 48h, escalate.
 - "Quanto custa X?" → use a TABELA VIVA no contexto.
-- "Atualizar/editar o site criado" → ajustes manuais: editor visual (Pro/King, sem custo); nova versão pela IA: custo de geração da TABELA VIVA.
+- "Atualizar/editar o site criado" → três caminhos: editor visual manual (Pro/King, grátis), assistente de IA dentro do editor (Pro/King — descreve a mudança e a IA aplica, grátis pra texto/HTML; gerar imagem custa a ação de imagem), ou "Nova versão" no workspace do lead (recria tudo pela IA no mesmo link, custo de geração da TABELA VIVA).
+- "Quero mudar só uma parte/cor/foto" → assistente de IA do editor (Pro/King) ou edição manual — não precisa regerar o site inteiro.
+- "Geração de IA temporariamente indisponível/erro ao gerar" → explique que é instabilidade pontual do provedor, que crédito cobrado com falha é estornado automaticamente, peça pra tentar de novo; se persistir depois de nova tentativa, aí sim escale.
 
 PRÉ-VENDA / FATOS DO PRODUTO (responda direto, sem escalar):
 - "Quantos créditos pra um site completo?" → o custo está em CUSTOS POR AÇÃO (site do lead); imagem, estratégia e mensagem são ações separadas — some se quiser o pacote completo.
@@ -109,20 +123,34 @@ function extractContent(data: unknown): string | null {
 }
 
 async function llm(system: string, convo: { role: string; content: string }[]): Promise<string | null> {
-  const orKey = await getSecret("OPENROUTER_API_KEY");
-  if (orKey) {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // Groq primeiro: gratuito e rápido. OpenRouter (pago) só quando os dois
+  // gratuitos falham — suporte não pode queimar crédito por resposta.
+  const groqKey = await getSecret("GROQ_API_KEY");
+  if (groqKey) {
+    const res = await fetch(`${GROQ_BASE}/chat/completions`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${orKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
-        "X-Title": "SeekerAi Support",
-      },
+      headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: OR_MODEL,
+        model: GROQ_MODEL,
         max_tokens: 700,
         response_format: { type: "json_object" },
+        messages: [{ role: "system", content: system }, ...convo],
+      }),
+      signal: AbortSignal.timeout(45_000),
+    }).catch(() => null);
+    if (res?.ok) {
+      const content = extractContent(await res.json().catch(() => null));
+      if (content) return content;
+    }
+  }
+  const nvKey = await getSecret("NVIDIA_API_KEY");
+  if (nvKey) {
+    const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${nvKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL, stream: false, max_tokens: 700,
+        ...(NVIDIA_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
         messages: [{ role: "system", content: system }, ...convo],
       }),
       signal: AbortSignal.timeout(60_000),
@@ -132,14 +160,20 @@ async function llm(system: string, convo: { role: string; content: string }[]): 
       if (content) return content;
     }
   }
-  const nvKey = await getSecret("NVIDIA_API_KEY");
-  if (!nvKey) return null;
-  const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+  const orKey = await getSecret("OPENROUTER_API_KEY");
+  if (!orKey) return null;
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${nvKey}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${orKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+      "X-Title": "SeekerAi Support",
+    },
     body: JSON.stringify({
-      model: NVIDIA_MODEL, stream: false, max_tokens: 700,
-      ...(NVIDIA_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
+      model: OR_MODEL,
+      max_tokens: 700,
+      response_format: { type: "json_object" },
       messages: [{ role: "system", content: system }, ...convo],
     }),
     signal: AbortSignal.timeout(60_000),
@@ -266,7 +300,7 @@ Deno.serve(async (req) => {
           .eq("ativo", true).order("ordem"),
         db.from("credit_action_rules").select("action,cost").eq("enabled", true),
         db.from("app_settings").select("key,value")
-          .in("key", ["first_purchase_discount_pct", "domain_price_cents"]),
+          .in("key", ["first_purchase_discount_pct", "domain_price_cents", "credit_packs"]),
         db.from("payments").select("id", { count: "exact", head: true })
           .eq("user_id", uid).eq("status", "paid"),
       ]);
@@ -310,6 +344,17 @@ Deno.serve(async (req) => {
     const discountPct = typeof setting("first_purchase_discount_pct") === "number"
       ? setting("first_purchase_discount_pct") as number : 0;
     const domainCents = setting("domain_price_cents");
+    // Packs de recarga vivem em app_settings.credit_packs — admin edita.
+    const packsRaw = setting("credit_packs");
+    const packs = (Array.isArray(packsRaw) ? packsRaw : [])
+      .map((p) => isRecord(p)
+        ? { credits: Number(p.credits), brl: Number(p.brlCents) }
+        : null)
+      .filter((p): p is { credits: number; brl: number } =>
+        Boolean(p && p.credits > 0 && p.brl > 0));
+    const packsLine = packs.length
+      ? packs.map((p) => `+${p.credits} por ${brl(p.brl)}`).join(" · ")
+      : "indisponível";
     const eligibleDiscount = (paidRes.count ?? 0) === 0;
     const liveTable =
       `TABELA VIVA (valores reais configurados agora — cite exatamente estes números):\n` +
@@ -319,7 +364,7 @@ Deno.serve(async (req) => {
           `este cliente ${eligibleDiscount ? "É elegível (nunca pagou)" : "NÃO é elegível (já pagou antes)"}.\n`
         : "") +
       `CUSTOS POR AÇÃO: ${rulesLine}.\n` +
-      `RECARGA (só assinante): +50 por R$39,97 · +150 por R$89,97 · +250 por R$129,97.\n` +
+      `RECARGA (só assinante): ${packsLine}.\n` +
       `DOMÍNIO PERSONALIZADO: ${brl(domainCents)}/ano — recurso dos planos Pro e King, junto com editor de site e apps do Estúdio.`;
 
     const convo = list.slice(-30).map((m) => ({
@@ -334,11 +379,18 @@ Deno.serve(async (req) => {
       `Chamado #${ticketId.slice(0, 8)} — assunto: "${ticket.assunto}".\n${customer}\n${liveTable}\n` +
       `Responda a ÚLTIMA mensagem do cliente considerando o histórico.`;
 
-    const raw = await llm(SYSTEM, [
+    const messages = [
       { role: "user", content: context },
       ...convo.slice(-29),
-    ]);
-    const decision = raw ? parseDecision(raw) : null;
+    ];
+    let raw = await llm(SYSTEM, messages);
+    let decision = raw ? parseDecision(raw) : null;
+    // Segunda chance antes de escalar: resposta truncada/malformada não
+    // deve mandar o chamado pro humano sem a IA ter respondido de fato.
+    if (!decision) {
+      raw = await llm(SYSTEM, messages);
+      decision = raw ? parseDecision(raw) : null;
+    }
     if (!decision) {
       return await escalate(
         "Vou chamar o nosso time humano pra te ajudar melhor com isso — eles assumem por aqui mesmo.",

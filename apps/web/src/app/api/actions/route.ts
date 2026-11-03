@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
     const payload = parsed.data.payload as Record<string, unknown>;
     const domainCheckout = parsed.data.funcao === "billing-checkout"
       && typeof payload.domainHost === "string" && payload.domainHost;
-    const appGen = parsed.data.funcao === "ai-generate" && payload.action === "generate_app";
+    const appGen = parsed.data.funcao === "ai-generate"
+      && (payload.action === "generate_app" || payload.action === "editor_assist");
     if (domainCheckout || appGen) {
       const planSlug = await userPlanSlug(session.supabase, session.user.id);
       if (!planAllowsPaidFeatures(planSlug)) {

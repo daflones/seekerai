@@ -36,6 +36,7 @@ const ACTIONS = new Set([
   "lead_assist",
   "image_prompt",
   "generate_app",
+  "editor_assist",
 ]);
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
@@ -279,6 +280,31 @@ function systemPromptFor(action: string, lang: string): string {
         "(novo → contatado → respondeu → proposta → ganho).",
         `Respostas curtas e diretas OBRIGATORIAMENTE em ${L}, com mensagens prontas entre aspas quando fizer sentido.`,
       ].join("\n");
+    case "editor_assist":
+      return [
+        "Você é o assistente de IA de um editor visual de sites. Você recebe o HTML atual",
+        "(de um elemento selecionado ou da página inteira) e uma instrução do usuário, e",
+        "devolve o HTML com a alteração aplicada.",
+        "",
+        "SAÍDA OBRIGATÓRIA — um único JSON, sem markdown nem texto fora dele:",
+        '{"reply":"...","html":"...","imagePrompt":"..."}',
+        "",
+        "- \"html\": o HTML COMPLETO do alvo já com a alteração — preserve classes, ids,",
+        "  data-attributes, links, botões, scripts, estilos e a estrutura existente; mude",
+        "  só o necessário. Se a instrução não exigir mudança no HTML (pergunta, elogio,",
+        "  pedido de imagem), omita o campo.",
+        "- \"reply\": resposta curta pro usuário (1-2 frases) no idioma dele dizendo o que",
+        "  foi feito.",
+        "- \"imagePrompt\": só quando o usuário pedir uma IMAGEM NOVA gerada por IA",
+        "  (foto, arte, ilustração). Nunca invente URL de imagem: omita \"html\" e descreva",
+        "  a imagem em inglês, detalhada — o app gera e insere depois.",
+        "- Se vierem URLs de imagem anexadas, use-as como <img src=\"URL\"> quando o",
+        "  pedido for adicionar foto/imagem (galeria, hero, card, fundo).",
+        "- Nunca remova funcionalidades (botões de agendamento/WhatsApp, mapas, vídeos,",
+        "  formulários, lightbox) a menos que peçam explicitamente.",
+        "- Mantenha o idioma dos textos que já existem no HTML.",
+        `Responda a parte conversacional em ${L}.`,
+      ].join("\n");
     case "generate_image":
       return [
         "Você é um diretor de arte e fotógrafo comercial premiado.",
@@ -477,6 +503,30 @@ function accentFromDescriptions(descriptions: string[]): { accent: string; accen
       return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l2 * 100)}%)`;
     })(),
   };
+}
+
+/** hsl {0-360,0-1,0-1} → "#rrggbb" — par do hexToHsl pra girar o matiz. */
+function hslToHex(h: number, s: number, l: number): string {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * c).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/** Gira o matiz de "#hex" ou "hsl(h,s%,l%)" — nova versão do site sai com
+    esquema de cor diferente mantendo saturação/luz da identidade real. */
+function hueShiftColor(color: string, deg: number): string {
+  const hsl = color.startsWith("#")
+    ? hexToHsl(color)
+    : (() => {
+      const m = color.match(/hsl\(\s*([\d.]+)[,\s]+([\d.]+)%[,\s]+([\d.]+)%\s*\)/i);
+      return m ? { h: +m[1], s: +m[2] / 100, l: +m[3] / 100 } : null;
+    })();
+  if (!hsl) return color;
+  return hslToHex((hsl.h + deg + 360) % 360, hsl.s, hsl.l);
 }
 
 interface NichoVocab {
@@ -2407,10 +2457,20 @@ async function publishPremiumSite(
   };
   // Tema: paleta do nicho + variante de layout (3 composições — sites
   // não ficam clones) + cores extraídas das fotos reais do lugar.
+  // variantSeed rota a variante: a "nova versão" (regeneração) sai com
+  // outro layout em vez de repetir a composição anterior.
   const variants = ["a", "b", "c"] as const;
   let h = 0;
   for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  config.tema = { paleta, variant: variants[h % 3], ...(cores ? { cores } : {}) };
+  const seed = typeof context.variantSeed === "number" && Number.isFinite(context.variantSeed)
+    ? Math.trunc(context.variantSeed)
+    : 0;
+  // Nova versão: além do layout, o acento gira no círculo de cor — o
+  // redesign sai com outro esquema de cor, não só posições diferentes.
+  const coresV = cores && seed > 0
+    ? { accent: hueShiftColor(cores.accent, seed * 67), accent2: hueShiftColor(cores.accent2, seed * 67) }
+    : cores;
+  config.tema = { paleta, variant: variants[(h + seed) % 3], ...(coresV ? { cores: coresV } : {}) };
   const vocabBase = resolvedVocab ?? nicheVocab(paleta, asString(lead.categoria, 150));
   // Idioma do site ≠ pt: a IA devolve os campos adaptados (patch.vocab);
   // sem patch (modelo fora), cai num vocab genérico no idioma em vez de PT.
@@ -2720,6 +2780,16 @@ Deno.serve(async (req) => {
 
       const userContent = action === "generate_image"
         ? enhancedImagePrompt!
+        : action === "editor_assist"
+          ? [
+            `INSTRUÇÃO DO USUÁRIO: ${prompt}`,
+            asString(context.alvo) ? `ALVO: ${asString(context.alvo)}` : "ALVO: página inteira",
+            asString(context.nome) ? `SITE: ${asString(context.nome)}` : "",
+            Array.isArray(context.imagens) && context.imagens.length
+              ? `IMAGENS ANEXADAS (use como <img src> quando fizer sentido):\n${(context.imagens as unknown[]).map((u) => `- ${asString(u, 1200)}`).join("\n")}`
+              : "",
+            `HTML ATUAL:\n${asString(context.html, 250_000) ?? ""}`,
+          ].filter(Boolean).join("\n\n")
         : body.context
           ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
           : prompt;
@@ -2734,18 +2804,20 @@ Deno.serve(async (req) => {
       // Copiloto do lead é ação gratuita (cost 0) — provedores free
       // primeiro: Groq (rápido) → NVIDIA → OpenRouter só como último
       // recurso, pra não queimar crédito pago num recurso de graça.
-      if (action === "lead_assist") {
-        const g = await groqChat(systemPrompt, userContent, 1200, 45_000);
+      if (action === "lead_assist" || action === "editor_assist") {
+        // Edição de HTML precisa de espaço pra devolver o trecho inteiro.
+        const cap = action === "editor_assist" ? 8192 : 1200;
+        const g = await groqChat(systemPrompt, userContent, cap, 60_000);
         if (g) {
           data = g;
           modelo = GROQ_TEXT_MODEL;
-          console.log("[ai-generate] lead_assist via Groq");
+          console.log(`[ai-generate] ${action} via Groq`);
         } else {
-          const nv = await nvidiaChat(systemPrompt, userContent, 1200, 60_000);
+          const nv = await nvidiaChat(systemPrompt, userContent, cap, 90_000);
           if (nv) {
             data = nv;
             modelo = NVIDIA_TEXT_MODEL;
-            console.log("[ai-generate] lead_assist via NVIDIA");
+            console.log(`[ai-generate] ${action} via NVIDIA`);
           }
         }
       }
@@ -2761,7 +2833,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model,
           modalities: action === "generate_image" ? ["image", "text"] : undefined,
-          max_tokens: action === "lead_assist" ? 1200 : undefined,
+          max_tokens: action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -2803,7 +2875,7 @@ Deno.serve(async (req) => {
           ? await nvidiaChat(
             systemPrompt,
             userContent,
-            action === "lead_assist" ? 1200 : undefined,
+            action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
             120_000,
           )
           : null;
