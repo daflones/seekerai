@@ -123,7 +123,13 @@ export function AdminChamados({ tickets: initial, initialOpen = null }: { ticket
                   </button>
                 )}
               </div>
-              <TicketChat ticketId={t.id} status={t.status} onStatus={(s) => setTickets((l) => l.map((x) => (x.id === t.id ? { ...x, status: s } : x)))} />
+              <TicketChat
+                ticketId={t.id}
+                status={t.status}
+                enhanceable
+                chatContext={{ assunto: t.assunto, cliente: t.cliente }}
+                onStatus={(s) => setTickets((l) => l.map((x) => (x.id === t.id ? { ...x, status: s } : x)))}
+              />
             </div>
           )}
         </li>

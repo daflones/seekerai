@@ -77,6 +77,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Aprimoramento de resposta é ferramenta interna do atendimento.
+  if (parsed.data.funcao === "ai-generate"
+    && parsed.data.payload.action === "enhance_reply"
+    && profile.role !== "admin") {
+    return NextResponse.json({ error: "Ação restrita ao suporte." }, { status: 403 });
+  }
+
   // Recursos Pro/King: checkout de domínio personalizado e geração de
   // app do estúdio não podem ser chamados por planos menores.
   if (profile.role !== "admin") {

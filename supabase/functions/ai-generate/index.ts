@@ -37,6 +37,7 @@ const ACTIONS = new Set([
   "image_prompt",
   "generate_app",
   "editor_assist",
+  "enhance_reply",
 ]);
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
@@ -269,6 +270,17 @@ function systemPromptFor(action: string, lang: string): string {
       return `Você é um estrategista de vendas B2B experiente. Analise o estabelecimento e produza: diagnóstico, oportunidades, ângulos de abordagem e próximos passos práticos. Responda OBRIGATORIAMENTE em ${L}, direto e acionável.`;
     case "sales_reply":
       return `Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em ${L} para o estabelecimento descrito. Sem emojis excessivos, sem promessas irreais.`;
+    case "enhance_reply":
+      return [
+        "Você reescreve mensagens de atendimento ao cliente da SeekerAi.",
+        "Receba o rascunho do atendente e o contexto da conversa, e devolva UMA",
+        "mensagem pronta pra enviar: clara, cordial, profissional e completa —",
+        "corrigindo português, organizando a informação e respondendo tudo o",
+        "que o cliente perguntou. Sem markdown, sem saudação robotizada, sem",
+        "promessas que o contexto não sustente. Escreva em português (pt-BR),",
+        "tom humano de suporte bom — direto mas gentil. Saída: só o texto da",
+        "mensagem, nada mais.",
+      ].join("\n");
     case "lead_assist":
       return [
         "Você é o copiloto de conversão do SeekerAi: um closer B2B experiente",
@@ -2693,6 +2705,13 @@ Deno.serve(async (req) => {
       JSON.stringify({ action, businessRef, service, prompt, context: body.context ?? null }),
     );
     const db = serviceClient();
+
+    // enhance_reply é ferramenta interna do atendimento — só admin.
+    if (action === "enhance_reply") {
+      const { data: prof } = await db.from("profiles")
+        .select("role").eq("id", user.id).maybeSingle();
+      if (prof?.role !== "admin") throw httpError(403, "Ação restrita ao suporte");
+    }
     // Progresso vivo pro painel admin — o orquestrador passa jobId/jobTable.
     const jobId = asString(body.jobId, 40);
     const jobTable = asString(body.jobTable, 30);
@@ -2789,6 +2808,16 @@ Deno.serve(async (req) => {
 
       const userContent = action === "generate_image"
         ? enhancedImagePrompt!
+        : action === "enhance_reply"
+          ? [
+            `RASCUNHO DO ATENDENTE: ${prompt}`,
+            asString(context.assunto) ? `ASSUNTO DO CHAMADO: ${asString(context.assunto, 140)}` : "",
+            asString(context.cliente) ? `CLIENTE: ${asString(context.cliente, 120)}` : "",
+            Array.isArray(context.mensagens) && context.mensagens.length
+              ? `ÚLTIMAS MENSAGENS DA CONVERSA:\n${(context.mensagens as unknown[]).map((m) => `- ${asString(m, 600)}`).join("\n")}`
+              : "",
+            "Reescreva o rascunho numa única mensagem pronta pra enviar.",
+          ].filter(Boolean).join("\n\n")
         : action === "editor_assist"
           ? [
             `INSTRUÇÃO DO USUÁRIO: ${prompt}`,

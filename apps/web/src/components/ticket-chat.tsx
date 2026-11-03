@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Lock, Send } from "lucide-react";
+import { Loader2, Lock, Send, Sparkles } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { callAction } from "@/lib/app-client";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { dateTag, type Lang } from "@/lib/i18n/shared";
 
@@ -35,12 +36,17 @@ export function TicketChat({
   onStatus,
   t,
   lang = "pt",
+  enhanceable = false,
+  chatContext,
 }: {
   ticketId: string;
   status: string;
   onStatus?: (status: string) => void;
   t?: Messages["support"];
   lang?: Lang;
+  /** Só no painel admin: botão "aprimorar com IA" no composer. */
+  enhanceable?: boolean;
+  chatContext?: { assunto?: string; cliente?: string };
 }) {
   const tt = t ?? getMessages("pt").support;
   const tag = dateTag(lang);
@@ -48,6 +54,7 @@ export function TicketChat({
   const [currentStatus, setCurrentStatus] = useState(status);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const seen = useRef(new Set<string>());
@@ -119,6 +126,32 @@ export function TicketChat({
     merge([data.mensagem as ChatMessage]);
   }
 
+  async function enhance() {
+    const draft = text.trim();
+    if (!draft || enhancing || busy) return;
+    setEnhancing(true);
+    setError("");
+    const res = await callAction<{ conteudo?: string }>("ai-generate", {
+      action: "enhance_reply",
+      serviceSlug: "_admin",
+      businessRef: `ticket:${ticketId}`,
+      requestRef: crypto.randomUUID(),
+      prompt: draft.slice(0, 4000),
+      context: {
+        assunto: chatContext?.assunto ?? null,
+        cliente: chatContext?.cliente ?? null,
+        mensagens: messages.slice(-8).map((m) => `[${m.sender_role}] ${m.mensagem}`),
+      },
+    }).catch(() => null);
+    setEnhancing(false);
+    const improved = res?.ok ? res.data?.conteudo?.trim() : "";
+    if (!improved) {
+      setError((!res?.ok && res?.error) || "Não foi possível aprimorar agora. Tenta de novo.");
+      return;
+    }
+    setText(improved);
+  }
+
   const open = ticketOpen(currentStatus);
 
   return <div className="chat">
@@ -145,7 +178,18 @@ export function TicketChat({
           rows={2}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
         />
-        <button type="button" onClick={() => void send()} disabled={busy || !text.trim()}>
+        {enhanceable && (
+          <button
+            type="button"
+            className="chat-enhance"
+            onClick={() => void enhance()}
+            disabled={enhancing || busy || !text.trim()}
+            title="Aprimorar com IA"
+          >
+            {enhancing ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+          </button>
+        )}
+        <button type="button" onClick={() => void send()} disabled={busy || enhancing || !text.trim()}>
           {busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} {tt.sendBtn}
         </button>
       </div>

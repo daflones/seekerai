@@ -447,6 +447,8 @@ a.lead-action { text-decoration: none; }
 .chat-composer textarea:focus { outline: none; border-color: #a177ff80; box-shadow: 0 0 0 3px #a177ff22; }
 .chat-composer button { display: inline-flex; align-items: center; gap: 6px; background: var(--violet); color: var(--panel); font-weight: 700; font-size: 12.5px; border: none; border-radius: 10px; padding: 11px 16px; cursor: pointer; }
 .chat-composer button:disabled { opacity: .45; cursor: default; }
+.chat-composer .chat-enhance { background: transparent; border: 1px solid #b387d155; color: var(--violet); padding: 11px 12px; }
+.chat-composer .chat-enhance:hover:not(:disabled) { border-color: #a177ff; box-shadow: 0 0 10px #a177ff33; }
 .chat-closed { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); background: #a879d10a; border: 1px dashed #a879d12e; border-radius: 10px; padding: 11px 13px; }
 
 /* ── Filtros e status (admin) ── */
