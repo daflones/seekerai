@@ -193,6 +193,10 @@ a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
 .lead-site-off-text { flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .lead-site-off-text strong { font-size: 12px; color: #e9ddf2; }
 .lead-site-off-text small { font-size: 11px; line-height: 1.5; }
+.lead-site-warn { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid #e8b93e33; background: #e8b93e0f; color: #e8cf8a; font-size: 11.5px; line-height: 1.5; }
+.lead-site-warn svg { flex-shrink: 0; }
+.lead-site-warn span { flex: 1; min-width: 200px; }
+.lead-site-warn.is-info { border-color: #a573ca33; background: #a573ca0f; color: #c9b3dd; }
 .lead-site-power { color: #ef9f9f !important; }
 
 /* CTA de domínio próprio — workspace do lead */

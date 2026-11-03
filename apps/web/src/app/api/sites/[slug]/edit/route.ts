@@ -136,6 +136,7 @@ export async function POST(
       },
       publicado: true,
       sem_expiracao: true,
+      owner_id: session.user.id,
     });
     if (error) return NextResponse.json({ error: "Falha ao salvar." }, { status: 500 });
     return NextResponse.json({ ok: true, canRestore: true });

@@ -28,6 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Aguardando pagamento",
   pending_setup: "Pago — configuração em até 48h",
   active: "Ativo",
+  expired: "Expirado — renovar",
   rejected: "Não ativado",
   removed: "Removido",
 };
@@ -50,7 +51,7 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
   const [notifs, setNotifs] = useState(notifications);
 
   const liveBySite = new Map(
-    domains.filter((d) => d.status !== "rejected" && d.status !== "removed")
+    domains.filter((d) => d.status !== "rejected" && d.status !== "removed" && d.status !== "expired")
       .map((d) => [d.site_slug, d]));
   const unread = notifs.filter((n) => !n.lida);
 

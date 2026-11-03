@@ -2528,7 +2528,7 @@ async function publishPremiumSite(
   // 4) Publica.
   onStep?.(90, "Publicando o site");
   const { error: siteErr } = await db.from("sites").upsert(
-    { slug, tipo, nome, lead_id: leadId, config, publicado: true },
+    { slug, tipo, nome, lead_id: leadId, config, publicado: true, owner_id: lead.user_id ?? null },
     { onConflict: "slug" },
   );
   if (siteErr) throw httpError(502, `Falha ao publicar site: ${siteErr.message}`);

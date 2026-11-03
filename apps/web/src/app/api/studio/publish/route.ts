@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
     lead_id: null,
     config: buildConfig(project, session.user.id),
     publicado: true,
+    owner_id: session.user.id,
   });
   if (error) return NextResponse.json({ error: "Falha ao publicar." }, { status: 500 });
 

@@ -104,12 +104,13 @@ export interface SiteRow {
   lead_id: string | null;
   config: SiteConfig;
   publicado: boolean;
+  owner_id?: string | null;
 }
 
 export async function loadSite(slug: string, opts: { raw?: boolean } = {}): Promise<SiteRow | null> {
   const admin = createSupabaseAdminClient();
   let query = admin.from("sites")
-    .select("slug,tipo,nome,lead_id,config,publicado,created_at,sem_expiracao")
+    .select("slug,tipo,nome,lead_id,config,publicado,created_at,sem_expiracao,owner_id")
     .eq("slug", slug);
   if (!opts.raw) query = query.eq("publicado", true);
   const { data } = await query.maybeSingle();

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
+  AlertTriangle, Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
   Lock, MapPin, MessageSquareText, Pencil, Phone, Plus, RotateCcw, Sparkles, Star, Trash2, Globe, Users,
   MessageCircle, FileText, MonitorSmartphone, Power,
 } from "lucide-react";
@@ -28,7 +28,7 @@ const NEXT_STAGE: Record<string, LeadRow["status"] | undefined> = {
   novo: "contatado", contatado: "respondeu", respondeu: "proposta", proposta: "ganho",
 };
 
-export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, senderName = null, currency = "brl", lang = "pt", trial = false, dailyActive = true, canEditSite = false, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
+export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serviceName, enabledActions, siteSlug, siteActive = null, siteOffMotivo = null, siteWarn = null, senderName = null, currency = "brl", lang = "pt", trial = false, dailyActive = true, canEditSite = false, t = getMessages("pt").lead, statusLabels = getMessages("pt").leadsPage.status }: {
   lead: LeadRow;
   outputs: OutputRow[];
   serviceName: string;
@@ -36,6 +36,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   siteSlug?: string | null;
   siteActive?: boolean | null;
   siteOffMotivo?: string | null;
+  siteWarn?: { kind: "plan_grace" | "domain_cover" | "domain_grace"; deadline: string | null } | null;
   senderName?: string | null;
   currency?: Currency;
   lang?: Lang;
@@ -546,6 +547,23 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
                   <RotateCcw size={14} />{t.regenSite}
                 </button>
               </div>
+              {siteWarn && <div className={`lead-site-warn${siteWarn.kind === "domain_cover" ? " is-info" : ""}`} role="status">
+                <AlertTriangle size={14} />
+                <span>{(
+                  siteWarn.kind === "plan_grace" ? t.siteWarnPlan
+                    : siteWarn.kind === "domain_grace" ? t.siteWarnDomain
+                    : t.siteWarnCover
+                ).replace("{d}", siteWarn.deadline
+                  ? new Date(siteWarn.deadline).toLocaleDateString(
+                      { pt: "pt-BR", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", it: "it-IT" }[lang],
+                      { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" })
+                  : "—")}</span>
+                {siteWarn.kind !== "domain_cover" && (
+                  <a className="button button-primary button-small"
+                    href={siteWarn.kind === "domain_grace" ? `/app/dominios?site=${siteSlug}` : "/app/planos"}>
+                    {siteWarn.kind === "domain_grace" ? t.siteWarnDomCta : t.siteWarnPlanCta}
+                  </a>)}
+              </div>}
               {regenOpen && <div className="lead-regen">
                 <small>{t.regenHint}</small>
                 {refPicker(true)}
@@ -574,13 +592,22 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               <Power size={16} />
               <div className="lead-site-off-text">
                 <strong>{t.siteOff}</strong>
-                <small>{offMotivo === "expired" ? t.siteOffExpired : t.siteOffManual}</small>
+                <small>{offMotivo === "expired" ? t.siteOffExpired
+                  : offMotivo === "subscription" ? t.siteOffSub
+                  : offMotivo === "domain" ? t.siteOffDomain
+                  : t.siteOffManual}</small>
               </div>
-              <button type="button" className="button button-glass button-small"
-                disabled={siteToggleBusy} onClick={() => void toggleSite()}>
-                {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
-                {t.reactivateSite}
-              </button>
+              {offMotivo === "subscription" || offMotivo === "domain" ? (
+                <a className="button button-primary button-small"
+                  href={offMotivo === "domain" ? "/app/dominios" : "/app/planos"}>
+                  {offMotivo === "domain" ? t.siteWarnDomCta : t.siteWarnPlanCta}
+                </a>
+              ) : (
+                <button type="button" className="button button-glass button-small"
+                  disabled={siteToggleBusy} onClick={() => void toggleSite()}>
+                  {siteToggleBusy ? <Loader2 size={14} className="spin" /> : <Power size={14} />}
+                  {t.reactivateSite}
+                </button>)}
             </div>}
           </div> : <div className="lead-step-body">
             {refPicker()}

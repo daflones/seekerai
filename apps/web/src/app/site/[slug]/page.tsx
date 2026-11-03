@@ -13,15 +13,21 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }> };
 
-/** Trial de 7 dias: sem plano ativo depois disso, o site público pausa. */
+/** Trial de 7 dias e tolerância pós-plano/pós-domínio: 7 dias. */
 const TRIAL_MS = 7 * 24 * 3600 * 1000;
+const GRACE_MS = TRIAL_MS;
 
 /**
- * Gate do site público — checado em tempo real (não é cron): assinou,
- * libera no próximo request; venceu o trial sem plano, pausa na hora.
- * Admin (donos) e sites sem dono rastreável nunca bloqueiam.
+ * Gate do site público — checado em tempo real (não é cron).
+ * O site fica no ar se QUALQUER proteção valer:
+ *   · assinatura ativa;
+ *   · domínio ativo dentro da anuidade (+7d de tolerância pós-vencimento);
+ *   · plano recém-encerrado dentro do aviso de 7 dias;
+ *   · trial de 7 dias pra quem nunca assinou.
+ * Vencidas todas as proteções, o site pausa e é despublicado na hora
+ * (lazy — não depende de cron). Admin nunca bloqueia.
  */
-async function siteBlocked(leadId: string | null, ownerId?: string | null): Promise<boolean> {
+async function siteBlocked(slug: string, leadId: string | null, ownerId?: string | null): Promise<boolean> {
   if (!process.env.SUPABASE_SECRET_KEY) return false;
   let userId = ownerId ?? null;
   const admin = createSupabaseAdminClient();
@@ -31,15 +37,44 @@ async function siteBlocked(leadId: string | null, ownerId?: string | null): Prom
     userId = (lead?.user_id as string | undefined) ?? null;
   }
   if (!userId) return false;
-  const [{ data: sub }, { data: profile }] = await Promise.all([
-    admin.from("subscriptions").select("user_id")
-      .eq("user_id", userId).eq("status", "active").limit(1).maybeSingle(),
+  const [{ data: sub }, { data: profile }, { data: domain }] = await Promise.all([
+    admin.from("subscriptions").select("status,current_period_end,updated_at")
+      .eq("user_id", userId).in("status", ["active", "canceled", "past_due"])
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("profiles").select("created_at,role").eq("id", userId).maybeSingle(),
+    admin.from("domains").select("expires_at")
+      .eq("site_slug", slug).eq("status", "active").limit(1).maybeSingle(),
   ]);
-  if (sub || profile?.role === "admin") return false;
-  const since = profile?.created_at ? Date.parse(profile.created_at) : NaN;
-  // Perfil ausente = sem prova de trial → trata como expirado.
-  return !Number.isFinite(since) || Date.now() - since > TRIAL_MS;
+  if (profile?.role === "admin") return false;
+  if (sub?.status === "active") return false;
+  const now = Date.now();
+  // Domínio vivo segura o site: anuidade + 7 dias de tolerância pra renovar.
+  if (domain) {
+    const until = domain.expires_at ? Date.parse(domain.expires_at) : NaN;
+    if (!Number.isFinite(until) || until + GRACE_MS > now) return false;
+  }
+  const lapsed = sub?.status === "canceled" || sub?.status === "past_due";
+  if (sub && lapsed) {
+    // Ex-assinante: aviso de 7 dias contado do fim real do período pago.
+    const end = Math.max(
+      Date.parse(sub.current_period_end ?? sub.updated_at) || 0,
+      Date.parse(sub.updated_at) || 0,
+    );
+    if (end + GRACE_MS > now) return false;
+  } else if (!lapsed) {
+    // Nunca assinou (ou só tem checkout pendente) — vale o trial de 7 dias.
+    const since = profile?.created_at ? Date.parse(profile.created_at) : NaN;
+    if (Number.isFinite(since) && now - since <= TRIAL_MS) return false;
+  }
+  // Todas as proteções venceram — despublica (o domínio expira junto via RPC).
+  await admin.from("sites")
+    .update({
+      publicado: false,
+      desativado_em: new Date(now).toISOString(),
+      desativado_motivo: domain ? "domain" : "subscription",
+    })
+    .eq("slug", slug).eq("publicado", true);
+  return true;
 }
 
 const gateStyle: Record<string, React.CSSProperties> = {
@@ -75,7 +110,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const site = await loadSite(slug);
   if (!site) return { title: "Site", robots: { index: false } };
-  if (await siteBlocked(site.lead_id)) {
+  if (await siteBlocked(slug, site.lead_id)) {
     return { title: siteStrings(site.config.lang).gateTitle, robots: { index: false } };
   }
   return {
@@ -92,8 +127,8 @@ export default async function SitePage({ params }: Props) {
   const internal = (await headers()).get(EDITOR_HEADER) === editorToken();
   const site = await loadSite(slug, { raw: internal });
   if (site) {
-    const owner = (site.config as { owner?: string }).owner ?? null;
-    if (!internal && await siteBlocked(site.lead_id, owner)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
+    const owner = site.owner_id ?? (site.config as { owner?: string }).owner ?? null;
+    if (!internal && await siteBlocked(slug, site.lead_id, owner)) return <SiteGate nome={site.nome} lang={site.config.lang} />;
     // Projetos do estúdio: HTML gerado por IA, renderizado direto.
     // target=mobile veste moldura de telefone.
     if (site.tipo === "custom" && site.config.html) {
@@ -126,7 +161,7 @@ export default async function SitePage({ params }: Props) {
   const { data: lead } = await admin.from("leads")
     .select("id").eq("dados->>siteSlug", slug).maybeSingle();
   if (!lead) notFound();
-  if (await siteBlocked(lead.id)) return <SiteGate nome={slug} />;
+  if (await siteBlocked(slug, lead.id)) return <SiteGate nome={slug} />;
   const { data: output } = await admin.from("lead_outputs")
     .select("conteudo").eq("lead_id", lead.id).eq("tipo", "generate_site")
     .order("created_at", { ascending: false }).limit(1).maybeSingle();

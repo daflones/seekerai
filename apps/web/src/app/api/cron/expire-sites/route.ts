@@ -15,5 +15,10 @@ export async function GET(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: "Falha ao expirar sites." }, { status: 500 });
   }
-  return NextResponse.json({ expired: data ?? 0 });
+  // Proteção pós-plano/domínio: avisos de 7 dias + desativação sem proteção.
+  const { data: grace, error: graceErr } = await admin.rpc("enforce_site_expirations");
+  if (graceErr) {
+    return NextResponse.json({ error: "Falha ao aplicar expirações." }, { status: 500 });
+  }
+  return NextResponse.json({ expired: data ?? 0, grace: grace ?? null });
 }

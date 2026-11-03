@@ -21,6 +21,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Aguardando pagamento",
   pending_setup: "Pago — configurar",
   active: "Ativo",
+  expired: "Expirado",
   rejected: "Rejeitado",
   removed: "Removido",
 };

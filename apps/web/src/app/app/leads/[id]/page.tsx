@@ -37,11 +37,39 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const slug = (lead as { dados?: { siteSlug?: string } }).dados?.siteSlug ?? null;
   // sites tem RLS "só publicado" — o estado de ativação vem do service role.
   let siteState: { active: boolean; motivo: string | null } | null = null;
+  // Aviso de proteção pós-plano/domínio exibido no card do site.
+  let siteWarn: { kind: "plan_grace" | "domain_cover" | "domain_grace"; deadline: string | null } | null = null;
   if (slug) {
     const admin = createSupabaseAdminClient();
-    const { data: site } = await admin.from("sites")
-      .select("publicado,desativado_motivo").eq("slug", slug).maybeSingle();
+    const GRACE = 7 * 24 * 3600 * 1000;
+    const now = Date.now();
+    const [{ data: site }, { data: lastSub }, { data: domain }] = await Promise.all([
+      admin.from("sites").select("publicado,desativado_motivo").eq("slug", slug).maybeSingle(),
+      admin.from("subscriptions").select("status,current_period_end,updated_at")
+        .eq("user_id", user.id).in("status", ["active", "canceled", "past_due"])
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("domains").select("status,expires_at")
+        .eq("site_slug", slug).eq("status", "active").limit(1).maybeSingle(),
+    ]);
     if (site) siteState = { active: Boolean(site.publicado), motivo: site.desativado_motivo ?? null };
+    const hasSub = lastSub?.status === "active";
+    const domUntil = domain?.expires_at ? Date.parse(domain.expires_at) : null;
+    const domLive = domain && (domUntil === null || domUntil + GRACE > now);
+    if (site?.publicado && !hasSub) {
+      if (domLive) {
+        siteWarn = domUntil !== null && domUntil < now
+          ? { kind: "domain_grace", deadline: new Date(domUntil + GRACE).toISOString() }
+          : { kind: "domain_cover", deadline: domain!.expires_at };
+      } else if (lastSub && (lastSub.status === "canceled" || lastSub.status === "past_due")) {
+        const lapse = Math.max(
+          Date.parse(lastSub.current_period_end ?? lastSub.updated_at) || 0,
+          Date.parse(lastSub.updated_at) || 0,
+        );
+        if (lapse + GRACE > now) {
+          siteWarn = { kind: "plan_grace", deadline: new Date(lapse + GRACE).toISOString() };
+        }
+      }
+    }
   }
 
   return <>
@@ -54,6 +82,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       siteSlug={slug}
       siteActive={siteState?.active ?? null}
       siteOffMotivo={siteState?.motivo ?? null}
+      siteWarn={siteWarn}
       senderName={((profile as { nome?: string } | null)?.nome) ?? null}
       currency={loc.currency}
       lang={loc.lang}
