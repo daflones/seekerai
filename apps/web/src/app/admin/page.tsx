@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { authReady } from "@/lib/auth/config";
+import { fetchAllRows } from "@/lib/supabase/admin";
 import { AdminCreditos } from "@/components/admin-creditos";
 import { AdminTools } from "@/components/admin-tools";
 
@@ -134,32 +135,38 @@ export default async function AdminPage() {
   const since60 = new Date(Date.now() - 60 * DAY).toISOString();
   const [
     { count: usuarios },
-    { data: profilesRecent },
+    profilesRecent,
     { data: settings },
     { data: rules },
     { data: subs },
-    { data: leadsRows },
-    { data: ops30 },
+    leadsRows,
+    ops30,
     { data: tickets },
-    { data: payments60 },
-    { data: sjRows },
-    { data: ajRows },
+    payments60,
+    sjRows,
+    ajRows,
     { count: sitesCount },
     { count: domainsCount },
     { data: audit },
     { data: plansData },
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
-    supabase.from("profiles").select("created_at").gte("created_at", since60).limit(5000),
+    fetchAllRows<{ created_at: string }>(
+      (f, t) => supabase.from("profiles").select("created_at").gte("created_at", since60).range(f, t)),
     supabase.from("credit_settings").select("welcome_credits").single(),
     supabase.from("credit_action_rules").select("action,cost,enabled").order("action"),
     supabase.from("subscriptions").select("status,billing_months, plans(slug,nome,preco_centavos)").eq("status", "active"),
-    supabase.from("leads").select("status").limit(10000),
-    supabase.from("credit_operations").select("action,cost,status,created_at").gte("created_at", since60).limit(20000),
+    fetchAllRows<{ status: string }>(
+      (f, t) => supabase.from("leads").select("status").range(f, t)),
+    fetchAllRows<{ action: string; cost: number; status: string; created_at: string }>(
+      (f, t) => supabase.from("credit_operations").select("action,cost,status,created_at").gte("created_at", since60).range(f, t)),
     supabase.from("support_tickets").select("status,atendente").limit(500),
-    supabase.from("payments").select("status,provider,method,amount_cents,metadata,created_at,user_id").gte("created_at", since60).limit(3000),
-    supabase.from("search_jobs").select("status,created_at").limit(2000),
-    supabase.from("ai_jobs").select("status,created_at").limit(2000),
+    fetchAllRows<{ status: string; provider: string | null; method: string | null; amount_cents: number; metadata: unknown; created_at: string; user_id: string | null }>(
+      (f, t) => supabase.from("payments").select("status,provider,method,amount_cents,metadata,created_at,user_id").gte("created_at", since60).range(f, t)),
+    fetchAllRows<{ status: string; created_at: string }>(
+      (f, t) => supabase.from("search_jobs").select("status,created_at").range(f, t)),
+    fetchAllRows<{ status: string; created_at: string }>(
+      (f, t) => supabase.from("ai_jobs").select("status,created_at").range(f, t)),
     supabase.from("sites").select("slug", { count: "exact", head: true }).eq("publicado", true),
     supabase.from("domains").select("id", { count: "exact", head: true }).in("status", ["active", "pending_setup"]),
     supabase.from("audit_log").select("acao,alvo,diff,created_at").order("created_at", { ascending: false }).limit(8),

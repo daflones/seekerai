@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Coins, Crown, Search, UserRound } from "lucide-react";
+import { ChevronDown, Coins, Crown, Phone, Search, UserRound } from "lucide-react";
 import type { AdminUserRow } from "@/lib/admin-users";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -19,6 +19,22 @@ const dateTag = (iso: string | null) => iso
   : "—";
 const periodLabel = (months: number) =>
   months === 1 ? "mensal" : months === 3 ? "trimestral" : months === 12 ? "anual" : `${months} meses`;
+
+// Telefones chegam em formatos variados (+55, com espaço, sem DDI).
+const fmtPhone = (t: string | null) => {
+  if (!t) return "";
+  const d = t.replace(/\D/g, "");
+  const local = d.startsWith("55") && d.length > 11 ? d.slice(2) : d;
+  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  return t;
+};
+const waLink = (t: string | null) => {
+  if (!t) return null;
+  const d = t.replace(/\D/g, "");
+  const full = d.startsWith("55") ? d : `55${d}`;
+  return full.length >= 12 ? `https://wa.me/${full}` : null;
+};
 
 export function AdminUsers({ users, plans }: {
   users: AdminUserRow[];
@@ -39,7 +55,10 @@ export function AdminUsers({ users, plans }: {
       if (filtro === "assinantes" && u.subStatus !== "active") return false;
       if (filtro === "gratuitos" && u.subStatus === "active") return false;
       if (filtro === "admins" && u.role !== "admin") return false;
-      if (term && !u.nome.toLowerCase().includes(term) && !u.email.toLowerCase().includes(term)) return false;
+      if (term
+        && !u.nome.toLowerCase().includes(term)
+        && !u.email.toLowerCase().includes(term)
+        && !(u.telefone ?? "").replace(/\D/g, "").includes(term.replace(/\D/g, "") || "￿")) return false;
       return true;
     });
   }, [users, q, filtro]);
@@ -82,7 +101,7 @@ export function AdminUsers({ users, plans }: {
                 <span className="admin-user-avatar"><UserRound size={16} /></span>
                 <span className="admin-user-id">
                   <strong>{u.nome}</strong>
-                  <small>{u.email || u.id}</small>
+                  <small>{[u.email, fmtPhone(u.telefone)].filter(Boolean).join(" · ") || u.id}</small>
                 </span>
                 <span className={`admin-user-plan${u.subStatus === "active" ? " is-active" : ""}`}>
                   {u.subStatus === "active"
@@ -102,6 +121,14 @@ export function AdminUsers({ users, plans }: {
                       <h4>Conta</h4>
                       <dl className="admin-user-dl">
                         <div><dt>ID</dt><dd className="mono">{u.id.slice(0, 8)}…</dd></div>
+                        <div><dt>Telefone</dt><dd>
+                          {u.telefone
+                            ? <>{fmtPhone(u.telefone)}{waLink(u.telefone) && (
+                                <a className="au-wa" href={waLink(u.telefone)!} target="_blank" rel="noreferrer" title="Abrir no WhatsApp">
+                                  <Phone size={11} /> WhatsApp
+                                </a>)}</>
+                            : "—"}
+                        </dd></div>
                         <div><dt>Role</dt><dd>{u.role}</dd></div>
                         <div><dt>Onboarding</dt><dd>{u.onboarding ? "Concluído" : "Pendente"}</dd></div>
                         <div><dt>Assinatura</dt><dd>{u.subStatus ?? "nenhuma"}{u.subStatus ? ` ${u.planNome ?? ""}${u.billingMonths ? ` · ${periodLabel(u.billingMonths)}` : ""}` : ""}{u.periodEnd ? ` · até ${dateTag(u.periodEnd)}` : ""}</dd></div>
@@ -135,32 +162,44 @@ export function AdminUsers({ users, plans }: {
                   </div>
 
                   <div className="admin-user-actions">
-                    <div className="admin-user-action">
-                      <label>Plano</label>
-                      <select value={planSel[u.id] ?? u.planSlug ?? ""} onChange={(e) => setPlanSel((s) => ({ ...s, [u.id]: e.target.value }))}>
-                        <option value="" disabled>Escolher plano…</option>
-                        {plans.map((p) => <option key={p.slug} value={p.slug}>{p.nome} · {p.creditos_mensais} cr/mês</option>)}
-                      </select>
-                      <button className="btn-admin" disabled={busy === u.id || !(planSel[u.id] ?? "").trim()}
-                        onClick={() => run(u.id, { action: "set_plan", planSlug: planSel[u.id] })}>
-                        Aplicar plano
-                      </button>
+                    <section className="au-action">
+                      <h4>Plano</h4>
+                      <div className="au-action-row">
+                        <select value={planSel[u.id] ?? u.planSlug ?? ""} onChange={(e) => setPlanSel((s) => ({ ...s, [u.id]: e.target.value }))}>
+                          <option value="" disabled>Escolher plano…</option>
+                          {plans.map((p) => <option key={p.slug} value={p.slug}>{p.nome} · {p.creditos_mensais} cr/mês</option>)}
+                        </select>
+                        <button className="btn-admin" disabled={busy === u.id || !(planSel[u.id] ?? "").trim()}
+                          onClick={() => run(u.id, { action: "set_plan", planSlug: planSel[u.id] })}>
+                          Aplicar
+                        </button>
+                      </div>
                       {u.subStatus === "active" && (
                         <button className="btn-admin btn-admin-danger" disabled={busy === u.id}
                           onClick={() => { if (confirm(`Cancelar a assinatura de ${u.nome}?`)) run(u.id, { action: "cancel_sub" }); }}>
                           Cancelar assinatura
                         </button>
                       )}
-                    </div>
-                    <div className="admin-user-action">
-                      <label>Créditos (saldo: {u.saldo})</label>
-                      <input type="number" placeholder="Ex.: 50 ou -20" value={delta[u.id] ?? ""}
-                        onChange={(e) => setDelta((s) => ({ ...s, [u.id]: e.target.value }))} />
-                      <button className="btn-admin" disabled={busy === u.id || !Number(delta[u.id])}
-                        onClick={() => run(u.id, { action: "adjust_credits", delta: Number(delta[u.id]) })}>
-                        Ajustar saldo
-                      </button>
-                    </div>
+                    </section>
+                    <section className="au-action">
+                      <h4>Créditos · saldo {u.saldo} cr</h4>
+                      <div className="au-action-row">
+                        <input type="number" placeholder="Ex.: 50 ou -20" value={delta[u.id] ?? ""}
+                          onChange={(e) => setDelta((s) => ({ ...s, [u.id]: e.target.value }))} />
+                        <button className="btn-admin" disabled={busy === u.id || !Number(delta[u.id])}
+                          onClick={() => run(u.id, { action: "adjust_credits", delta: Number(delta[u.id]) })}>
+                          Ajustar
+                        </button>
+                      </div>
+                      <div className="au-chips">
+                        {[20, 50, 100, -20].map((n) => (
+                          <button key={n} type="button" className="au-chip"
+                            onClick={() => setDelta((s) => ({ ...s, [u.id]: String(n) }))}>
+                            {n > 0 ? `+${n}` : n}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
                   </div>
                   <p className="admin-user-note">Aplicar plano repõe a cota mensal do plano. Ajustes de saldo ficam registrados no extrato de créditos.</p>
                 </div>

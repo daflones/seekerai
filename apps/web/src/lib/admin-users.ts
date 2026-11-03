@@ -1,10 +1,11 @@
 import "server-only";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseAdminClient, fetchAllAuthUsers, fetchAllRows } from "@/lib/supabase/admin";
 
 export interface AdminUserRow {
   id: string;
   nome: string;
   email: string;
+  telefone: string | null;
   role: string;
   onboarding: boolean;
   createdAt: string;
@@ -30,20 +31,32 @@ const LEAD_STAGES = ["novo", "contatado", "respondeu", "proposta", "ganho", "per
 export async function loadAdminUsers(): Promise<AdminUserRow[]> {
   const admin = createSupabaseAdminClient();
   const [profiles, wallets, subs, leads, outputs, jobs, authUsers] = await Promise.all([
-    admin.from("profiles").select("id,nome,role,onboarding_concluido,created_at").order("created_at", { ascending: false }).limit(2000),
-    admin.from("credit_wallets").select("user_id,saldo"),
-    admin.from("subscriptions").select("user_id,status,current_period_end,billing_months,created_at,plans(slug,nome,preco_centavos)").neq("status", "canceled").order("created_at", { ascending: false }),
-    admin.from("leads").select("user_id,status,valor_fechado"),
-    admin.from("lead_outputs").select("user_id,tipo"),
-    admin.from("ai_jobs").select("user_id,status"),
-    admin.auth.admin.listUsers({ perPage: 1000 }),
+    fetchAllRows<{ id: string; nome: string | null; telefone: string | null; role: string; onboarding_concluido: boolean; created_at: string }>(
+      (f, t) => admin.from("profiles").select("id,nome,telefone,role,onboarding_concluido,created_at").order("created_at", { ascending: false }).range(f, t),
+    ),
+    fetchAllRows<{ user_id: string; saldo: number }>(
+      (f, t) => admin.from("credit_wallets").select("user_id,saldo").range(f, t),
+    ),
+    fetchAllRows<{ user_id: string; status: string; current_period_end: string | null; billing_months: number | null; created_at: string; plans: unknown }>(
+      (f, t) => admin.from("subscriptions").select("user_id,status,current_period_end,billing_months,created_at,plans(slug,nome,preco_centavos)").neq("status", "canceled").order("created_at", { ascending: false }).range(f, t),
+    ),
+    fetchAllRows<{ user_id: string; status: string; valor_fechado: number | null }>(
+      (f, t) => admin.from("leads").select("user_id,status,valor_fechado").range(f, t),
+    ),
+    fetchAllRows<{ user_id: string; tipo: string }>(
+      (f, t) => admin.from("lead_outputs").select("user_id,tipo").range(f, t),
+    ),
+    fetchAllRows<{ user_id: string; status: string }>(
+      (f, t) => admin.from("ai_jobs").select("user_id,status").range(f, t),
+    ),
+    fetchAllAuthUsers(admin),
   ]);
 
-  const emailById = new Map((authUsers.data?.users ?? []).map((u) => [u.id, u.email ?? ""]));
-  const saldoById = new Map((wallets.data ?? []).map((w) => [w.user_id, w.saldo]));
+  const emailById = new Map(authUsers.map((u) => [u.id, u.email ?? ""]));
+  const saldoById = new Map((wallets ?? []).map((w) => [w.user_id, w.saldo]));
   // A assinatura relevante é a ativa; senão, a mais recente não cancelada.
   const subById = new Map<string, { slug: string; nome: string; preco: number; status: string; end: string | null; months: number }>();
-  for (const s of subs.data ?? []) {
+  for (const s of subs ?? []) {
     const plan = s.plans as unknown as { slug: string; nome: string; preco_centavos: number } | null;
     const cur = subById.get(s.user_id);
     if (!cur || s.status === "active") {
@@ -54,7 +67,7 @@ export async function loadAdminUsers(): Promise<AdminUserRow[]> {
     }
   }
   const leadsByUser = new Map<string, { stages: Record<string, number>; total: number; valor: number }>();
-  for (const l of leads.data ?? []) {
+  for (const l of leads ?? []) {
     const cur = leadsByUser.get(l.user_id) ?? { stages: {}, total: 0, valor: 0 };
     cur.stages[l.status] = (cur.stages[l.status] ?? 0) + 1;
     cur.total += 1;
@@ -62,7 +75,7 @@ export async function loadAdminUsers(): Promise<AdminUserRow[]> {
     leadsByUser.set(l.user_id, cur);
   }
   const outputsByUser = new Map<string, { tipos: Record<string, number>; total: number }>();
-  for (const o of outputs.data ?? []) {
+  for (const o of outputs ?? []) {
     const cur = outputsByUser.get(o.user_id) ?? { tipos: {}, total: 0 };
     cur.tipos[o.tipo] = (cur.tipos[o.tipo] ?? 0) + 1;
     cur.total += 1;
@@ -70,14 +83,14 @@ export async function loadAdminUsers(): Promise<AdminUserRow[]> {
   }
 
   const jobsByUser = new Map<string, { running: number; error: number }>();
-  for (const j of jobs.data ?? []) {
+  for (const j of jobs ?? []) {
     const cur = jobsByUser.get(j.user_id) ?? { running: 0, error: 0 };
     if (j.status === "running") cur.running += 1;
     else if (j.status === "error") cur.error += 1;
     jobsByUser.set(j.user_id, cur);
   }
 
-  return (profiles.data ?? []).map((p) => {
+  return (profiles ?? []).map((p) => {
     const sub = subById.get(p.id);
     const leadsAgg = leadsByUser.get(p.id) ?? { stages: {}, total: 0, valor: 0 };
     const outputsAgg = outputsByUser.get(p.id) ?? { tipos: {}, total: 0 };
@@ -85,6 +98,7 @@ export async function loadAdminUsers(): Promise<AdminUserRow[]> {
       id: p.id,
       nome: p.nome || "—",
       email: emailById.get(p.id) ?? "",
+      telefone: p.telefone ?? null,
       role: p.role,
       onboarding: p.onboarding_concluido,
       createdAt: p.created_at,
