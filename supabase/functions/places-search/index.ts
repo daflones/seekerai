@@ -730,9 +730,10 @@ Deno.serve(async (req) => {
         }
       }
       if (!resultados) {
-        throw lastErr instanceof Error
-          ? lastErr
-          : httpError(502, "Busca indisponível no momento");
+        // O motivo real fica no console.error acima — pro cliente vai
+        // sempre a mensagem genérica, sem nome de provedor.
+        console.error("[places-search] todos os provedores falharam:", lastErr);
+        throw httpError(502, "Busca indisponível no momento. Tente novamente em instantes.");
       }
 
       // Enriquecimento: WhatsApp em lote (grátis) + varredura dos sites
