@@ -1983,7 +1983,12 @@ function baseSiteConfig(lead: Record<string, unknown>, tipo: string): Record<str
       telefone: telefone ?? undefined,
       whatsapp: whatsapp || undefined,
       instagram: instagram
-        ? (instagram.startsWith("http") ? instagram : `https://instagram.com/${instagram.replace(/^@/, "")}`)
+        ? (() => {
+            // "@user" | "user" | URL completa → handle → URL canônica.
+            const m = instagram.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9_.]+)/i);
+            const h = (m ? m[1] : instagram.replace(/^@+/, "")).replace(/\/+$/, "");
+            return /^[A-Za-z0-9_.]{1,30}$/.test(h) ? `https://instagram.com/${h}` : undefined;
+          })()
         : undefined,
       endereco: asString(lead.endereco, 300) ?? undefined,
       mapsUrl: asString(lead.maps_url, 800) ?? asString(dados.mapsUrl, 800) ?? undefined,
@@ -2482,7 +2487,14 @@ async function publishPremiumSite(
   // Fatos reais vencem o patch — horários e avaliações vêm do Maps,
   // e o Instagram descoberto completa o contato.
   if (place.instagram && isRecord(config.contato) && !config.contato.instagram) {
-    config.contato.instagram = `https://instagram.com/${place.instagram.replace(/^@/, "")}`;
+    // place.instagram pode vir como "@user", "user" ou URL completa —
+    // normaliza pra URL canônica sem duplicar domínio.
+    const raw = String(place.instagram).trim();
+    const m = raw.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9_.]+)/i);
+    const handle = (m ? m[1] : raw.replace(/^@+/, "")).replace(/\/+$/, "");
+    if (/^[A-Za-z0-9_.]{1,30}$/.test(handle)) {
+      config.contato.instagram = `https://instagram.com/${handle}`;
+    }
   }
   if (place.horariosLabel?.length) config.horariosLabel = place.horariosLabel;
   // Mapa de janelas pro modal de agendamento: Maps direto ou derivado
@@ -2910,7 +2922,16 @@ Deno.serve(async (req) => {
           .filter((u): u is string => typeof u === "string")
         : [];
 
-      const conteudo = typeof message.content === "string" ? message.content : null;
+      let conteudo = typeof message.content === "string" ? message.content : null;
+
+      // Abordagem vai pro WhatsApp — markdown [texto](url) vira literal
+      // quebrado. Achata pra "texto url" e deduplica URL repetida seguida.
+      if (action === "sales_reply" && conteudo) {
+        conteudo = conteudo
+          .replace(/\[([^\]]*)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g,
+            (_m, text: string, url: string) => text && text !== url ? `${text} ${url}` : url)
+          .replace(/(https?:\/\/\S+)\s+\1/g, "$1");
+      }
 
       return json({
         conteudo,

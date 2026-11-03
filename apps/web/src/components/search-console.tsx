@@ -8,7 +8,7 @@ import {
   AlarmClock, Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
   Search, SlidersHorizontal, Sparkles, Star, Users, XCircle,
 } from "lucide-react";
-import { fmtCompact, placeImageSrc, type PlaceResult } from "@/lib/app-client";
+import { fmtCompact, igHandle, igUrl, placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
 import { formatPotential, potentialEstimate } from "@/lib/catalog";
 import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/lib/catalog-i18n";
@@ -558,17 +558,17 @@ export function SearchConsole({
                 <span className="seek-badge seek-site-note" title={check.sinais}>{check.sinais.split(" · ")[0]}</span>}
               {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.waOk}</span>}
               {p.whatsapp === false && p.telefone && <span className="seek-badge">{t.waNo}</span>}
-              {p.instagram && !p.ig && <a className="seek-badge" href={`https://instagram.com/${p.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{p.instagram}</a>}
+              {p.instagram && !p.ig && igUrl(p.instagram) && <a className="seek-badge" href={igUrl(p.instagram)!} target="_blank" rel="noopener noreferrer"><Instagram size={11} />@{igHandle(p.instagram)}</a>}
               {p.sitePronto && <span className="seek-badge seek-badge-ok">{t.siteDone}</span>}
               {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">{t.closed}</span>}
             </div>
-            {p.ig && <a className="seek-ig" href={`https://instagram.com/${p.instagram!.replace(/^@/, "")}`}
+            {p.ig && igUrl(p.instagram) && <a className="seek-ig" href={igUrl(p.instagram)!}
               target="_blank" rel="noopener noreferrer" title={p.ig.bio ?? p.instagram ?? ""}>
               {p.ig.foto
                 // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
                 ? <img className="seek-ig-pic" src={p.ig.foto} alt="" loading="lazy" />
                 : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
-              <span className="seek-ig-handle">{p.instagram}</span>
+              <span className="seek-ig-handle">@{igHandle(p.instagram)}</span>
               {p.ig.seguidores !== null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(p.ig.seguidores, lang)} {t.igFollowers}</span>}
               {p.ig.posts !== null && <span className="seek-ig-stat">{fmtCompact(p.ig.posts, lang)} {t.igPosts}</span>}
               {p.ig.curtidas !== null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(p.ig.curtidas, lang)} {t.igLikes}</span>}

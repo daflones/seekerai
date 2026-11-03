@@ -8,7 +8,7 @@ import {
   Lock, MapPin, MessageSquareText, Pencil, Phone, Plus, RotateCcw, Sparkles, Star, Trash2, Globe, Users,
   MessageCircle, FileText, MonitorSmartphone, Power,
 } from "lucide-react";
-import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { callAction, fmtCompact, igHandle, igUrl, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { promptFor } from "@/lib/ai-prompts";
 import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
@@ -282,9 +282,24 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   // com o nome de quem está vendendo (perfil da conta).
   function generateOutreach() {
     const site = siteAbsoluteUrl();
+    const linkRule: Record<string, string> = site ? {
+      pt: `\n\nO site de demonstração já está pronto: ${site} — inclua o link na mensagem de forma natural (ex.: "montei uma prévia do site pra você ver"). IMPORTANTE: escreva a URL pura, exatamente como está — nunca use formato markdown [texto](url), colchetes ou aspas em volta do link, e cite o link uma única vez.`,
+      en: `\n\nThe demo site is ready: ${site} — include the link naturally in the message (e.g. "I put together a site preview for you"). IMPORTANT: write the plain URL exactly as-is — never use markdown [text](url), brackets or quotes around the link, and mention it only once.`,
+      es: `\n\nEl sitio de demostración ya está listo: ${site} — incluye el enlace de forma natural. IMPORTANTE: escribe la URL pura, tal cual — nunca uses markdown [texto](url), corchetes ni comillas alrededor del enlace, y menciónalo una sola vez.`,
+      fr: `\n\nLe site de démonstration est prêt : ${site} — incluez le lien naturellement. IMPORTANT : écrivez l'URL brute telle quelle — jamais de markdown [texte](url), crochets ou guillemets autour du lien, et ne le citez qu'une seule fois.`,
+      de: `\n\nDie Demo-Website ist fertig: ${site} — fügen Sie den Link natürlich ein. WICHTIG: Schreiben Sie die reine URL genau so — niemals Markdown [Text](url), Klammern oder Anführungszeichen um den Link, und erwähnen Sie ihn nur einmal.`,
+      it: `\n\nIl sito demo è pronto: ${site} — includi il link in modo naturale. IMPORTANTE: scrivi l'URL puro così com'è — mai markdown [testo](url), parentesi quadre o virgolette attorno al link, e citalo una sola volta.`,
+    } : { pt: "", en: "", es: "", fr: "", de: "", it: "" };
+    const signRule: Record<string, string> = senderName ? {
+      pt: `\nAssine a mensagem como "${senderName}".`,
+      en: `\nSign the message as "${senderName}".`,
+      es: `\nFirma el mensaje como "${senderName}".`,
+      fr: `\nSignez le message « ${senderName} ».`,
+      de: `\nUnterschreiben Sie die Nachricht als "${senderName}".`,
+      it: `\nFirma il messaggio come "${senderName}".`,
+    } : { pt: "", en: "", es: "", fr: "", de: "", it: "" };
     void generate("sales_reply", {
-      prompt: (site ? `\n\nO site de demonstração já está pronto: ${site} — inclua o link completo na mensagem de forma natural (ex.: "montei uma prévia do site pra você ver").` : "")
-        + (senderName ? `\nAssine a mensagem como "${senderName}".` : ""),
+      prompt: linkRule[lang] + signRule[lang],
       context: { remetente: senderName ?? undefined, siteUrl: site || undefined },
     });
   }
@@ -453,16 +468,16 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
             title={(siteCheck!.sinais ?? []).join(" · ")}>
             {siteCheckLabel}
           </span>}
-          {lead.instagram && !ig && <a className="seek-badge" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer"><Instagram size={11} />{lead.instagram}</a>}
+          {lead.instagram && !ig && igUrl(lead.instagram) && <a className="seek-badge" href={igUrl(lead.instagram)!} target="_blank" rel="noopener noreferrer"><Instagram size={11} />@{igHandle(lead.instagram)}</a>}
           {lead.maps_url && <a className="seek-badge" href={lead.maps_url} target="_blank" rel="noopener noreferrer"><MapPin size={11} />Maps<ExternalLink size={10} /></a>}
         </div>
-        {ig && lead.instagram && <a className="seek-ig" href={`https://instagram.com/${lead.instagram.replace(/^@/, "")}`}
+        {ig && igUrl(lead.instagram) && <a className="seek-ig" href={igUrl(lead.instagram)!}
           target="_blank" rel="noopener noreferrer" title={ig.bio ?? ""}>
           {ig.foto
             // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
             ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
             : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
-          <span className="seek-ig-handle">{lead.instagram}</span>
+          <span className="seek-ig-handle">@{igHandle(lead.instagram)}</span>
           {ig.seguidores != null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
           {ig.posts != null && <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} posts</span>}
           {ig.curtidas != null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)}/post</span>}

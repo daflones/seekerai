@@ -33,6 +33,20 @@ export function placeImageSrc(imagem: string | null | undefined): string | null 
   return imagem;
 }
 
+// Instagram vem de fontes diferentes como "@user", "user" ou URL completa
+// (com/sem www, barra final) — normaliza pro handle antes de montar o link.
+export function igHandle(v: string | null | undefined): string | null {
+  const s = (v ?? "").trim();
+  if (!s) return null;
+  const m = s.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9_.]+)/i);
+  const handle = (m ? m[1] : s.replace(/^@+/, "")).replace(/\/+$/, "");
+  return /^[A-Za-z0-9_.]{1,30}$/.test(handle) ? handle : null;
+}
+export function igUrl(v: string | null | undefined): string | null {
+  const h = igHandle(v);
+  return h ? `https://instagram.com/${h}` : null;
+}
+
 // Resultado normalizado de places-search.
 export interface PlaceResult {
   id: string | null;

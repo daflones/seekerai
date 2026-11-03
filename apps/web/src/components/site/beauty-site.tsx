@@ -13,6 +13,7 @@ import {
   Instagram, MapPin, Menu, MessageCircle, Phone, Sparkles, Tag, X,
 } from "lucide-react";
 import type { SiteConfig, SiteServico } from "@/lib/sites";
+import { igHandle, igUrl } from "@/lib/app-client";
 import { ImageStreamHero } from "./image-stream-hero";
 import {
   CountUp, EASE, FadeUp, Magnetic, RevealText, Spotlight,
@@ -595,7 +596,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 {cfg.contato.telefone && <p>{cfg.contato.telefone}</p>}
                 <div className="bbeauty-contact-links">
                   {waNumber && <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={14} /> {S.chamarWa}</a>}
-                  {cfg.contato.instagram && <a href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={14} /> @{cfg.contato.instagram}</a>}
+                  {igUrl(cfg.contato.instagram) && <a href={igUrl(cfg.contato.instagram)!} target="_blank" rel="noopener"><Instagram size={14} /> @{igHandle(cfg.contato.instagram)}</a>}
                   {cfg.contato.telefone && <a href={`tel:${cfg.contato.telefone.replace(/\D/g, "")}`}><Phone size={14} /> {S.ligar}</a>}
                 </div>
               </Spotlight>
@@ -682,7 +683,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
               <Magnetic><CtaButton className="bbeauty-pill primary"><Sparkles size={15} /> {ctaLabel}</CtaButton></Magnetic>
               {waNumber && <Magnetic><a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
               {cfg.contato.mapsUrl && <Magnetic><a className="bbeauty-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> {S.comoChegar}</a></Magnetic>}
-              {cfg.contato.instagram && <Magnetic><a className="bbeauty-pill" href={`https://instagram.com/${cfg.contato.instagram}`} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
+              {igUrl(cfg.contato.instagram) && <Magnetic><a className="bbeauty-pill" href={igUrl(cfg.contato.instagram)!} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
             </div>
           </div>
 

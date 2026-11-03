@@ -7,7 +7,7 @@ import {
   Globe, Heart, Image as ImageIcon, Instagram, Loader2, MapPin,
   MessageSquareText, Phone, Sparkles, Star, Target, Users, FileCode2,
 } from "lucide-react";
-import { callAction, fmtCompact, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { callAction, fmtCompact, igHandle, igUrl, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { promptFor } from "@/lib/ai-prompts";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import type { Lang } from "@/lib/i18n/shared";
@@ -231,13 +231,13 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok">WhatsApp</span>}
               {lead.instagram && !ig && <span className="seek-badge">{lead.instagram}</span>}
             </p>
-            {ig && <a className="seek-ig" href={`https://instagram.com/${(lead.instagram ?? "").replace(/^@/, "")}`}
+            {ig && igUrl(lead.instagram) && <a className="seek-ig" href={igUrl(lead.instagram)!}
               target="_blank" rel="noopener noreferrer" title={ig.bio ?? ""}>
               {ig.foto
                 // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
                 ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
                 : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
-              <span className="seek-ig-handle">{lead.instagram}</span>
+              <span className="seek-ig-handle">@{igHandle(lead.instagram)}</span>
               {ig.seguidores !== null && ig.seguidores !== undefined &&
                 <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
               {ig.posts !== null && ig.posts !== undefined &&

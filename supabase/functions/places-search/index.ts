@@ -417,7 +417,15 @@ async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
   } catch {
     return;
   }
-  const urls = misses.map((p) => `https://www.instagram.com/${p.instagram!.replace(/^@/, "")}/`);
+  // instagram pode vir como "@user", "user" ou URL completa — extrai o handle.
+  const igHandleOf = (v: string) => {
+    const m = v.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9_.]+)/i);
+    return (m ? m[1] : v.replace(/^@+/, "")).replace(/\/+$/, "");
+  };
+  const urls = misses
+    .map((p) => igHandleOf(p.instagram!))
+    .filter((h) => /^[A-Za-z0-9_.]{1,30}$/.test(h))
+    .map((h) => `https://www.instagram.com/${h}/`);
   // Uma chamada só: "details" volta rápido (~10s) e já traz latestPosts
   // com curtidas — o resultsType "posts" estoura o tempo e nunca retorna.
   const details = await Promise.race([
