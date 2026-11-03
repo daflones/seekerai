@@ -45,8 +45,14 @@ export async function middleware(request: NextRequest) {
 
   // Domínio customizado: qualquer rota serve o site publicado correspondente.
   if (host && !appHosts().has(host) && config) {
-    const slug = await resolveCustomDomain(host, config.url, config.key);
+    const apex = host.startsWith("www.") ? host.slice(4) : host;
+    const slug = await resolveCustomDomain(apex, config.url, config.key);
     if (slug) {
+      if (apex !== host) {
+        // www.dominio.com → dominio.com (domínio ativo é sempre o apex)
+        const target = new URL(`https://${apex}${request.nextUrl.pathname}${request.nextUrl.search}`);
+        return NextResponse.redirect(target, 301);
+      }
       const url = request.nextUrl.clone();
       url.pathname = `/site/${slug}`;
       return NextResponse.rewrite(url);
