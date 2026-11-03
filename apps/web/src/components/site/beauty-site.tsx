@@ -34,7 +34,7 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
   const {
     bookOpen, setBookOpen, step, bk, setBk, erro, waNumber,
     pros, hasPros, dias, slots, stepsTotal, dataStep, horaStep, finalStep,
-    openBook, next, back, dataLabel,
+    openBook, next, back, dataLabel, bookingEnabled,
   } = useBooking(config);
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -126,7 +126,11 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
 
   // CTA por nicho: "agendar" abre o fluxo de horário; "zap" pede pelo
   // WhatsApp; "mapa" leva ao endereço. Sem destino, cai pro #contato.
-  const ctaKind = vocab?.cta ?? "agendar";
+  // Sem janela real de horário, "agendar" degrada pro WhatsApp — nunca
+  // abre um calendário com todos os dias mortos.
+  const ctaKind = (vocab?.cta ?? "agendar") === "agendar" && !bookingEnabled
+    ? "zap"
+    : (vocab?.cta ?? "agendar");
   const ctaLabel = vocab?.ctaLabel ?? S.ctaAgendar;
   const waHref = waNumber ? `https://wa.me/${waNumber}` : null;
   const telHref = cfg.contato.telefone ? `tel:${cfg.contato.telefone.replace(/\D/g, "")}` : null;

@@ -182,6 +182,13 @@ export function useBooking(cfg: SiteConfig) {
   const pros = cfg.profissionais ?? [];
   const hasPros = pros.length > 0;
 
+  // Sem nenhuma janela aberta o calendário só exibiria dias mortos —
+  // os temas escondem os CTAs de agendar nesse caso.
+  const bookingEnabled = useMemo(
+    () => Boolean(cfg.horarios && Object.values(cfg.horarios).some((w) => w?.length)),
+    [cfg],
+  );
+
   const dias = useMemo(() => {
     const out: { d: Date; aberto: boolean }[] = [];
     const now = new Date();
@@ -250,7 +257,7 @@ export function useBooking(cfg: SiteConfig) {
   return {
     bookOpen, setBookOpen, step, bk, setBk, erro, waNumber,
     pros, hasPros, dias, slots, stepsTotal, dataStep, horaStep, finalStep,
-    openBook, next, back, dataLabel,
+    openBook, next, back, dataLabel, bookingEnabled,
   };
 }
 

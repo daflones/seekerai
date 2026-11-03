@@ -58,6 +58,8 @@ const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-la
 const VISION_MODELS = (optionalEnv("VISION_MODEL")
   ?? "google/gemini-2.5-flash,google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free")
   .split(",").map((s) => s.trim()).filter(Boolean);
+// Groq (api.groq.com) — gratuito, OpenAI-compatible, latência baixa.
+const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
 
 /** Chat de texto na NVIDIA — mesmo formato OpenAI. Retorna o JSON ou null. */
 async function nvidiaChat(
@@ -94,6 +96,36 @@ async function nvidiaChat(
   }).catch(() => null);
   if (!res?.ok) {
     console.error("[nvidia] chat falhou:", res?.status ?? "network");
+    return null;
+  }
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+/** Chat de texto no Groq — mesmo formato OpenAI. Retorna o JSON ou null. */
+async function groqChat(
+  system: string,
+  userContent: string,
+  maxTokens?: number,
+  timeoutMs?: number,
+): Promise<Record<string, unknown> | null> {
+  const key = await getSecret("GROQ_API_KEY");
+  if (!key) return null;
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: GROQ_TEXT_MODEL,
+      stream: false,
+      max_tokens: maxTokens ?? 1024,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+    }),
+    signal: AbortSignal.timeout(timeoutMs ?? 45_000),
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.error("[groq] chat falhou:", res?.status ?? "network");
     return null;
   }
   return (await res.json().catch(() => null)) as Record<string, unknown> | null;
@@ -495,6 +527,15 @@ function nicheVocab(paleta: string, categoria: string | null): NichoVocab {
       servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "momento",
       servicosHint: "toque para agendar", ofertasTitle: null,
       guia: "servicos = serviços de beleza/bem-estar com duracaoMin plausível (30-120). FAQ pode falar de agendamento, duração e preparo.",
+    },
+    barbearia: {
+      rotulo: "BARBEARIA", em: "sair renovado",
+      desc: "cortes clássicos e modernos, barba desenhada e atendimento de respeito. Cadeira quente, navalha afiada.",
+      prep: "a barbearia", marquee: "Estilo que respeita a sua história", ctaEm: "renovar o visual", schema: "BarberShop",
+      cta: "agendar", ctaLabel: "Agendar horário",
+      servicosLabel: "Serviços", servicosTitle: "Escolha o seu", servicosEm: "corte",
+      servicosHint: "toque para agendar", ofertasTitle: null,
+      guia: "servicos = serviços de barbearia (corte, barba, sobrancelha, pigmentação, combo corte+barba) — duracaoMin 30-90. Combos e planos de assinatura viram ofertas. FAQ fala de agendamento, duração e cuidados.",
     },
     tattoo: {
       rotulo: "ESTÚDIO DE TATUAGEM", em: "marcar a sua história",
@@ -1121,7 +1162,37 @@ const DOW_NAME: Record<string, string> = {
   freitag: "5", samstag: "6", sonntag: "0",
   lundi: "1", mardi: "2", mercredi: "3", jeudi: "4", vendredi: "5",
   samedi: "6", dimanche: "0",
+  // Abreviações que o Maps/Serper também devolvem.
+  seg: "1", ter: "2", qua: "3", qui: "4", sex: "5", sab: "6", "sáb": "6", dom: "0",
+  mon: "1", tue: "2", wed: "3", thu: "4", fri: "5", sat: "6", sun: "0",
+  mar: "2", "mié": "3", mie: "3", jue: "4", vie: "5",
+  jeu: "4", ven: "5", sam: "6", dim: "0",
 };
+
+/** "terça a sábado" / "segunda e domingo" / "sábado, domingo" → chaves de dia. */
+function dayKeysFromLabel(day: string): string[] {
+  const d = day.toLowerCase().replace(/\s+/g, " ").trim();
+  const single = DOW_NAME[d];
+  if (single) return [single];
+  // Range de dias: "segunda a sexta", "monday to friday", "terça - sábado".
+  const range = d.match(/^(.+?)\s+(?:a|à|até|to|until|bis|–|—|-)\s+(.+)$/);
+  if (range) {
+    const a = DOW_NAME[range[1].trim()];
+    const b = DOW_NAME[range[2].trim()];
+    if (a && b) {
+      const out: string[] = [];
+      for (let i = Number(a), guard = 0; guard < 7; i = (i + 1) % 7, guard++) {
+        out.push(String(i));
+        if (i === Number(b)) break;
+      }
+      if (out.length <= 7) return out;
+    }
+  }
+  // Lista: "segunda e domingo", "sábado, domingo", "sat & sun".
+  const parts = d.split(/\s*(?:,|&| e | and | et | und | y )\s*/);
+  const keys = parts.map((p) => DOW_NAME[p.trim()]).filter((k): k is string => Boolean(k));
+  return keys;
+}
 
 /** Labels reais ("Segunda", "09:00 – 19:00") → mapa de janelas pro booking. */
 function horariosFromLabels(
@@ -1130,11 +1201,14 @@ function horariosFromLabels(
   if (!labels?.length) return undefined;
   const out: Record<string, [string, string][] | null> = {};
   for (const [day, range] of labels) {
-    const key = DOW_NAME[day.toLowerCase()];
-    if (!key || key in out) continue;
-    out[key] = parseOpeningHours(range);
+    const windows = parseOpeningHours(range);
+    for (const key of dayKeysFromLabel(day)) {
+      if (!(key in out)) out[key] = windows;
+    }
   }
-  return Object.keys(out).length ? out : undefined;
+  // Nenhum dia com janela (tudo fechado/irreconhecível) → sem calendário:
+  // deixa o fluxo cair pro CTA de WhatsApp em vez de mostrar dias mortos.
+  return Object.values(out).some((w) => w?.length) ? out : undefined;
 }
 
 /** Resolve referências de imagem do lead/contexto em URLs baixáveis. */
@@ -1259,20 +1333,30 @@ function open24Label(lang: string): string {
   return OPEN24_LABEL[lang] ?? "Open 24 hours";
 }
 
-/** "9:00 AM to 7:00 PM" / "05:00 to 21:00" (e múltiplas janelas) → [["09:00","19:00"], ...]. */
+/** "9:00 AM to 7:00 PM" / "08:00–20:00" / "9 AM–7 PM" (e múltiplas janelas) → [["09:00","19:00"], ...]. */
 function parseOpeningHours(hours: string): [string, string][] | null {
-  if (/closed|fechado|cerrado|fermé|geschlossen|chiuso/i.test(hours)) return null;
-  if (/24\s*(hours|horas|heures|h)/i.test(hours)) return [["00:00", "23:59"]];
-  const to24 = (h: string, m: string, ap: string | undefined) => {
+  // Google usa espaços unicode (nbsp, narrow nbsp) nos labels localizados.
+  const norm = hours.replace(/[\u00A0\u2009\u202F]/g, " ").trim();
+  if (/closed|fechad|cerrad|fermé|geschlossen|chiuso|permanent/i.test(norm)) return null;
+  if (/24\s*(hours?|horas|heures|hrs?|h)\b/i.test(norm) && !/\d{1,2}\s*[:.]\s*\d{2}/.test(norm)) {
+    return [["00:00", "23:59"]];
+  }
+  const to24 = (h: string, m: string | undefined, ap: string | undefined) => {
     let hh = Number(h);
-    if (ap?.toUpperCase() === "PM" && hh < 12) hh += 12;
-    if (ap?.toUpperCase() === "AM" && hh === 12) hh = 0;
-    return `${String(hh).padStart(2, "0")}:${m}`;
+    const mm = m ?? "00";
+    if (ap) {
+      const pm = ap.replace(/\./g, "").toUpperCase() === "PM";
+      if (pm && hh < 12) hh += 12;
+      if (!pm && hh === 12) hh = 0;
+    }
+    return `${String(hh).padStart(2, "0")}:${mm}`;
   };
   const out: [string, string][] = [];
-  const re = /(\d{1,2}):(\d{2})\s*([AP]M)?\s*(?:to|às|a)\s*(\d{1,2}):(\d{2})\s*([AP]M)?/gi;
+  // Separadores reais que chegam do Maps/Apify/Serper: "to", "às", "a",
+  // "até", "until", "bis" e os traços – — -.
+  const re = /(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?\s*(?:to|às|até|until|bis|a\b|–|—|-)\s*(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?/gi;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(hours))) out.push([to24(m[1], m[2], m[3]), to24(m[4], m[5], m[6])]);
+  while ((m = re.exec(norm))) out.push([to24(m[1], m[2], m[3]), to24(m[4], m[5], m[6])]);
   return out.length ? out : null;
 }
 
@@ -2342,9 +2426,13 @@ async function publishPremiumSite(
   }
   if (place.horariosLabel?.length) config.horariosLabel = place.horariosLabel;
   // Mapa de janelas pro modal de agendamento: Maps direto ou derivado
-  // dos labels reais (busca/fallback Google só devolvem o label).
-  const horariosMap = place.horarios
-    ?? horariosFromLabels(config.horariosLabel as [string, string][] | undefined);
+  // dos labels reais (busca/fallback Google só devolvem o label). Mapa
+  // sem nenhuma janela aberta não vale — deixaria o calendário morto.
+  const hasOpenWindow = (m: Record<string, [string, string][] | null> | undefined) =>
+    Boolean(m && Object.values(m).some((w) => w?.length));
+  const horariosMap = [place.horarios,
+    horariosFromLabels(config.horariosLabel as [string, string][] | undefined),
+  ].find(hasOpenWindow);
   if (horariosMap) config.horarios = horariosMap;
   // Nicho agendável sem horário real → o CTA vira WhatsApp (sem inventar
   // disponibilidade falsa no calendário).
@@ -2642,7 +2730,27 @@ Deno.serve(async (req) => {
       let data: Record<string, unknown> | null = null;
       let modelo = model;
       const systemPrompt = systemPromptFor(action, lang);
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+
+      // Copiloto do lead é ação gratuita (cost 0) — provedores free
+      // primeiro: Groq (rápido) → NVIDIA → OpenRouter só como último
+      // recurso, pra não queimar crédito pago num recurso de graça.
+      if (action === "lead_assist") {
+        const g = await groqChat(systemPrompt, userContent, 1200, 45_000);
+        if (g) {
+          data = g;
+          modelo = GROQ_TEXT_MODEL;
+          console.log("[ai-generate] lead_assist via Groq");
+        } else {
+          const nv = await nvidiaChat(systemPrompt, userContent, 1200, 60_000);
+          if (nv) {
+            data = nv;
+            modelo = NVIDIA_TEXT_MODEL;
+            console.log("[ai-generate] lead_assist via NVIDIA");
+          }
+        }
+      }
+
+      const res = data ? null : await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
