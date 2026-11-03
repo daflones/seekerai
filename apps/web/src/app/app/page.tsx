@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { getLocale, formatMoney } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { AnimatedNumber } from "@/components/animated-number";
+import { DashNotifications } from "@/components/dash-notifications";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
   const [params, loc, { supabase, user, profile }] = await Promise.all([
@@ -21,7 +22,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   // janela de 7 dias. 'ativo' diz se a renovação ainda está valendo.
   const { data: daily } = await supabase.rpc("claim_daily_credits");
   const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
-  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }] = await Promise.all([
+  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }, { data: notifs }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "novo"),
@@ -31,6 +32,8 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
       .eq("status", "completed").order("created_at", { ascending: false }).limit(30),
     supabase.from("leads").select("id,nome,valor_fechado,updated_at")
       .eq("status", "ganho").order("updated_at", { ascending: false }).limit(20),
+    supabase.from("notifications").select("id,tipo,titulo,corpo,lida")
+      .eq("user_id", user.id).order("created_at", { ascending: false }).limit(6),
   ]);
 
   type Op = { action: string; cost: number; status: string; created_at: string };
@@ -54,6 +57,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
     {params.checkout === "sucesso" && (
       <p className="shell-notice" role="status">{t.success}</p>
     )}
+    <DashNotifications items={notifs ?? []} title={t.notifT} markAll={t.notifMarkAll} />
     {assinatura && (wallet?.saldo ?? 0) <= 0 && (
       <div className="pay-banner pay-banner-warn" role="status">
         <Zap size={18} className="pay-banner-icon" />

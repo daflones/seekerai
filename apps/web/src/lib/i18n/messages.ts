@@ -177,6 +177,7 @@ const pt = {
     n3t: "Montar seu portfólio", n3s: "Página que vai junto com cada abordagem",
     n4t: "Assinar um plano", n4s: "Desbloqueie a busca e créditos mensais",
     disc: "Buscas e gerações consomem créditos conforme a regra de cada ação.",
+    notifT: "Avisos", notifMarkAll: "Marcar todas como lidas",
     actionLabels: {
       search: "Busca de oportunidades", generate_site: "Site gerado com IA",
       generate_image: "Imagem gerada", image_prompt: "Prompt de imagem",
@@ -743,6 +744,7 @@ export const messages: Record<Lang, Messages> = {
       n3t: "Build your portfolio", n3s: "A page that goes along with every outreach",
       n4t: "Subscribe to a plan", n4s: "Unlock search and monthly credits",
       disc: "Searches and generations consume credits per each action's rule.",
+      notifT: "Notices", notifMarkAll: "Mark all as read",
       actionLabels: {
         search: "Opportunity search", generate_site: "AI-generated site",
         generate_image: "Generated image", image_prompt: "Image prompt",
@@ -1304,6 +1306,7 @@ export const messages: Record<Lang, Messages> = {
       n3t: "Armar tu portafolio", n3s: "Una página que acompaña cada acercamiento",
       n4t: "Suscribirte a un plan", n4s: "Desbloquea la búsqueda y créditos mensuales",
       disc: "Búsquedas y generaciones consumen créditos según la regla de cada acción.",
+      notifT: "Avisos", notifMarkAll: "Marcar todas como leídas",
       actionLabels: {
         search: "Búsqueda de oportunidades", generate_site: "Sitio generado con IA",
         generate_image: "Imagen generada", image_prompt: "Prompt de imagen",
@@ -1865,6 +1868,7 @@ export const messages: Record<Lang, Messages> = {
       n3t: "Monter votre portfolio", n3s: "Une page qui accompagne chaque approche",
       n4t: "Souscrire une offre", n4s: "Débloquez la recherche et les crédits mensuels",
       disc: "Recherches et générations consomment des crédits selon la règle de chaque action.",
+      notifT: "Notifications", notifMarkAll: "Tout marquer comme lu",
       actionLabels: {
         search: "Recherche d'opportunités", generate_site: "Site généré par IA",
         generate_image: "Image générée", image_prompt: "Prompt d'image",
@@ -2425,6 +2429,7 @@ export const messages: Record<Lang, Messages> = {
       n3t: "Portfolio bauen", n3s: "Eine Seite, die jede Ansprache begleitet",
       n4t: "Tarif abschließen", n4s: "Suche und monatliche Credits freischalten",
       disc: "Suchen und Generierungen verbrauchen Credits je Aktionsregel.",
+      notifT: "Hinweise", notifMarkAll: "Alle als gelesen markieren",
       actionLabels: {
         search: "Chancen-Suche", generate_site: "KI-generierte Website",
         generate_image: "Generiertes Bild", image_prompt: "Bild-Prompt",
@@ -2985,6 +2990,7 @@ export const messages: Record<Lang, Messages> = {
       n3t: "Crea il tuo portfolio", n3s: "Una pagina che accompagna ogni approccio",
       n4t: "Abbonati a un piano", n4s: "Sblocca ricerca e crediti mensili",
       disc: "Ricerche e generazioni consumano crediti secondo la regola di ogni azione.",
+      notifT: "Avvisi", notifMarkAll: "Segna tutte come lette",
       actionLabels: {
         search: "Ricerca opportunità", generate_site: "Sito generato con IA",
         generate_image: "Immagine generata", image_prompt: "Prompt immagine",

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Coins, Crown, Phone, Search, UserRound } from "lucide-react";
+import { ChevronDown, Coins, Crown, Loader2, MessageCircle, Phone, Search, UserRound } from "lucide-react";
 import type { AdminUserRow } from "@/lib/admin-users";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -47,6 +47,7 @@ export function AdminUsers({ users, plans }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [delta, setDelta] = useState<Record<string, string>>({});
   const [planSel, setPlanSel] = useState<Record<string, string>>({});
+  const [chatMsg, setChatMsg] = useState<Record<string, string>>({});
   const [erro, setErro] = useState("");
 
   const list = useMemo(() => {
@@ -73,6 +74,23 @@ export function AdminUsers({ users, plans }: {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setErro(data.error ?? "Ação falhou."); return; }
       router.refresh();
+    } finally { setBusy(null); }
+  }
+
+  // Abre uma conversa direta com o usuário — vira um chamado humano e
+  // cai na lista de chamados já aberta pra continuar a conversa.
+  async function startChat(userId: string) {
+    const mensagem = (chatMsg[userId] ?? "").trim();
+    if (!mensagem || busy === userId) return;
+    setBusy(userId); setErro("");
+    try {
+      const res = await fetch("/api/admin/tickets", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, mensagem }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.id) { setErro(data.error ?? "Não foi possível iniciar a conversa."); return; }
+      router.push(`/admin/chamados?abrir=${data.id}`);
     } finally { setBusy(null); }
   }
 
@@ -198,6 +216,19 @@ export function AdminUsers({ users, plans }: {
                             {n > 0 ? `+${n}` : n}
                           </button>
                         ))}
+                      </div>
+                    </section>
+                    <section className="au-action">
+                      <h4>Conversa direta</h4>
+                      <div className="au-action-row">
+                        <input type="text" placeholder="Primeira mensagem pro usuário…" maxLength={4000}
+                          value={chatMsg[u.id] ?? ""}
+                          onChange={(e) => setChatMsg((s) => ({ ...s, [u.id]: e.target.value }))} />
+                        <button className="btn-admin" disabled={busy === u.id || !(chatMsg[u.id] ?? "").trim()}
+                          onClick={() => void startChat(u.id)}>
+                          {busy === u.id ? <Loader2 size={13} className="spin" /> : <MessageCircle size={13} />}
+                          Iniciar chat
+                        </button>
                       </div>
                     </section>
                   </div>

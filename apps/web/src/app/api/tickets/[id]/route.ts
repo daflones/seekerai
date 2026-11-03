@@ -3,6 +3,7 @@ import { z } from "zod";
 import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { triggerSupportAgent } from "@/lib/support/agent";
 
 const OPEN = ["aberto", "em_andamento", "pendente"];
@@ -73,6 +74,20 @@ export async function POST(request: NextRequest, ctx: Params) {
     const upd: Record<string, string> = { atendente: "admin" };
     if (ticket.status === "aberto") upd.status = "em_andamento";
     await session.supabase.from("support_tickets").update(upd).eq("id", ticket.id);
+    // Avisa o cliente na dashboard — 1 notificação não lida por vez,
+    // mesmo que o admin mande várias mensagens seguidas.
+    const adminDb = createSupabaseAdminClient();
+    const { count } = await adminDb.from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", ticket.user_id).eq("tipo", "chamado_respondido").eq("lida", false);
+    if (!count) {
+      await adminDb.from("notifications").insert({
+        user_id: ticket.user_id,
+        tipo: "chamado_respondido",
+        titulo: "Seu chamado foi respondido",
+        corpo: `"${ticket.assunto.slice(0, 120)}" tem uma nova mensagem do suporte.`,
+      });
+    }
   } else if (ticket.atendente === "ia") {
     triggerSupportAgent(ticket.id);
   }

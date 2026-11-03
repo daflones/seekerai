@@ -22,10 +22,10 @@ const ACOES: [string, typeof CheckCircle2][] = [
   ["cancelado", XCircle],
 ];
 
-export function AdminChamados({ tickets: initial }: { tickets: TicketRow[] }) {
+export function AdminChamados({ tickets: initial, initialOpen = null }: { tickets: TicketRow[]; initialOpen?: string | null }) {
   const [tickets, setTickets] = useState(initial);
   const [filtro, setFiltro] = useState("todos");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpen);
   const [busyStatus, setBusyStatus] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);

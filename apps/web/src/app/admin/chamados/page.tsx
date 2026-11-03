@@ -5,8 +5,9 @@ import { AdminChamados } from "@/components/admin-chamados";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Chamados", robots: { index: false, follow: false } };
 
-export default async function AdminChamadosPage() {
+export default async function AdminChamadosPage({ searchParams }: { searchParams: Promise<{ abrir?: string }> }) {
   const { supabase } = await requireSession("/admin/chamados", { admin: true });
+  const { abrir } = await searchParams;
   const { data: tickets } = await supabase
     .from("support_tickets")
     .select("id,assunto,categoria,prioridade,status,atendente,created_at,user_id")
@@ -25,7 +26,7 @@ export default async function AdminChamadosPage() {
     <h1>Chamados<span className="gradient-text">.</span></h1>
     <p className="private-intro">Responda os clientes pela conversa e mude o status conforme o andamento.</p>
     <section className="dash-panel">
-      <AdminChamados tickets={list} />
+      <AdminChamados tickets={list} initialOpen={abrir && /^[0-9a-f-]{36}$/i.test(abrir) ? abrir : null} />
     </section>
   </>;
 }
