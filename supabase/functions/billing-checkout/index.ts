@@ -53,12 +53,30 @@ const INTL_PRICES: Record<string, number> = {
 };
 
 // Pacotes avulsos de créditos — somam no saldo (não é assinatura).
-// Os mesmos ids/valores do front (lib/i18n/shared.ts CREDIT_PACKS).
-const CREDIT_PACKS: Record<string, { credits: number; amountCents: number; intlCents: number }> = {
-  pack50: { credits: 50, amountCents: 3997, intlCents: 799 },
-  pack150: { credits: 150, amountCents: 8997, intlCents: 1999 },
-  pack250: { credits: 250, amountCents: 12997, intlCents: 2999 },
+// Configuráveis pelo admin em app_settings.credit_packs; fallback = 80% off.
+interface PackPrice { credits: number; amountCents: number; intlCents: number }
+const DEFAULT_PACKS: Record<string, PackPrice> = {
+  pack50: { credits: 50, amountCents: 997, intlCents: 199 },
+  pack150: { credits: 150, amountCents: 1797, intlCents: 399 },
+  pack250: { credits: 250, amountCents: 2797, intlCents: 599 },
 };
+
+async function creditPacks(): Promise<Record<string, PackPrice>> {
+  const raw = await getSetting<unknown>("credit_packs", null);
+  if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_PACKS;
+  const out: Record<string, PackPrice> = {};
+  for (const p of raw) {
+    if (!p || typeof p !== "object") continue;
+    const id = String((p as Record<string, unknown>).id ?? "");
+    const credits = Number((p as Record<string, unknown>).credits);
+    const brl = Number((p as Record<string, unknown>).brlCents);
+    const intl = Number((p as Record<string, unknown>).intlCents);
+    if (id && credits >= 1 && brl >= 100 && intl >= 50) {
+      out[id] = { credits: Math.trunc(credits), amountCents: Math.trunc(brl), intlCents: Math.trunc(intl) };
+    }
+  }
+  return Object.keys(out).length ? out : DEFAULT_PACKS;
+}
 
 // Sinais antifraude recomendados pelo Stripe Radar: Customer estável por
 // usuário (histórico de pagamento) e endereço de faturamento obrigatório
@@ -462,8 +480,9 @@ Deno.serve(async (req) => {
         .select("id").eq("user_id", user.id)
         .in("status", ["active", "past_due"]).limit(1).maybeSingle();
       if (!sub) throw httpError(403, "Pacote de créditos disponível só para assinantes");
-      const pack = CREDIT_PACKS[typeof body.packId === "string" ? body.packId : "pack50"]
-        ?? CREDIT_PACKS.pack50;
+      const packs = await creditPacks();
+      const pack = packs[typeof body.packId === "string" ? body.packId : "pack50"]
+        ?? packs[Object.keys(packs)[0]] ?? DEFAULT_PACKS.pack50;
       const internalRef = crypto.randomUUID();
       const { error } = await db.from("payments").insert({
         user_id: user.id,

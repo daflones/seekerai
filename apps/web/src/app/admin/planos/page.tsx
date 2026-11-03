@@ -1,12 +1,19 @@
 import { requireSession } from "@/lib/auth/session";
 import { cardContentSchema, planSlug, type PlanCard } from "@/lib/plans/model";
 import { defaultCardContent } from "@/lib/plans/preview";
+import { CREDIT_PACKS, parseCreditPacks } from "@/lib/i18n/shared";
 import { PlanEditor } from "@/components/plan-editor";
+import { AdminPacks } from "@/components/admin-packs";
 
 export default async function PlanAdminPage() {
   const { supabase } = await requireSession("/admin/planos", { admin: true });
   const { data, error } = await supabase.from("plans")
     .select("id,slug,nome,preco_centavos,ordem,destaque,landing_visible,card_content,card_revision").order("ordem");
+  const { data: packsRow } = await supabase.from("app_settings")
+    .select("value").eq("key", "credit_packs").maybeSingle();
+  const packs = parseCreditPacks(packsRow?.value).length
+    ? parseCreditPacks(packsRow?.value)
+    : CREDIT_PACKS;
   const plans: PlanCard[] = [];
   for (const row of data || []) {
     const slug = planSlug.safeParse(row.slug);
@@ -23,5 +30,6 @@ export default async function PlanAdminPage() {
     <span className="eyebrow">A OFERTA, DO SEU JEITO</span><h1>Planos e apresentação<span className="gradient-text">.</span></h1>
     <p className="private-intro">Configure o preço real do plano e a apresentação do card. A prévia usa o mesmo componente da landing.</p>
     {error ? <p role="alert" className="auth-error">Não foi possível carregar os planos.</p> : plans.length ? <PlanEditor initialPlans={plans} /> : <p className="auth-notice">Nenhum plano inicial foi provisionado. Execute o seed antes de editar.</p>}
+    <AdminPacks initial={packs} />
   </>;
 }

@@ -50,13 +50,26 @@ export const INTL_PRICES: Record<string, number> = {
   pro: 1500,
   king: 2500,
 };
-// Pacotes avulsos de créditos — os mesmos ids/valores da edge billing-checkout.
+// Pacotes avulsos de créditos — o valor de verdade vem de
+// app_settings.credit_packs (editável no admin); estes são o fallback.
 export interface CreditPack { id: string; credits: number; brlCents: number; intlCents: number }
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: "pack50", credits: 50, brlCents: 3997, intlCents: 799 },
-  { id: "pack150", credits: 150, brlCents: 8997, intlCents: 1999 },
-  { id: "pack250", credits: 250, brlCents: 12997, intlCents: 2999 },
+  { id: "pack50", credits: 50, brlCents: 997, intlCents: 199 },
+  { id: "pack150", credits: 150, brlCents: 1797, intlCents: 399 },
+  { id: "pack250", credits: 250, brlCents: 2797, intlCents: 599 },
 ];
+
+// Parse seguro do setting JSONB — ignora entradas malformadas.
+export function parseCreditPacks(value: unknown): CreditPack[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((p): p is CreditPack =>
+    Boolean(p && typeof p === "object"
+      && typeof (p as CreditPack).id === "string" && (p as CreditPack).id.length >= 2
+      && Number.isFinite((p as CreditPack).credits) && (p as CreditPack).credits >= 1
+      && Number.isFinite((p as CreditPack).brlCents) && (p as CreditPack).brlCents >= 100
+      && Number.isFinite((p as CreditPack).intlCents) && (p as CreditPack).intlCents >= 50),
+  );
+}
 
 export function formatMoney(cents: number, currency: Currency, lang: Lang = "pt"): string {
   const locale = { pt: "pt-BR", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", it: "it-IT" }[lang];

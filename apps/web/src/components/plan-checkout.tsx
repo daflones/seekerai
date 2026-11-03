@@ -30,7 +30,7 @@ interface PixResult {
 }
 
 export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t,
-  subEnd = null, subMonths = 1, planCredits = {} }: {
+  subEnd = null, subMonths = 1, planCredits = {}, packs = CREDIT_PACKS }: {
   plans: PlanItem[];
   hasSubscription: boolean;
   currentPlanSlug: string | null;
@@ -40,6 +40,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
   subEnd?: string | null;
   subMonths?: number;
   planCredits?: Record<string, number>;
+  packs?: CreditPack[];
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -210,7 +211,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       <h3 className="pack-section-title">{t.packTitle}</h3>
       <p className="pack-section-sub">{t.packSub}</p>
       <div className="pack-rows">
-        {CREDIT_PACKS.map((pack) => <article key={pack.id} className="pack-row">
+        {packs.map((pack) => <article key={pack.id} className="pack-row">
           <div className="pack-amount"><strong>+{pack.credits}</strong><small>{t.packCredits}</small></div>
           <div className="pack-price">
             <strong>{money(packCents(pack))}</strong>
