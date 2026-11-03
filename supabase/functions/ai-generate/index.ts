@@ -23,7 +23,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
-import { getSecret, requireSecret } from "../_shared/secrets.ts";
+import { getSecret } from "../_shared/secrets.ts";
 import { igCachePut, igMediaCached } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
@@ -2146,9 +2146,9 @@ async function configPatchFromAi(
       console.error("[site-config] openrouter falhou:", orStatus || "network");
     }
   }
-  // Em 402 (conta sem créditos) a NVIDIA também não entrega a tempo —
-  // pula direto pro template base em vez de queimar 2×60s à toa.
-  if ((typeof content !== "string" || !content.trim()) && orStatus !== 402) {
+  // Qualquer falha do OpenRouter (rede, 402, 5xx, vazio) tenta a NVIDIA —
+  // patch vazio só degrada o site, nunca mata a geração.
+  if (typeof content !== "string" || !content.trim()) {
     // Uma falha transitória não deve derrubar o patch — uma retentativa.
     for (let t = 0; t < 2; t++) {
       const nv = await nvidiaChat(system, userContent, 3000, 60_000);
@@ -2640,10 +2640,9 @@ async function generateAppHtml(
       console.error("[app] openrouter falhou:", orStatus || "network");
     }
   }
-  // Fallback gratuito NVIDIA — só quando o OpenRouter falha por rede/5xx.
-  // Em 402 (conta sem créditos) o modelo gratuito é lento demais pra
-  // escrever um app inteiro dentro do budget do worker; falha rápido.
-  if (!html && orStatus !== 402) {
+  // Fallback gratuito NVIDIA — em qualquer falha do OpenRouter (rede,
+  // 402 sem crédito, 5xx). Falhar depois de tentar é melhor que nem tentar.
+  if (!html) {
     modelo = NVIDIA_TEXT_MODEL;
     const nv = await nvidiaChat(APP_SYSTEM, user, 24000, 90_000);
     const ch = nv && Array.isArray(nv.choices) ? nv.choices : [];
@@ -2709,11 +2708,9 @@ Deno.serve(async (req) => {
     });
 
     try {
-      // generate_site e generate_app não exigem OpenRouter — a NVIDIA
-      // assume texto e imagem quando a chave falta ou o provedor falha.
-      const apiKey = action === "generate_site" || action === "generate_app"
-        ? await getSecret("OPENROUTER_API_KEY")
-        : await requireSecret("OPENROUTER_API_KEY");
+      // Nenhuma ação exige OpenRouter — a NVIDIA (e o Groq no copiloto)
+      // assume quando a chave falta ou o provedor falha.
+      const apiKey = await getSecret("OPENROUTER_API_KEY");
       const context = isRecord(body.context) ? body.context : {};
       await reportJob(10, "Reservando créditos");
 
@@ -2822,7 +2819,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      const res = data ? null : await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      // Sem chave o OpenRouter nem é tentado — cai direto nos gratuitos.
+      const res = data || !apiKey ? null : await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -2868,21 +2866,28 @@ Deno.serve(async (req) => {
           }
         }
       } else if (!data) {
-        // Sem orçamento pra NVIDIA se o OpenRouter já comeu o tempo da
-        // function — e em 402 (sem créditos) o fallback lento não resolve.
-        const elapsed = Date.now() - t0;
-        const nv = elapsed < 120_000 && orStatus !== 402
-          ? await nvidiaChat(
-            systemPrompt,
-            userContent,
-            action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
-            120_000,
-          )
-          : null;
-        if (nv) {
-          data = nv;
-          modelo = NVIDIA_TEXT_MODEL;
-          console.log("[ai-generate] respondido via NVIDIA (fallback)");
+        // Qualquer falha do OpenRouter (rede, 402, 5xx, resposta vazia)
+        // cai nos gratuitos: Groq primeiro (rápido), NVIDIA depois.
+        const g = await groqChat(systemPrompt, userContent, 8192, 60_000);
+        if (g) {
+          data = g;
+          modelo = GROQ_TEXT_MODEL;
+          console.log("[ai-generate] respondido via Groq (fallback)");
+        } else {
+          const elapsed = Date.now() - t0;
+          const nv = elapsed < 120_000
+            ? await nvidiaChat(
+              systemPrompt,
+              userContent,
+              action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
+              120_000,
+            )
+            : null;
+          if (nv) {
+            data = nv;
+            modelo = NVIDIA_TEXT_MODEL;
+            console.log("[ai-generate] respondido via NVIDIA (fallback)");
+          }
         }
       }
 
