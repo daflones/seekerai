@@ -2930,6 +2930,7 @@ Deno.serve(async (req) => {
         conteudo = conteudo
           .replace(/\[([^\]]*)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g,
             (_m, text: string, url: string) => text && text !== url ? `${text} ${url}` : url)
+          .replace(/\[(\s*https?:\/\/[^\]\s]+)\s*\]/g, "$1")
           .replace(/(https?:\/\/\S+)\s+\1/g, "$1");
       }
 
