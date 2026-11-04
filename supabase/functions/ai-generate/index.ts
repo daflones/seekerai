@@ -62,6 +62,15 @@ const VISION_MODELS = (optionalEnv("VISION_MODEL")
   .split(",").map((s) => s.trim()).filter(Boolean);
 // Groq (api.groq.com) — gratuito, OpenAI-compatible, latência baixa.
 const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
+// Modelo ":free" do próprio OpenRouter — não consome crédito pago e
+// responde rápido (~10s). Rede de segurança quando a NVIDIA está fora.
+const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
+
+// Circuit breaker: a conta free da NVIDIA derruba modelos sem aviso
+// (404/410) e os que aceitam a requisição travam até o timeout — sem o
+// breaker cada chamada queimava ~120s antes de morrer. Falhou, fica
+// fora do ar por 3min por instância.
+let nvidiaDownUntil = 0;
 
 /** Chat de texto na NVIDIA — mesmo formato OpenAI. Retorna o JSON ou null. */
 async function nvidiaChat(
@@ -71,6 +80,7 @@ async function nvidiaChat(
   timeoutMs?: number,
   model?: string,
 ): Promise<Record<string, unknown> | null> {
+  if (Date.now() < nvidiaDownUntil) return null;
   const key = await getSecret("NVIDIA_API_KEY");
   if (!key) return null;
   const useModel = model ?? NVIDIA_TEXT_MODEL;
@@ -98,6 +108,7 @@ async function nvidiaChat(
   }).catch(() => null);
   if (!res?.ok) {
     console.error("[nvidia] chat falhou:", res?.status ?? "network");
+    nvidiaDownUntil = Date.now() + 3 * 60_000;
     return null;
   }
   return (await res.json().catch(() => null)) as Record<string, unknown> | null;
@@ -128,6 +139,44 @@ async function groqChat(
   }).catch(() => null);
   if (!res?.ok) {
     console.error("[groq] chat falhou:", res?.status ?? "network");
+    return null;
+  }
+  return (await res.json().catch(() => null)) as Record<string, unknown> | null;
+}
+
+/**
+ * Chat via modelo ":free" do OpenRouter — usa a mesma chave mas não
+ * consome crédito pago (free tier diário). Responde em ~10s; é a rede
+ * de segurança quando a NVIDIA está fora e o modelo pago falhou.
+ */
+async function orFreeChat(
+  system: string,
+  userContent: string,
+  maxTokens?: number,
+  timeoutMs?: number,
+): Promise<Record<string, unknown> | null> {
+  const key = await getSecret("OPENROUTER_API_KEY");
+  if (!key) return null;
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`, "Content-Type": "application/json",
+      "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+      "X-Title": "SeekerAi",
+    },
+    body: JSON.stringify({
+      model: OR_FREE_TEXT_MODEL,
+      stream: false,
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+    }),
+    signal: AbortSignal.timeout(timeoutMs ?? 40_000),
+  }).catch(() => null);
+  if (!res?.ok) {
+    console.error("[openrouter:free] chat falhou:", res?.status ?? "network");
     return null;
   }
   return (await res.json().catch(() => null)) as Record<string, unknown> | null;
@@ -175,21 +224,19 @@ async function enhanceImagePrompt(
   const nome = asString(context.nome) ?? "";
   const categoria = asString(context.categoria) ?? "";
   const cidade = [asString(context.cidade), asString(context.uf)].filter(Boolean).join(" - ");
-  const res = await nvidiaChat(
-    [
-      "You are a senior art director writing text-to-image prompts for FLUX.",
-      "Rewrite the user's request (Portuguese) as ONE optimized English image prompt.",
-      "Photorealistic commercial/editorial quality; describe scene, lighting and composition explicitly.",
-      nome
-        ? `Business: ${nome}${categoria ? ` (${categoria})` : ""}${cidade ? ` — ${cidade}, Brazil` : ""}. Weave the real business identity into the scene (products, signage, colors); never invent another business.`
-        : categoria ? `Business category: ${categoria}.` : "",
-      "If the user asked for a promo post/ad with text, include the EXACT short headline to render inside double quotes (keep it in Portuguese, max 5 words, spelled correctly). If not asked for, end with 'no text, no letters, no words'.",
-      "Reply with ONLY the image prompt — no explanations.",
-    ].filter(Boolean).join("\n"),
-    userPrompt,
-    // GLM gasta tokens em reasoning_content — folga pra resposta não truncar.
-    1500,
-  ).catch(() => null);
+  const enhanceSys = [
+    "You are a senior art director writing text-to-image prompts for FLUX.",
+    "Rewrite the user's request (Portuguese) as ONE optimized English image prompt.",
+    "Photorealistic commercial/editorial quality; describe scene, lighting and composition explicitly.",
+    nome
+      ? `Business: ${nome}${categoria ? ` (${categoria})` : ""}${cidade ? ` — ${cidade}, Brazil` : ""}. Weave the real business identity into the scene (products, signage, colors); never invent another business.`
+      : categoria ? `Business category: ${categoria}.` : "",
+    "If the user asked for a promo post/ad with text, include the EXACT short headline to render inside double quotes (keep it in Portuguese, max 5 words, spelled correctly). If not asked for, end with 'no text, no letters, no words'.",
+    "Reply with ONLY the image prompt — no explanations.",
+  ].filter(Boolean).join("\n");
+  // GLM gasta tokens em reasoning_content — folga pra resposta não truncar.
+  const res = (await nvidiaChat(enhanceSys, userPrompt, 1500, 30_000).catch(() => null))
+    ?? (await orFreeChat(enhanceSys, userPrompt, 1500, 30_000).catch(() => null));
   const choices = res && Array.isArray(res.choices) ? res.choices : [];
   const content = isRecord(choices[0]) && isRecord(choices[0].message)
     ? choices[0].message.content
@@ -1158,6 +1205,12 @@ async function classifyNichoAI(
       content = isRecord(choices[0]) && isRecord(choices[0].message)
         ? choices[0].message.content : null;
     }
+  }
+  if (typeof content !== "string" || !content.trim()) {
+    const f = await orFreeChat(classifySystem, userContent, 900, 30_000);
+    const fChoices = f && Array.isArray(f.choices) ? f.choices : [];
+    content = isRecord(fChoices[0]) && isRecord(fChoices[0].message)
+      ? fChoices[0].message.content : null;
   }
   if (typeof content !== "string" || !content.trim()) {
     const nv = await nvidiaChat(classifySystem, userContent, 900, 30_000);
@@ -2163,12 +2216,24 @@ async function configPatchFromAi(
       console.error("[site-config] openrouter falhou:", orStatus || "network");
     }
   }
-  // Qualquer falha do OpenRouter (rede, 402, 5xx, vazio) tenta a NVIDIA —
-  // patch vazio só degrada o site, nunca mata a geração.
+  // Qualquer falha do OpenRouter (rede, 402, 5xx, vazio) tenta o modelo
+  // ":free" do OR e depois a NVIDIA — patch vazio só degrada o site,
+  // nunca mata a geração.
+  if (typeof content !== "string" || !content.trim()) {
+    const f = await orFreeChat(system, userContent, 3000, 40_000);
+    const fChoices = f && Array.isArray(f.choices) ? f.choices : [];
+    const fContent = isRecord(fChoices[0]) && isRecord(fChoices[0].message)
+      ? fChoices[0].message.content : null;
+    if (typeof fContent === "string" && fContent.trim()) {
+      content = fContent;
+      modelo = OR_FREE_TEXT_MODEL;
+      console.log("[site-config] respondido via OpenRouter :free");
+    }
+  }
   if (typeof content !== "string" || !content.trim()) {
     // Uma falha transitória não deve derrubar o patch — uma retentativa.
     for (let t = 0; t < 2; t++) {
-      const nv = await nvidiaChat(system, userContent, 3000, 60_000);
+      const nv = await nvidiaChat(system, userContent, 3000, 45_000);
       const nvChoices = nv && Array.isArray(nv.choices) ? nv.choices : [];
       const nvContent = isRecord(nvChoices[0]) && isRecord(nvChoices[0].message)
         ? nvChoices[0].message.content : null;
@@ -2664,8 +2729,17 @@ async function generateAppHtml(
       console.error("[app] openrouter falhou:", orStatus || "network");
     }
   }
-  // Fallback gratuito NVIDIA — em qualquer falha do OpenRouter (rede,
-  // 402 sem crédito, 5xx). Falhar depois de tentar é melhor que nem tentar.
+  // Fallbacks gratuitos — em qualquer falha do OpenRouter (rede,
+  // 402 sem crédito, 5xx): modelo ":free" do OR, depois a NVIDIA.
+  if (!html) {
+    const f = await orFreeChat(APP_SYSTEM, user, 24000, 60_000);
+    const fch = f && Array.isArray(f.choices) ? f.choices : [];
+    const fContent = isRecord(fch[0]) && isRecord(fch[0].message) ? fch[0].message.content : null;
+    if (typeof fContent === "string") {
+      html = extractHtml(fContent);
+      if (html) modelo = OR_FREE_TEXT_MODEL;
+    }
+  }
   if (!html) {
     modelo = NVIDIA_TEXT_MODEL;
     const nv = await nvidiaChat(APP_SYSTEM, user, 24000, 90_000);
@@ -2846,17 +2920,12 @@ Deno.serve(async (req) => {
         // Edição de HTML precisa de espaço pra devolver o trecho inteiro.
         const cap = action === "editor_assist" ? 8192 : 1200;
         const g = await groqChat(systemPrompt, userContent, cap, 60_000);
-        if (g) {
-          data = g;
-          modelo = GROQ_TEXT_MODEL;
-          console.log(`[ai-generate] ${action} via Groq`);
-        } else {
-          const nv = await nvidiaChat(systemPrompt, userContent, cap, 90_000);
-          if (nv) {
-            data = nv;
-            modelo = NVIDIA_TEXT_MODEL;
-            console.log(`[ai-generate] ${action} via NVIDIA`);
-          }
+        const f = g ?? await orFreeChat(systemPrompt, userContent, cap, 45_000);
+        const nv = f ?? await nvidiaChat(systemPrompt, userContent, cap, 45_000);
+        if (nv) {
+          data = nv;
+          modelo = g ? GROQ_TEXT_MODEL : f ? OR_FREE_TEXT_MODEL : NVIDIA_TEXT_MODEL;
+          console.log(`[ai-generate] ${action} via ${modelo}`);
         }
       }
 
@@ -2908,27 +2977,23 @@ Deno.serve(async (req) => {
         }
       } else if (!data) {
         // Qualquer falha do OpenRouter (rede, 402, 5xx, resposta vazia)
-        // cai nos gratuitos: Groq primeiro (rápido), NVIDIA depois.
+        // cai nos gratuitos: Groq → modelo ":free" do OR → NVIDIA.
         const g = await groqChat(systemPrompt, userContent, 8192, 60_000);
-        if (g) {
-          data = g;
-          modelo = GROQ_TEXT_MODEL;
-          console.log("[ai-generate] respondido via Groq (fallback)");
-        } else {
-          const elapsed = Date.now() - t0;
-          const nv = elapsed < 120_000
-            ? await nvidiaChat(
-              systemPrompt,
-              userContent,
-              action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
-              120_000,
-            )
-            : null;
-          if (nv) {
-            data = nv;
-            modelo = NVIDIA_TEXT_MODEL;
-            console.log("[ai-generate] respondido via NVIDIA (fallback)");
-          }
+        const f = g ?? await orFreeChat(systemPrompt, userContent, 8192, 45_000);
+        const elapsed = Date.now() - t0;
+        const nv = f ?? (elapsed < 100_000
+          ? await nvidiaChat(
+            systemPrompt,
+            userContent,
+            action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
+            45_000,
+          )
+          : null);
+        const hit = g ?? f ?? nv;
+        if (hit) {
+          data = hit;
+          modelo = g ? GROQ_TEXT_MODEL : f ? OR_FREE_TEXT_MODEL : NVIDIA_TEXT_MODEL;
+          console.log(`[ai-generate] respondido via ${modelo} (fallback)`);
         }
       }
 

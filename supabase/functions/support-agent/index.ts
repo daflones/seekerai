@@ -23,6 +23,9 @@ const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 const NVIDIA_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
 const GROQ_BASE = "https://api.groq.com/openai/v1";
 const GROQ_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
+// Modelo ":free" do OpenRouter — não gasta crédito, segura a cadeia
+// quando a NVIDIA free está fora (comum: modelos somem da conta).
+const OR_FREE_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
 
 const SYSTEM = `Você é a IA oficial de suporte do SeekerAi (seekerai.digital), plataforma que ajuda freelancers, agências, designers, social media e prestadores de serviço a encontrar e fechar clientes locais. Você é consultivo: além de responder, guia o cliente pro próximo passo prático quando fizer sentido.
 
@@ -143,6 +146,27 @@ async function llm(system: string, convo: { role: string; content: string }[]): 
       if (content) return content;
     }
   }
+  const orKey = await getSecret("OPENROUTER_API_KEY");
+  if (orKey) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${orKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+        "X-Title": "SeekerAi Support",
+      },
+      body: JSON.stringify({
+        model: OR_FREE_MODEL, stream: false, max_tokens: 700,
+        messages: [{ role: "system", content: system }, ...convo],
+      }),
+      signal: AbortSignal.timeout(40_000),
+    }).catch(() => null);
+    if (res?.ok) {
+      const content = extractContent(await res.json().catch(() => null));
+      if (content) return content;
+    }
+  }
   const nvKey = await getSecret("NVIDIA_API_KEY");
   if (nvKey) {
     const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
@@ -153,14 +177,14 @@ async function llm(system: string, convo: { role: string; content: string }[]): 
         ...(NVIDIA_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
         messages: [{ role: "system", content: system }, ...convo],
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(35_000),
     }).catch(() => null);
     if (res?.ok) {
       const content = extractContent(await res.json().catch(() => null));
       if (content) return content;
     }
   }
-  const orKey = await getSecret("OPENROUTER_API_KEY");
+  if (!orKey) return null;
   if (!orKey) return null;
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
