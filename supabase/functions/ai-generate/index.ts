@@ -65,6 +65,9 @@ const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versati
 // Modelo ":free" do próprio OpenRouter — não consome crédito pago e
 // responde rápido (~10s). Rede de segurança quando a NVIDIA está fora.
 const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
+// Patch de config do site é JSON estruturado de ~2.5k tokens — modelo
+// mid-tier resolve sobrando; Sonnet fica só pro generate_app (HTML cheio).
+const PATCH_MODEL = optionalEnv("AI_PATCH_MODEL") ?? "openai/gpt-4.1-mini";
 
 // Circuit breaker: a conta free da NVIDIA derruba modelos sem aviso
 // (404/410) e os que aceitam a requisição travam até o timeout — sem o
@@ -182,8 +185,13 @@ async function orFreeChat(
   return (await res.json().catch(() => null)) as Record<string, unknown> | null;
 }
 
+// Breaker da imagem NVIDIA também — endpoint free morto queimava 120s
+// por tentativa (e o site tenta até 5 imagens + retries).
+let nvidiaImgDownUntil = 0;
+
 /** Imagem na NVIDIA (genai/FLUX). Retorna data URL ou null. */
 async function nvidiaImage(prompt: string, errors?: string[]): Promise<string | null> {
+  if (Date.now() < nvidiaImgDownUntil) return null;
   const key = await getSecret("NVIDIA_API_KEY");
   if (!key) { errors?.push("nvidia:sem-chave"); return null; }
   const res = await fetch(`https://ai.api.nvidia.com/v1/genai/${NVIDIA_IMAGE_MODEL}`, {
@@ -207,6 +215,7 @@ async function nvidiaImage(prompt: string, errors?: string[]): Promise<string | 
     const body = res ? (await res.text().catch(() => "")).slice(0, 160) : "";
     console.error("[nvidia] imagem falhou:", res?.status ?? "network", body);
     errors?.push(`nvidia:${res?.status ?? "network"}${body ? ` ${body.slice(0, 120)}` : ""}`);
+    nvidiaImgDownUntil = Date.now() + 3 * 60_000;
     return null;
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -2186,7 +2195,7 @@ async function configPatchFromAi(
 
   // OpenRouter primeiro; NVIDIA gratuita se falhar ou não houver chave.
   let content: unknown = null;
-  let modelo = SITE_MODEL;
+  let modelo = PATCH_MODEL;
   let orStatus = 0;
   if (apiKey) {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -2196,7 +2205,7 @@ async function configPatchFromAi(
         "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi",
       },
       body: JSON.stringify({
-        model: SITE_MODEL,
+        model: PATCH_MODEL,
         max_tokens: 2500,
         response_format: { type: "json_object" },
         messages: [
@@ -2803,6 +2812,47 @@ Deno.serve(async (req) => {
         .select("*").eq("id", businessRef).maybeSingle();
       if (leadRow) lang = siteLangFor(leadRow);
     }
+    // Anti-spam 1 — mesma ação pro mesmo alvo já está rodando? Clique
+    // duplo ou retry de timeout não pode disparar um segundo pipeline
+    // pago. Ops presas em 'reserved' (edge morta) liberam após 4min.
+    {
+      const { data: inflight } = await db.from("credit_operations")
+        .select("id")
+        .eq("user_id", user.id).eq("action", action).eq("business_ref", businessRef)
+        .eq("status", "reserved")
+        .gte("created_at", new Date(Date.now() - 4 * 60_000).toISOString())
+        .limit(1);
+      if (inflight?.length) {
+        throw httpError(409, "Essa geração já está em andamento — aguarde ela terminar.");
+      }
+    }
+
+    // Anti-spam 2 — o MESMO pedido (hash idêntico) já foi gerado há
+    // pouco? Devolve a saída salva grátis em vez de queimar o modelo.
+    const REPLAYABLE = new Set(["sales_reply", "deep_strategy", "image_prompt"]);
+    if (REPLAYABLE.has(action)) {
+      const { data: dup } = await db.from("credit_operations")
+        .select("id").eq("user_id", user.id).eq("action", action)
+        .eq("business_ref", businessRef).eq("input_hash", inputHash)
+        .eq("status", "completed")
+        .gte("created_at", new Date(Date.now() - 30 * 60_000).toISOString())
+        .limit(1);
+      if (dup?.length) {
+        const { data: out } = await db.from("lead_outputs")
+          .select("conteudo,modelo")
+          .eq("user_id", user.id).eq("lead_id", businessRef).eq("tipo", action)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (typeof out?.conteudo === "string" && out.conteudo.trim()) {
+          return json({
+            conteudo: out.conteudo,
+            modelo: out.modelo ?? "cache",
+            reutilizado: true,
+            creditosCobrados: 0,
+          });
+        }
+      }
+    }
+
     const reservation = await reserveAction(db, {
       userId: user.id,
       action,
@@ -2916,9 +2966,11 @@ Deno.serve(async (req) => {
       // Copiloto do lead é ação gratuita (cost 0) — provedores free
       // primeiro: Groq (rápido) → NVIDIA → OpenRouter só como último
       // recurso, pra não queimar crédito pago num recurso de graça.
-      if (action === "lead_assist" || action === "editor_assist") {
+      // enhance_reply entra no grupo gratuito: ferramenta interna de
+      // suporte não pode queimar crédito pago enquanto houver free.
+      if (action === "lead_assist" || action === "editor_assist" || action === "enhance_reply") {
         // Edição de HTML precisa de espaço pra devolver o trecho inteiro.
-        const cap = action === "editor_assist" ? 8192 : 1200;
+        const cap = action === "editor_assist" ? 8192 : action === "lead_assist" ? 1200 : 1500;
         const g = await groqChat(systemPrompt, userContent, cap, 60_000);
         const f = g ?? await orFreeChat(systemPrompt, userContent, cap, 45_000);
         const nv = f ?? await nvidiaChat(systemPrompt, userContent, cap, 45_000);
@@ -2941,7 +2993,14 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model,
           modalities: action === "generate_image" ? ["image", "text"] : undefined,
-          max_tokens: action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
+          // Caps por ação: sem teto o modelo decide o tamanho — resposta
+          // simples não pode sair queimando milhares de tokens à toa.
+          max_tokens: action === "lead_assist" ? 1200
+            : action === "editor_assist" ? 8192
+            : action === "enhance_reply" ? 1500
+            : action === "sales_reply" ? 2000
+            : action === "deep_strategy" ? 4000
+            : undefined,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
