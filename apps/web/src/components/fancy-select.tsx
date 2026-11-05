@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 
 export interface FancyOption {
   value: string;
@@ -14,18 +14,33 @@ export interface FancyGroup {
   options: FancyOption[];
 }
 
-export function FancySelect({ value, onChange, groups, options, icon, ariaLabel }: {
+// Compara sem acento/caixa — achar "Sao Jose" quando a opção é "São José".
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+
+export function FancySelect({ value, onChange, groups, options, icon, ariaLabel, searchPlaceholder }: {
   value: string;
   onChange: (value: string) => void;
   groups?: FancyGroup[];
   options?: FancyOption[];
   icon?: React.ReactNode;
   ariaLabel: string;
+  /** Quando definido, mostra um filtro no topo do painel (listas grandes). */
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const flat = groups ? groups.flatMap((g) => g.options) : (options ?? []);
   const selected = flat.find((o) => o.value === value);
+  const needle = fold(query.trim());
+  const visibleGroups = groups
+    ? groups.map((g) => ({
+        ...g,
+        options: needle ? g.options.filter((o) => fold(o.label).includes(needle)) : g.options,
+      })).filter((g) => g.options.length > 0)
+    : null;
+  const visibleFlat = !groups && needle ? flat.filter((o) => fold(o.label).includes(needle)) : flat;
 
   useEffect(() => {
     if (!open) return;
@@ -65,12 +80,22 @@ export function FancySelect({ value, onChange, groups, options, icon, ariaLabel 
       <ChevronDown size={13} className="fancy-chevron" />
     </button>
     {open && <div className="fancy-panel" role="listbox" aria-label={ariaLabel}>
-      {groups
-        ? groups.map((group) => <div key={group.label} className="fancy-group">
+      {searchPlaceholder && <div className="fancy-search">
+        <Search size={12} />
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") { if (query) { setQuery(""); e.stopPropagation(); } } }}
+          placeholder={searchPlaceholder}
+        />
+      </div>}
+      {visibleGroups
+        ? visibleGroups.map((group) => <div key={group.label} className="fancy-group">
             <span className="fancy-group-label">{group.label}</span>
             <ul>{group.options.map(renderOption)}</ul>
           </div>)
-        : <ul>{flat.map(renderOption)}</ul>}
+        : <ul>{visibleFlat.map(renderOption)}</ul>}
     </div>}
   </div>;
 }

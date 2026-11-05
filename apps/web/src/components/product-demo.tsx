@@ -48,7 +48,8 @@ export function ProductDemo({ full = false, loc, t }: {
   const nGroups = useMemo(() => nicheGroupsFor(lang), [lang]);
   const cGroups = useMemo(() => cityGroupsFor(locale), [locale]);
   const firstNiche = nGroups[0].options[0].label;
-  const firstCity = cGroups[0].cities[0].label;
+  const firstCity = cGroups.flatMap((g) => g.cities)
+    .find((c) => c.label.startsWith("São Paulo"))?.label ?? cGroups[0].cities[0].label;
 
   const [service, setService] = useState("sites");
   const [niche, setNiche] = useState<string>(firstNiche);

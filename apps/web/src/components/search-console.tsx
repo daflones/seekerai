@@ -85,7 +85,10 @@ export function SearchConsole({
   const router = useRouter();
   const [service, setService] = useState(services[0]?.slug ?? "");
   const [niche, setNiche] = useState(nGroups[0].options[0].label);
-  const [city, setCity] = useState(cGroups[0].cities[0].label);
+  const [city, setCity] = useState(
+    cGroups.flatMap((g) => g.cities).find((c) => c.label.startsWith("São Paulo"))?.label
+      ?? cGroups[0].cities[0].label,
+  );
   const [refine, setRefine] = useState("");
   const [results, setResults] = useState<PlaceResult[] | null>(null);
   const [meta, setMeta] = useState<{ provedor?: string; replay?: boolean; creditos?: number } | null>(null);
@@ -391,6 +394,7 @@ export function SearchConsole({
       <label className="seek-field seek-field-grow">
         <span>{t.fCity}</span>
         <FancySelect ariaLabel={t.fCity} value={city} onChange={setCity} icon={<MapPin size={14} />}
+          searchPlaceholder={t.search}
           groups={cGroups.map((group) => ({
             label: group.region,
             options: group.cities.map((item) => ({
