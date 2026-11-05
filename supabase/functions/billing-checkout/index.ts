@@ -170,6 +170,39 @@ async function createStripeDomainSession(
   return { id, url };
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// A API devolve 422 genérico tanto pra payload inválido quanto pra
+// janelas de instabilidade do gateway PIX deles — taxa de sucesso
+// observada ~30% por tentativa, sem padrão por valor. Tentativas
+// com backoff crescente atravessam a janela (~28s no máx.).
+async function postMercosulPix(payload: Record<string, unknown>, tag: string) {
+  const backoff = [4000, 8000, 16000];
+  let res: Response | null = null;
+  let data: Record<string, unknown> = {};
+  for (let attempt = 0; attempt <= backoff.length; attempt++) {
+    res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20_000),
+    });
+    data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) return isRecord(data.data) ? data.data : data;
+    if (attempt < backoff.length && res.status === 422) {
+      await sleep(backoff[attempt]);
+      continue;
+    }
+    break;
+  }
+  console.error(`[mercosulpay] ${tag} falhou:`, res?.status,
+    JSON.stringify(data).slice(0, 300));
+  throw httpError(502, "MercosulPay recusou a criação do PIX");
+}
+
 // MercosulPay passou a exigir o objeto `customer` na cobrança.
 // Combinações aceitas: {email} | {} | {name,email,document} —
 // name/document parciais isolados são recusados (422). Sem dado
@@ -193,28 +226,13 @@ async function createMercosulDomainPix(
   host: string,
   payerEmail: string | null,
 ): Promise<Record<string, unknown>> {
-  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      amount: amountCents / 100,
-      currency: "BRL",
-      description: `SeekerAi — Domínio ${host} (1 ano)`.slice(0, 200),
-      reference_id: internalRef,
-      customer: mercosulCustomer({ email: payerEmail }),
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    console.error("[mercosulpay] domain PIX falhou:", res.status,
-      JSON.stringify(data).slice(0, 300));
-    throw httpError(502, "MercosulPay recusou a criação do PIX");
-  }
-  return isRecord(data.data) ? data.data : data;
+  return postMercosulPix({
+    amount: amountCents / 100,
+    currency: "BRL",
+    description: `SeekerAi — Domínio ${host} (1 ano)`.slice(0, 200),
+    reference_id: internalRef,
+    customer: mercosulCustomer({ email: payerEmail }),
+  }, "domain PIX");
 }
 
 async function createMercosulPackPix(
@@ -222,28 +240,13 @@ async function createMercosulPackPix(
   pack: { credits: number; amountCents: number; intlCents: number },
   payerEmail: string | null,
 ): Promise<Record<string, unknown>> {
-  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      amount: pack.amountCents / 100,
-      currency: "BRL",
-      description: `SeekerAi — +${pack.credits} créditos`,
-      reference_id: internalRef,
-      customer: mercosulCustomer({ email: payerEmail }),
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    console.error("[mercosulpay] pack PIX falhou:", res.status,
-      JSON.stringify(data).slice(0, 300));
-    throw httpError(502, "MercosulPay recusou a criação do PIX");
-  }
-  return isRecord(data.data) ? data.data : data;
+  return postMercosulPix({
+    amount: pack.amountCents / 100,
+    currency: "BRL",
+    description: `SeekerAi — +${pack.credits} créditos`,
+    reference_id: internalRef,
+    customer: mercosulCustomer({ email: payerEmail }),
+  }, "pack PIX");
 }
 
 // Cupom do desconto de primeira compra — "once" desconta só a primeira
@@ -376,28 +379,13 @@ async function createMercosulPix(
   periodLabel: string,
   payerEmail: string | null,
 ): Promise<Record<string, unknown>> {
-  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      amount: amountCents / 100,
-      currency: "BRL",
-      description: `SeekerAi — ${plan.nome} · ${periodLabel}`.slice(0, 200),
-      reference_id: internalRef,
-      customer: mercosulCustomer({ email: payerEmail }),
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    console.error("[mercosulpay] cobrança PIX falhou:", res.status,
-      JSON.stringify(data).slice(0, 300));
-    throw httpError(502, "MercosulPay recusou a criação do PIX");
-  }
-  return isRecord(data.data) ? data.data : data;
+  return postMercosulPix({
+    amount: amountCents / 100,
+    currency: "BRL",
+    description: `SeekerAi — ${plan.nome} · ${periodLabel}`.slice(0, 200),
+    reference_id: internalRef,
+    customer: mercosulCustomer({ email: payerEmail }),
+  }, "cobrança PIX");
 }
 
 // Checkout Pro do Mercado Pago — hosted, cartão apenas (PIX/boleto ficam

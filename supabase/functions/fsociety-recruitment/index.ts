@@ -188,28 +188,41 @@ async function createMercosulPixCharge(
   amountCents: number,
   email: string,
 ) {
-  const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      amount: amountCents / 100,
-      currency: "BRL",
-      description: `F.SOCIETY.DEV — Sinal de Comprometimento (${fullName.slice(0, 60)})`.slice(0, 190),
-      reference_id: internalRef,
-      // API passou a exigir `customer` — sem CPF coletado, vai o
-      // e-mail (name isolado é recusado). Fallback: dados do admin.
-      customer: email
-        ? { email }
-        : { name: "Eduardo Daflon", email: "contatodaflonedu@gmail.com", document: "17239089754" },
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    console.error("[fsociety-mercosulpay] falha ao criar PIX:", res.status,
+  const payload = {
+    amount: amountCents / 100,
+    currency: "BRL",
+    description: `F.SOCIETY.DEV — Sinal de Comprometimento (${fullName.slice(0, 60)})`.slice(0, 190),
+    reference_id: internalRef,
+    // API passou a exigir `customer` — sem CPF coletado, vai o
+    // e-mail (name isolado é recusado). Fallback: dados do admin.
+    customer: email
+      ? { email }
+      : { name: "Eduardo Daflon", email: "contatodaflonedu@gmail.com", document: "17239089754" },
+  };
+  // O 422 genérico da API também sai em janelas de instabilidade —
+  // backoff crescente atravessa a janela (~28s no máximo).
+  const backoff = [4000, 8000, 16000];
+  let res: Response | null = null;
+  let data: Record<string, unknown> = {};
+  for (let attempt = 0; attempt <= backoff.length; attempt++) {
+    res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20_000),
+    });
+    data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok) break;
+    if (attempt < backoff.length && res.status === 422) {
+      await new Promise((r) => setTimeout(r, backoff[attempt]));
+      continue;
+    }
+  }
+  if (!res?.ok) {
+    console.error("[fsociety-mercosulpay] falha ao criar PIX:", res?.status,
       JSON.stringify(data).slice(0, 300));
     throw httpError(502, "MercosulPay recusou a criação da cobrança PIX.");
   }
