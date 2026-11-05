@@ -484,8 +484,15 @@ async function describeReferenceImage(
 // em `sites` (SiteConfig) + assets em site-assets/<slug>/ — renderizado
 // pelo React multi-tenant (barbearia dark / beleza editorial claro).
 
-const slugify = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "")
-  .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "site";
+// sites.slug exige ^[a-z0-9][a-z0-9-]{1,60}$ — máx. 61 chars e
+// min. 2; sem o cap o nome grande do lead derrubava o publish.
+const slugify = (s: string) => {
+  const out = s.normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 61).replace(/-+$/g, "");
+  return out.length >= 2 ? out : "site";
+};
 
 /** Tema + paleta visual por categoria do negócio.
     O tipo escolhe o layout (barbearia dark / beleza editorial);
@@ -2313,12 +2320,15 @@ async function publishPremiumSite(
   const nichoPromise = new Promise<NichoResult | null>((r) => { nichoResolve = r; });
   let resolvedVocab: NichoVocab | null = null;
 
-  // Slug: o do lead se já existir; senão nome+bairro/cidade sem colidir.
-  let slug = asString(dados.siteSlug, 80) ??
-    slugify([nome, asString(lead.bairro, 80) ?? asString(lead.cidade, 80)].filter(Boolean).join(" "));
+  // Slug: o do lead se já existir (sanitizado — um valor legado
+  // fora do padrão derrubava o insert); senão nome+bairro/cidade.
+  let slug = dados.siteSlug
+    ? slugify(asString(dados.siteSlug, 120) ?? "")
+    : slugify([nome, asString(lead.bairro, 80) ?? asString(lead.cidade, 80)].filter(Boolean).join(" "));
   const { data: owner } = await db.from("sites").select("lead_id").eq("slug", slug).maybeSingle();
   if (owner && owner.lead_id !== leadId) {
-    const base = slug;
+    // Base com folga pro sufixo "-NN" ficar dentro dos 61 chars.
+    const base = slug.slice(0, 57).replace(/-+$/g, "");
     for (let i = 2; i < 20; i++) {
       slug = `${base}-${i}`;
       const { data: clash } = await db.from("sites").select("slug").eq("slug", slug).maybeSingle();

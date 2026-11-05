@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: `/site/${project.site_slug}`, slug: project.site_slug });
   }
 
-  const base = slugify(project.nome);
+  // Base com folga pro sufixo "-NN" — sites.slug aceita máx. 61 chars.
+  const base = slugify(project.nome).slice(0, 57).replace(/-+$/g, "") || "app";
   let slug = base;
   for (let i = 2; i < 20; i++) {
     const { data: clash } = await admin.from("sites").select("slug").eq("slug", slug).maybeSingle();
