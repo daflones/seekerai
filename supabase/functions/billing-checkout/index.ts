@@ -170,10 +170,28 @@ async function createStripeDomainSession(
   return { id, url };
 }
 
+// MercosulPay passou a exigir o objeto `customer` na cobrança.
+// Combinações aceitas: {email} | {} | {name,email,document} —
+// name/document parciais isolados são recusados (422). Sem dado
+// do pagador, identifica com os dados do admin.
+function mercosulCustomer(payer: {
+  email?: string | null;
+  name?: string | null;
+  document?: string | null;
+}): Record<string, unknown> {
+  const email = payer.email?.trim() || null;
+  const name = payer.name?.trim() || null;
+  const doc = payer.document?.replace(/\D/g, "") || null;
+  if (name && doc) return { name, email: email ?? "contatodaflonedu@gmail.com", document: doc };
+  if (email) return { email };
+  return { name: "Eduardo Daflon", email: "contatodaflonedu@gmail.com", document: "17239089754" };
+}
+
 async function createMercosulDomainPix(
   internalRef: string,
   amountCents: number,
   host: string,
+  payerEmail: string | null,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
@@ -186,12 +204,14 @@ async function createMercosulDomainPix(
       currency: "BRL",
       description: `SeekerAi — Domínio ${host} (1 ano)`.slice(0, 200),
       reference_id: internalRef,
+      customer: mercosulCustomer({ email: payerEmail }),
     }),
     signal: AbortSignal.timeout(20_000),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    console.error("[mercosulpay] domain PIX falhou:", res.status);
+    console.error("[mercosulpay] domain PIX falhou:", res.status,
+      JSON.stringify(data).slice(0, 300));
     throw httpError(502, "MercosulPay recusou a criação do PIX");
   }
   return isRecord(data.data) ? data.data : data;
@@ -200,6 +220,7 @@ async function createMercosulDomainPix(
 async function createMercosulPackPix(
   internalRef: string,
   pack: { credits: number; amountCents: number; intlCents: number },
+  payerEmail: string | null,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
@@ -212,12 +233,14 @@ async function createMercosulPackPix(
       currency: "BRL",
       description: `SeekerAi — +${pack.credits} créditos`,
       reference_id: internalRef,
+      customer: mercosulCustomer({ email: payerEmail }),
     }),
     signal: AbortSignal.timeout(20_000),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    console.error("[mercosulpay] pack PIX falhou:", res.status);
+    console.error("[mercosulpay] pack PIX falhou:", res.status,
+      JSON.stringify(data).slice(0, 300));
     throw httpError(502, "MercosulPay recusou a criação do PIX");
   }
   return isRecord(data.data) ? data.data : data;
@@ -351,6 +374,7 @@ async function createMercosulPix(
   internalRef: string,
   amountCents: number,
   periodLabel: string,
+  payerEmail: string | null,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
     method: "POST",
@@ -363,12 +387,14 @@ async function createMercosulPix(
       currency: "BRL",
       description: `SeekerAi — ${plan.nome} · ${periodLabel}`.slice(0, 200),
       reference_id: internalRef,
+      customer: mercosulCustomer({ email: payerEmail }),
     }),
     signal: AbortSignal.timeout(20_000),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    console.error("[mercosulpay] cobrança PIX falhou:", res.status);
+    console.error("[mercosulpay] cobrança PIX falhou:", res.status,
+      JSON.stringify(data).slice(0, 300));
     throw httpError(502, "MercosulPay recusou a criação do PIX");
   }
   return isRecord(data.data) ? data.data : data;
@@ -520,7 +546,7 @@ Deno.serve(async (req) => {
         return json({ provider: "stripe", method, checkoutUrl: session.url });
       }
       try {
-        const charge = await createMercosulPackPix(internalRef, pack);
+        const charge = await createMercosulPackPix(internalRef, pack, user.email ?? null);
         return json({
           provider: "mercosulpay", method, reference: internalRef,
           qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste"]),
@@ -624,7 +650,7 @@ Deno.serve(async (req) => {
         return json({ provider: "stripe", method, checkoutUrl: session.url, domainId: domain.id });
       }
       try {
-        const charge = await createMercosulDomainPix(internalRef, priceCents, host);
+        const charge = await createMercosulDomainPix(internalRef, priceCents, host, user.email ?? null);
         return json({
           provider: "mercosulpay", method, reference: internalRef, domainId: domain.id,
           qrCode: pickDeep(charge, ["qr_code", "qrCode", "emv", "pix_copy_paste"]),
@@ -767,7 +793,8 @@ Deno.serve(async (req) => {
     if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
     try {
-      const charge = await createMercosulPix(plan, internalRef, chargedCents, periodDef.label);
+      const charge = await createMercosulPix(
+        plan, internalRef, chargedCents, periodDef.label, user.email ?? null);
       return json({
         provider: "mercosulpay",
         method,
