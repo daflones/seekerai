@@ -45,6 +45,9 @@ const FREE_PROPS = {
   draggable: true, resizable: true, copyable: true, removable: true,
   selectable: true, hoverable: true, stylable: true, layerable: true,
   badgable: true, highlightable: true,
+  // editable libera o dblclick nativo: texto abre o RTE inline e
+  // <img> abre o gerenciador de mídia pra trocar a foto.
+  editable: true,
 };
 
 const UNLOCKED = new WeakSet<Component>();
@@ -55,6 +58,12 @@ function unlockTree(root: Component) {
   const tag = (root.get("tagName") ?? "").toLowerCase();
   if (!SKIP_TAGS.has(tag)) {
     root.set({ ...FREE_PROPS, droppable: !VOID_TAGS.has(tag) });
+    // O GrapesJS monta a toolbar padrão na criação do componente
+    // (initToolbar); anexo o 📷 aqui — roda antes de qualquer seleção.
+    const tb = root.get("toolbar");
+    if (Array.isArray(tb) && !tb.some((x) => x?.command === "sk:swap-image")) {
+      root.set("toolbar", [...tb, { command: "sk:swap-image", label: ICONS.image }]);
+    }
   }
   if (tag !== "svg") root.components().forEach(unlockTree);
 }
@@ -99,6 +108,7 @@ const ICONS = {
   price: ico('<path d="M12 3v18M16 7.5C16 6 14.2 5 12 5s-4 1-4 3 2 2.7 4 3.2 4 1.3 4 3.3-1.8 3-4 3-4-1-4-2.5"/>'),
   cta: ico('<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M7 10h7M7 14h4"/><rect x="15" y="12" width="4" height="3" rx="1"/>'),
   spacer: ico('<path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4"/>'),
+  image: ico('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M3 17l6-5 4 3 4-3 4 3"/>'),
 };
 
 const DEVICES: { id: Device; icon: typeof Monitor; key: "desktop" | "tablet" | "mobile" }[] = [
@@ -284,6 +294,89 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
         },
       });
 
+      // 📷 na toolbar de qualquer elemento: troca a foto do item
+      // selecionado, o fundo, ou adiciona imagem nova (galerias ganham
+      // um item clonado pra manter a estrutura do lightbox).
+      const tagOf = (c: Component) => (c.get("tagName") ?? "").toLowerCase();
+      const firstImg = (c: Component): Component | null => {
+        if (tagOf(c) === "img") return c;
+        for (const child of c.components()) {
+          const hit = firstImg(child);
+          if (hit) return hit;
+        }
+        return null;
+      };
+      const pickPhoto = (cb: (url: string) => void) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.onchange = async () => {
+          const f = input.files?.[0];
+          input.remove();
+          if (!f) return;
+          const form = new FormData();
+          form.append("file", f);
+          const d = await fetch("/api/sites/refs", { method: "POST", body: form })
+            .then((r) => r.json()).catch(() => ({}));
+          if (d.url) cb(d.url as string);
+          else setFail(d.error ?? t.imgErr);
+        };
+        input.click();
+      };
+      // Troca o src no lugar — limpa srcset pra não sobrar a foto
+      // antiga servindo nos breakpoints responsivos.
+      const swapSrc = (c: Component, url: string) => {
+        if (c.get("type") === "image") c.set({ src: url });
+        c.addAttributes({ src: url, srcset: "" });
+      };
+      const openImagePicker = (ed: GjsEditor, target: Component) => {
+        ed.AssetManager.open({
+          select: (asset, complete) => {
+            const url = (asset as { getSrc?: () => string }).getSrc?.()
+              ?? (asset as unknown as { src?: string }).src ?? "";
+            if (url) { swapSrc(target, url); setDirty(true); }
+            if (complete) ed.AssetManager.close();
+          },
+          target,
+          types: ["image"],
+          accept: "image/*",
+        });
+      };
+      editor.Commands.add("sk:swap-image", {
+        run(ed, _s, opts) {
+          const comp = (opts?.target as Component | undefined) ?? ed.getSelected();
+          if (!comp) return;
+          if (tagOf(comp) === "img") {
+            openImagePicker(ed, comp);
+            return;
+          }
+          // Seção com exatamente uma foto dentro → abre o gerenciador de
+          // mídia nela (upload incluso) — fluxo "trocar foto no lugar".
+          const inner = firstImg(comp);
+          const imgChildren = [...comp.components()].filter((c) => firstImg(c));
+          if (inner && imgChildren.length <= 1) {
+            openImagePicker(ed, inner);
+            return;
+          }
+          const el = comp.view?.el as HTMLElement | undefined;
+          const hasBg = !!el && /url\(/.test(getComputedStyle(el).backgroundImage);
+          pickPhoto((url) => {
+            if (hasBg) {
+              comp.addStyle({ "background-image": `url("${url}")` });
+            } else if (imgChildren.length > 1) {
+              // Grade/galeria: clona o último item com a foto nova —
+              // classes e estrutura continuam iguais pro runtime.
+              const clone = comp.append(imgChildren[imgChildren.length - 1].toHTML())[0];
+              const cloneImg = clone ? firstImg(clone) : null;
+              if (cloneImg) swapSrc(cloneImg, url);
+            } else {
+              comp.append(`<img src="${url}" alt="" style="max-width:100%;display:block;border-radius:12px;">`);
+            }
+            ed.DomComponents.getWrapper()?.components().forEach(unlockTree);
+            setDirty(true);
+          });
+        },
+      });
       // Todo elemento vira editável: arrasta, redimensiona, copia e remove.
       // O handler cobre tanto o load inicial quanto blocos novos.
       editor.on("component:add", (c: Component) => unlockTree(c));
@@ -666,6 +759,7 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
         <div className="se-panel-scroll" hidden={right !== "settings" || !sel}><div ref={traitsRef} /></div>
         <div className="se-panel-scroll se-ai" hidden={right !== "ai"}>
           <p className="se-ai-hint">{t.aiHint}</p>
+          <p className="se-ai-hint">{t.aiRegenTip}</p>
           <div className="se-ai-target"><Sparkles size={12} />{t.aiSel}<strong>{sel ? sel.name : t.aiPage}</strong></div>
           <div className="se-ai-msgs" ref={aiScrollRef}>
             {!aiMsgs.length && !aiBusy && <div className="se-ai-empty"><Sparkles size={18} /><span>{t.aiPh}</span></div>}

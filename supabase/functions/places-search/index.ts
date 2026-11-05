@@ -39,6 +39,9 @@ const FIELD_MASK = [
   "places.regularOpeningHours.weekdayDescriptions",
   "places.addressComponents",
   "places.photos",
+  // Paginação: o token é campo top-level da resposta — sem ele na
+  // máscara a API nunca devolve e só viria a 1ª página (20).
+  "nextPageToken",
 ].join(",");
 
 const APIFY_ACTOR = "compass~crawler-google-places";
@@ -96,29 +99,44 @@ interface SiteCheck {
   sinais: string[];
 }
 
-async function searchGooglePlaces(query: string, regionCode: string): Promise<NormalizedPlace[]> {
-  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "X-Goog-Api-Key": await requireSecret("GOOGLE_PLACES_API_KEY"),
-      "X-Goog-FieldMask": FIELD_MASK,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      textQuery: query,
-      languageCode: "pt-BR",
-      regionCode,
-      pageSize: 20,
-    }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const detail = isRecord(data.error) ? asString(data.error.message, 300) : null;
-    console.error("[places-search] Google respondeu", res.status, detail ?? "");
-    throw httpError(502, "Google Places indisponível no momento");
+async function searchGooglePlaces(query: string, regionCode: string, pages = 1): Promise<NormalizedPlace[]> {
+  const key = await requireSecret("GOOGLE_PLACES_API_KEY");
+  const all: Record<string, unknown>[] = [];
+  let pageToken: string | null = null;
+  for (let p = 0; p < pages; p++) {
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": FIELD_MASK,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        textQuery: query,
+        languageCode: "pt-BR",
+        regionCode,
+        pageSize: 20,
+        ...(pageToken ? { pageToken } : {}),
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const detail = isRecord(data.error) ? asString(data.error.message, 300) : null;
+      console.error("[places-search] Google respondeu", res.status, detail ?? "");
+      // Primeira página falhou = provedor fora; página seguinte falhou =
+      // devolve o que já veio em vez de perder a busca toda.
+      if (!all.length) throw httpError(502, "Google Places indisponível no momento");
+      break;
+    }
+    const batch = (Array.isArray(data.places) ? data.places : []) as Record<string, unknown>[];
+    all.push(...batch);
+    pageToken = asString(data.nextPageToken, 300);
+    if (!pageToken || !batch.length) break;
+    // O pageToken só fica válido alguns segundos depois de emitido.
+    if (p < pages - 1) await sleep(2000);
   }
-  return (Array.isArray(data.places) ? data.places : []).map((p) => {
+  return all.map((p) => {
     const place = isRecord(p) ? p : {};
     // País/cidade/bairro saem dos addressComponents — alimenta o código de
     // discagem correto pra verificação de WhatsApp em qualquer país.
@@ -182,7 +200,7 @@ const DAY_PT_SEARCH: Record<string, string> = {
   friday: "Sexta", saturday: "Sábado", sunday: "Domingo",
 };
 
-async function searchApify(query: string): Promise<NormalizedPlace[]> {
+async function searchApify(query: string, target = 20): Promise<NormalizedPlace[]> {
   const token = await requireSecret("APIFY_API_TOKEN");
   const res = await fetch(
     `https://api.apify.com/v2/actors/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
@@ -191,7 +209,7 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         searchStringsArray: [query],
-        maxCrawledPlacesPerSearch: 20,
+        maxCrawledPlacesPerSearch: target,
         language: "pt-BR",
         maxReviews: 0,
       }),
@@ -251,7 +269,7 @@ async function searchApify(query: string): Promise<NormalizedPlace[]> {
  * Devolve dados que nem o Places New traz: horários em pt-BR,
  * thumbnail e category em português. Terceira fonte da cadeia.
  */
-async function searchSerper(query: string, regionCode: string): Promise<NormalizedPlace[]> {
+async function searchSerper(query: string, regionCode: string, pages = 1): Promise<NormalizedPlace[]> {
   // Chave principal + reserva (SERPER_API_KEY_2): se a primeira falhar
   // (cota, rate limit, outage) tenta a segunda antes de desistir.
   const keys = [
@@ -259,25 +277,37 @@ async function searchSerper(query: string, regionCode: string): Promise<Normaliz
     await getSecret("SERPER_API_KEY_2"),
   ].filter((k): k is string => Boolean(k));
   if (!keys.length) throw httpError(502, "Serper não configurado");
-  let res: Response | null = null;
-  for (const key of keys) {
-    res = await fetch("https://google.serper.dev/maps", {
-      method: "POST",
-      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        q: query,
-        gl: regionCode.toLowerCase(),
-        hl: "pt-br",
-        num: 20,
-      }),
-      signal: AbortSignal.timeout(30_000),
-    }).catch(() => null);
-    if (res?.ok) break;
-    res = null;
+  const fetchPage = async (page: number, ll: string | null) => {
+    for (const key of keys) {
+      const res = await fetch("https://google.serper.dev/maps", {
+        method: "POST",
+        headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          q: query,
+          gl: regionCode.toLowerCase(),
+          hl: "pt-br",
+          num: 20,
+          // Paginação do maps exige o "ll" (GPS) devolvido na pág. 1.
+          ...(page > 1 ? { page, ll } : {}),
+        }),
+        signal: AbortSignal.timeout(30_000),
+      }).catch(() => null);
+      if (res?.ok) return await res.json().catch(() => null);
+    }
+    return null;
+  };
+  const first = await fetchPage(1, null);
+  if (!first) throw httpError(502, "Serper indisponível no momento");
+  const pages_ = [first];
+  const ll = asString(first.ll, 100);
+  // Páginas extras (planos maiores) saem em paralelo — ~$0.002 cada.
+  if (pages > 1 && ll) {
+    pages_.push(...await Promise.all(
+      Array.from({ length: pages - 1 }, (_, i) => fetchPage(i + 2, ll)),
+    ));
   }
-  if (!res?.ok) throw httpError(502, "Serper indisponível no momento");
-  const data = await res.json().catch(() => null);
-  const places = isRecord(data) && Array.isArray(data.places) ? data.places : [];
+  const places = pages_.flatMap((data) =>
+    isRecord(data) && Array.isArray(data.places) ? data.places : []);
   if (!places.length) throw httpError(502, "Serper não retornou resultados");
 
   // "Av. X, 1310 - Bairro, Cidade - UF, CEP, Brasil" → partes.
@@ -315,7 +345,7 @@ async function searchSerper(query: string, regionCode: string): Promise<Normaliz
       bairro: addr.bairro,
       cidade: addr.cidade,
       uf: addr.uf,
-      pais: "BR",
+      pais: regionCode.toUpperCase(),
       telefone: asString(p.phoneNumber),
       site: asString(p.website, 500),
       avaliacao: typeof p.rating === "number" ? p.rating : null,
@@ -375,10 +405,11 @@ async function igApifyCall(token: string, body: Record<string, unknown>, timeout
  * Enriquecimento Instagram: depois que o Maps revela o @, uma chamada
  * batelada no instagram-scraper traz perfil (seguidores/posts/foto/bio)
  * e os últimos posts (média de curtidas + mídia/legendas pro site).
- * Capado em 8 perfis e corrido com timeout — nunca derruba a busca.
+ * Cap por plano (8 base, até 16) e corrido com timeout — nunca
+ * derruba a busca.
  */
-async function enrichInstagram(places: NormalizedPlace[]): Promise<void> {
-  const comIg = places.filter((p) => p.instagram).slice(0, 8);
+async function enrichInstagram(places: NormalizedPlace[], cap = 8): Promise<void> {
+  const comIg = places.filter((p) => p.instagram).slice(0, cap);
   if (!comIg.length) return;
 
   const applyProfile = (p: NormalizedPlace, prof: {
@@ -559,7 +590,9 @@ async function scanWebsite(site: string): Promise<SiteCheck & { instagram?: stri
 
 /** Varre os sites em lotes para não estourar o tempo da function. */
 async function scanWebsites(places: NormalizedPlace[]): Promise<void> {
-  const comSite = places.filter((p) => p.site);
+  // Buscas grandes (plano King, até 60) capam a varredura — os demais
+  // ficam sem siteCheck e ainda pontuam como "com site" neutro.
+  const comSite = places.filter((p) => p.site).slice(0, 30);
   const batch = 6;
   for (let i = 0; i < comSite.length; i += batch) {
     await Promise.all(
@@ -656,14 +689,25 @@ Deno.serve(async (req) => {
         .eq("id", jobId).eq("status", "running")
         .then(() => {}, () => {});
     };
-    const [{ data: profile }, replay, provider] = await Promise.all([
+    const [{ data: profile }, { data: sub }, replay, provider] = await Promise.all([
       isDemo
         ? Promise.resolve({ data: null })
         : db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+      isDemo
+        ? Promise.resolve({ data: null })
+        : db.from("subscriptions").select("plans(slug)").eq("user_id", user.id)
+          .eq("status", "active").limit(1).maybeSingle(),
       getSetting("search_replay", "off"),
       getSetting("search_provider", "google_places"),
     ]);
     const isAdmin = profile?.role === "admin";
+    const planSlug = (sub?.plans as { slug?: unknown } | null)?.slug;
+    // Profundidade da busca por plano: provedores devolvem ~20 por
+    // página — planos maiores paginam pra encher a lista de leads.
+    const planTarget = isDemo ? 15
+      : isAdmin || planSlug === "king" ? 60
+      : planSlug === "pro" ? 40 : 20;
+    const providerPages = Math.max(1, Math.ceil(planTarget / 20));
 
     // Replay de demonstração: somente para admin, sem chamar API nem cobrar.
     if (replay === "on" && isAdmin) {
@@ -704,9 +748,9 @@ Deno.serve(async (req) => {
       // Provedor configurado primeiro; se cair, a busca segue pelos
       // outros (Apify sem crédito → Google Places → Serper).
       const providers: [string, () => Promise<NormalizedPlace[]>][] = [
-        ["google_places", () => searchGooglePlaces(query, regionCode)],
-        ["apify", () => searchApify(query)],
-        ["serper", () => searchSerper(query, regionCode)],
+        ["google_places", () => searchGooglePlaces(query, regionCode, providerPages)],
+        ["apify", () => searchApify(query, planTarget)],
+        ["serper", () => searchSerper(query, regionCode, providerPages)],
       ].sort((a) => a[0] === provider ? -1 : 0) as [
         string,
         () => Promise<NormalizedPlace[]>,
@@ -736,6 +780,17 @@ Deno.serve(async (req) => {
         throw httpError(502, "Busca indisponível no momento. Tente novamente em instantes.");
       }
 
+      // Paginação pode repetir o mesmo lugar (id ou nome+endereço).
+      {
+        const seen = new Set<string>();
+        resultados = resultados.filter((p) => {
+          const k = (p.id ?? `${p.nome}|${p.endereco}`).toLowerCase();
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      }
+
       // Enriquecimento: WhatsApp em lote (grátis) + varredura dos sites
       // (que também descobre o @ do Instagram no HTML) — depois o scrape
       // batelado dos perfis (seguidores, curtidas, foto) com cap curto pra
@@ -751,17 +806,20 @@ Deno.serve(async (req) => {
       ]);
       await progress(62, "Verificando WhatsApp e sites");
       if (!isDemo) {
-        await Promise.race([enrichInstagram(resultados), sleep(55_000)]);
+        const igCap = Math.min(16, Math.max(8, Math.ceil(planTarget / 4)));
+        await Promise.race([enrichInstagram(resultados, igCap), sleep(55_000)]);
       }
       await progress(80, "Enriquecendo Instagram");
       resultados.sort((a, b) => {
         const score = (p: NormalizedPlace) =>
           (p.telefone ? 4 : 0) + (p.whatsapp === true ? 2 : 0) +
+          (p.instagram ? 1.5 : 0) +
           (p.status === "OPERATIONAL" ? 1 : 0) + (p.avaliacao ?? 0) / 10 +
           (!p.site ? 3 : p.siteCheck?.estado === "fora" ? 2.5
             : p.siteCheck?.estado === "desatualizado" ? 2 : 0);
         return score(b) - score(a);
       });
+      if (resultados.length > planTarget) resultados = resultados.slice(0, planTarget);
 
       // Resultados que já são lead salvo: match por place_id → "Ver lead"
       // e badge de site gerado, evitando salvar duplicado.
