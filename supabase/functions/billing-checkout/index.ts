@@ -173,33 +173,38 @@ async function createStripeDomainSession(
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // A API devolve 422 genérico tanto pra payload inválido quanto pra
-// janelas de instabilidade do gateway PIX deles — taxa de sucesso
-// observada ~30% por tentativa, sem padrão por valor. Tentativas
-// com backoff crescente atravessam a janela (~28s no máx.).
+// janelas de instabilidade do gateway PIX deles — e ainda quebra com
+// timeouts/5xx esporádicos. Qualquer falha transitória (fetch, 408,
+// 422, 429, 5xx) retenta com backoff crescente (~28s no máx.);
+// só um 4xx permanente (401/403/400) desiste na hora.
 async function postMercosulPix(payload: Record<string, unknown>, tag: string) {
   const backoff = [4000, 8000, 16000];
   let res: Response | null = null;
   let data: Record<string, unknown> = {};
+  let lastErr = "";
   for (let attempt = 0; attempt <= backoff.length; attempt++) {
-    res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(20_000),
-    });
-    data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (res.ok) return isRecord(data.data) ? data.data : data;
-    if (attempt < backoff.length && res.status === 422) {
-      await sleep(backoff[attempt]);
-      continue;
+    res = null;
+    try {
+      res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(20_000),
+      });
+      data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (res.ok) return isRecord(data.data) ? data.data : data;
+      lastErr = `${res.status} ${JSON.stringify(data).slice(0, 200)}`;
+      // 4xx permanente (exceto o 422 instável deles) não adianta retentar.
+      if (res.status >= 400 && res.status < 500 && res.status !== 422 && res.status !== 429) break;
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : String(err);
     }
-    break;
+    if (attempt < backoff.length) await sleep(backoff[attempt]);
   }
-  console.error(`[mercosulpay] ${tag} falhou:`, res?.status,
-    JSON.stringify(data).slice(0, 300));
+  console.error(`[mercosulpay] ${tag} falhou:`, lastErr.slice(0, 300));
   throw httpError(502, "MercosulPay recusou a criação do PIX");
 }
 

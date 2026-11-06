@@ -199,31 +199,37 @@ async function createMercosulPixCharge(
       ? { email }
       : { name: "Eduardo Daflon", email: "contatodaflonedu@gmail.com", document: "17239089754" },
   };
-  // O 422 genérico da API também sai em janelas de instabilidade —
-  // backoff crescente atravessa a janela (~28s no máximo).
+  // Falhas transitórias (timeout, 408, 422, 429, 5xx) retentam com
+  // backoff crescente (~28s no máx.); só 4xx permanente desiste na hora.
   const backoff = [4000, 8000, 16000];
   let res: Response | null = null;
   let data: Record<string, unknown> = {};
+  let lastErr = "";
   for (let attempt = 0; attempt <= backoff.length; attempt++) {
-    res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(20_000),
-    });
-    data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (res.ok) break;
-    if (attempt < backoff.length && res.status === 422) {
+    res = null;
+    try {
+      res = await fetch(`${MERCOSUL_API_URL}/pix/charges`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await requireSecret("MERCOSULPAY_API_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(20_000),
+      });
+      data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (res.ok) break;
+      lastErr = `${res.status} ${JSON.stringify(data).slice(0, 200)}`;
+      if (res.status >= 400 && res.status < 500 && res.status !== 422 && res.status !== 429) break;
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : String(err);
+    }
+    if (attempt < backoff.length) {
       await new Promise((r) => setTimeout(r, backoff[attempt]));
-      continue;
     }
   }
   if (!res?.ok) {
-    console.error("[fsociety-mercosulpay] falha ao criar PIX:", res?.status,
-      JSON.stringify(data).slice(0, 300));
+    console.error("[fsociety-mercosulpay] falha ao criar PIX:", lastErr.slice(0, 300));
     throw httpError(502, "MercosulPay recusou a criação da cobrança PIX.");
   }
   const charge = isRecord(data.data) ? data.data : data;
