@@ -106,8 +106,23 @@ Deno.serve(async (req) => {
           .maybeSingle()
         : { data: null };
 
-      // Cobrança de outro sistema na mesma conta MP — não é nossa.
+      // Cobrança de outro sistema na mesma conta MP — verifica se é do recrutamento F.SOCIETY.DEV.
       if (!payment) {
+        if (externalRef && status === "approved") {
+          const paidCents = typeof mpPay.transaction_amount === "number"
+            ? Math.round(mpPay.transaction_amount * 100) : 1000;
+          const { data: fsoc } = await db.rpc("fsociety_confirm_payment", {
+            p_provider: "mercadopago",
+            p_provider_ref: externalRef,
+            p_paid_cents: paidCents,
+            p_external_id: paymentId,
+            p_payload: mpPay,
+          });
+          if (isRecord(fsoc) && fsoc.found === true) {
+            await finish(db, eventId, null);
+            return json({ received: true, project: "recrutamento-fsociety", result: fsoc });
+          }
+        }
         await finish(db, eventId, null);
         return json({ received: true, result: { status: "ignored", reason: "unknown_reference" } });
       }
@@ -179,10 +194,13 @@ Deno.serve(async (req) => {
         await trackPlanSignup(payment);
         const { data: plan } = await db.from("plans").select("*").eq("id", payment.plan_id).maybeSingle();
         const planNome = isRecord(plan) ? String(plan.nome ?? plan.name ?? "plano") : "plano";
+        const planChange = typeof meta.plan_change === "string" ? meta.plan_change : null;
         await notifySale({
           tipo: "assinatura",
           valorReais: payment.amount_cents / 100,
-          descricao: `Nova assinatura no cartão (Mercado Pago) — plano ${planNome}`,
+          descricao: planChange
+            ? `${planChange === "upgrade" ? "Upgrade de plano" : planChange === "downgrade" ? "Downgrade de plano" : "Troca de período"} no cartão (Mercado Pago) — ${String(meta.from_plan ?? "?")} → ${planNome}`
+            : `Nova assinatura no cartão (Mercado Pago) — plano ${planNome}`,
           usuario: await notifyUserOf(payment.user_id),
         });
         await finish(db, eventId, null);

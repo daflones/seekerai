@@ -42,6 +42,18 @@ function kindOf(p: PayRow): string {
   return typeof k === "string" ? k : "plan";
 }
 
+/** Sufixo "↑ upgrade Pro → King" quando o pagamento é troca de plano. */
+function changeLabel(p: PayRow, toName: string, fromName?: string): string {
+  const m = p.metadata as Record<string, unknown> | null;
+  const chg = typeof m?.plan_change === "string" ? m.plan_change : null;
+  if (!chg) return "";
+  const from = typeof m?.from_plan === "string" && m.from_plan
+    ? (fromName ?? m.from_plan) : null;
+  const arrow = chg === "upgrade" ? "↑" : chg === "downgrade" ? "↓" : "⟳";
+  const word = chg === "periodo" ? "mudou período" : chg;
+  return ` ${arrow} ${word}${from ? ` ${from} → ${toName}` : ""}`;
+}
+
 function daySum(pairs: { date: string; amount: number }[], days: number) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const buckets = new Array<number>(days).fill(0);
@@ -191,6 +203,7 @@ export default async function AdminFinanceiroPage() {
   }, {})).sort((a, b) => b[1] - a[1]);
 
   const planName = new Map((plansData ?? []).map((pl) => [pl.id, pl.nome]));
+  const planNameBySlug = new Map((plansData ?? []).map((pl) => [pl.slug, pl.nome]));
   const byPlan = Object.entries(paid.reduce<Record<string, number>>((acc, p) => {
     const k = kindOf(p);
     const label = k === "plan"
@@ -362,7 +375,10 @@ export default async function AdminFinanceiroPage() {
                 const last = rows[0];
                 const meta = (last.metadata ?? {}) as Record<string, unknown>;
                 const periodo = typeof meta.period === "string" ? meta.period : null;
-                const oQue = `${KIND_LABEL[kindOf(last)] ?? kindOf(last)}${periodo ? ` ${periodo}` : ""}`;
+                const oQue = `${KIND_LABEL[kindOf(last)] ?? kindOf(last)}${periodo ? ` ${periodo}` : ""}`
+                  + changeLabel(last,
+                      planName.get(last.plan_id ?? "") ?? "Plano",
+                      planNameBySlug.get(String(meta.from_plan ?? "")));
                 const converted = (lastPaidAt.get(uid) ?? "") > last.created_at;
                 const hasNewer = (lastAnyAt.get(uid) ?? "") > last.created_at;
                 const motivo = converted
@@ -419,6 +435,9 @@ export default async function AdminFinanceiroPage() {
                 <span title={String(p.user_id ?? "")}>
                   <strong>{userName.get(p.user_id ?? "") ?? "—"}</strong>
                   {" · "}{p.method ?? "?"} · {p.provider ?? "?"} · {KIND_LABEL[kindOf(p)] ?? kindOf(p)}
+                  <em>{changeLabel(p,
+                    planName.get(p.plan_id ?? "") ?? "Plano",
+                    planNameBySlug.get(String((p.metadata as Record<string, unknown> | null)?.from_plan ?? "")))}</em>
                 </span>
                 <small>{fmtHora(p.created_at)}</small>
               </li>

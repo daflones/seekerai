@@ -78,7 +78,25 @@ Deno.serve(async (req) => {
           .eq("provider", "mercosulpay")
           .eq("provider_ref", reference)
           .maybeSingle();
-        if (!payment) throw httpError(404, "Pagamento desconhecido");
+        if (!payment) {
+          if (String(data.status ?? "") === "completed") {
+            const paidCents = typeof data.amount === "number"
+              ? Math.round(data.amount * 100)
+              : 1000;
+            const { data: fsoc } = await db.rpc("fsociety_confirm_payment", {
+              p_provider: "mercosulpay",
+              p_provider_ref: reference,
+              p_paid_cents: paidCents,
+              p_external_id: typeof data.id === "string" ? data.id : null,
+              p_payload: data,
+            });
+            if (isRecord(fsoc) && fsoc.found === true) {
+              await finish(db, deliveryId, null);
+              return json({ received: true, project: "recrutamento-fsociety", result: fsoc });
+            }
+          }
+          throw httpError(404, "Pagamento desconhecido");
+        }
 
         // Domínio próprio — confirma pedido; a ativação é manual pelo admin.
         if (isRecord(payment.metadata) && payment.metadata.kind === "domain") {
@@ -164,10 +182,13 @@ Deno.serve(async (req) => {
         const planNome = isRecord(plan)
           ? String(plan.nome ?? plan.name ?? "plano")
           : "plano";
+        const planChange = typeof meta.plan_change === "string" ? meta.plan_change : null;
         await notifySale({
           tipo: "assinatura",
           valorReais: payment.amount_cents / 100,
-          descricao: `Nova assinatura via Pix — plano ${planNome}`,
+          descricao: planChange
+            ? `${planChange === "upgrade" ? "Upgrade de plano" : planChange === "downgrade" ? "Downgrade de plano" : "Troca de período"} via Pix — ${String(meta.from_plan ?? "?")} → ${planNome}`
+            : `Nova assinatura via Pix — plano ${planNome}`,
           usuario: await notifyUserOf(payment.user_id),
         });
         await finish(db, deliveryId, null);

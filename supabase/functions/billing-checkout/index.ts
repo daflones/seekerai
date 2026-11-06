@@ -661,7 +661,7 @@ Deno.serve(async (req) => {
     if (!planSlug) throw httpError(400, "Informe planSlug");
     const { data: plan, error: planError } = await db
       .from("plans")
-      .select("id, slug, nome, preco_centavos, ativo")
+      .select("id, slug, nome, preco_centavos, ativo, ordem")
       .eq("slug", planSlug)
       .maybeSingle();
     if (planError || !plan) throw httpError(404, "Plano não encontrado");
@@ -676,7 +676,7 @@ Deno.serve(async (req) => {
     // mesmo plano em período maior (mensal→anual) segue como upgrade.
     const { data: active } = await db
       .from("subscriptions")
-      .select("id, plan_id, billing_months")
+      .select("id, plan_id, billing_months, plans:plan_id(slug, ordem)")
       .eq("user_id", user.id)
       .in("status", ["pending", "active", "past_due"])
       .limit(1);
@@ -684,6 +684,16 @@ Deno.serve(async (req) => {
     if (cur && cur.plan_id === plan.id && periodDef.months <= (cur.billing_months ?? 1)) {
       throw httpError(409, "Você já está neste plano — escolha outro plano ou um período maior");
     }
+    // Marca a troca no metadata do pagamento — o financeiro distingue
+    // upgrade/downgrade/extensão de período de assinatura nova.
+    const curPlan = cur && isRecord(cur.plans) ? cur.plans : null;
+    const planChange = !cur ? null
+      : cur.plan_id !== plan.id
+        ? (Number(plan.ordem) || 0) > (Number(curPlan?.ordem) || 0) ? "upgrade" : "downgrade"
+        : "periodo";
+    const changeMeta = planChange
+      ? { plan_change: planChange, from_plan: String(curPlan?.slug ?? "") }
+      : {};
 
     // Preço cobrado: BRL usa o preço do banco; USD/EUR usam a tabela
     // internacional. Desconto do período aplica sobre a mensalidade
@@ -738,7 +748,7 @@ Deno.serve(async (req) => {
           method: "card",
           amount_cents: chargedCents,
           status: "pending",
-          metadata: { period, months: periodDef.months, currency, ...discMeta, ...fbMeta },
+          metadata: { period, months: periodDef.months, currency, ...discMeta, ...changeMeta, ...fbMeta },
         });
         if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
         try {
@@ -766,7 +776,7 @@ Deno.serve(async (req) => {
         method: "card",
         amount_cents: chargedCents,
         status: "pending",
-        metadata: { currency, period, months: periodDef.months, ...discMeta, ...fbMeta },
+        metadata: { currency, period, months: periodDef.months, ...discMeta, ...changeMeta, ...fbMeta },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
       return json({ provider: "stripe", method, checkoutUrl: session.url });
@@ -782,7 +792,7 @@ Deno.serve(async (req) => {
       method: "pix",
       amount_cents: chargedCents,
       status: "pending",
-      metadata: { period, months: periodDef.months, ...discMeta, ...fbMeta },
+      metadata: { period, months: periodDef.months, ...discMeta, ...changeMeta, ...fbMeta },
     });
     if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
 
