@@ -669,14 +669,20 @@ Deno.serve(async (req) => {
       throw httpError(409, "Este plano ainda não está disponível para contratação");
     }
 
+    // Troca de plano (upgrade OU downgrade): o pagamento confirma e o
+    // confirm_plan_payment reaponta a assinatura atual pro novo plano —
+    // novo ciclo e nova cota passam a valer na hora. Só bloqueia a
+    // recompra do mesmo plano+período (perderia o ciclo pago sem ganho);
+    // mesmo plano em período maior (mensal→anual) segue como upgrade.
     const { data: active } = await db
       .from("subscriptions")
-      .select("id")
+      .select("id, plan_id, billing_months")
       .eq("user_id", user.id)
       .in("status", ["pending", "active", "past_due"])
       .limit(1);
-    if (active && active.length > 0) {
-      throw httpError(409, "Você já possui uma assinatura em andamento");
+    const cur = active?.[0];
+    if (cur && cur.plan_id === plan.id && periodDef.months <= (cur.billing_months ?? 1)) {
+      throw httpError(409, "Você já está neste plano — escolha outro plano ou um período maior");
     }
 
     // Preço cobrado: BRL usa o preço do banco; USD/EUR usam a tabela

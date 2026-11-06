@@ -284,6 +284,7 @@ const pt = {
     pixValid: "Válido até", pixAuto: "Assim que o pagamento confirmar, o plano ativa sozinho.",
     pixCopy: "Copiar código", pixCopied: "Copiado",
     yourPlan: "Seu plano", renewsIn: "renova em", creditsCycle: "créditos/ciclo", upTitle: "Quer mais poder?", upSub: "Upgrade libera editor de sites, apps e domínio personalizado — e mais créditos por ciclo.", topPlan: "Você já está no plano máximo — tudo liberado.", packCredits: "créditos", perCredit: "/crédito", upgradeFlag: "UPGRADE",
+    changeTitle: "Trocar de plano", changeSub: "O pagamento confirmado troca seu plano na hora — o novo período e a nova cota já valem a partir de agora.", downgradeFlag: "MENOR CUSTO",
   },
   lead: {
     actReply: "Mensagem de abordagem", actStrategy: "Estratégia",
@@ -852,6 +853,7 @@ export const messages: Record<Lang, Messages> = {
       pixValid: "Valid until", pixAuto: "Once payment confirms, the plan activates by itself.",
       pixCopy: "Copy code", pixCopied: "Copied",
     yourPlan: "Your plan", renewsIn: "renews on", creditsCycle: "credits/cycle", upTitle: "Want more power?", upSub: "Upgrading unlocks the site editor, apps and custom domains — plus more credits per cycle.", topPlan: "You are on the top plan — everything unlocked.", packCredits: "credits", perCredit: "/credit", upgradeFlag: "UPGRADE",
+    changeTitle: "Switch plans", changeSub: "Once the payment confirms, your plan switches right away — the new period and allowance start now.", downgradeFlag: "LOWER COST",
     },
     lead: {
       actReply: "Outreach message", actStrategy: "Strategy",
@@ -1416,6 +1418,7 @@ export const messages: Record<Lang, Messages> = {
       pixValid: "Válido hasta", pixAuto: "Apenas se confirme el pago, el plan se activa solo.",
       pixCopy: "Copiar código", pixCopied: "Copiado",
     yourPlan: "Tu plan", renewsIn: "renueva el", creditsCycle: "créditos/ciclo", upTitle: "¿Quieres más poder?", upSub: "El upgrade desbloquea editor de sitios, apps y dominio personalizado — y más créditos por ciclo.", topPlan: "Ya estás en el plan máximo — todo desbloqueado.", packCredits: "créditos", perCredit: "/crédito", upgradeFlag: "UPGRADE",
+    changeTitle: "Cambiar de plan", changeSub: "Al confirmarse el pago tu plan cambia enseguida — el nuevo período y la nueva cuota ya valen.", downgradeFlag: "MENOR COSTO",
     },
     lead: {
       actReply: "Mensaje de acercamiento", actStrategy: "Estrategia",
@@ -1980,6 +1983,7 @@ export const messages: Record<Lang, Messages> = {
       pixValid: "Valide jusqu'au", pixAuto: "Dès confirmation du paiement, l'offre s'active toute seule.",
       pixCopy: "Copier le code", pixCopied: "Copié",
     yourPlan: "Votre formule", renewsIn: "renouvelé le", creditsCycle: "crédits/cycle", upTitle: "Envie de plus ?", upSub: "Le surclassement débloque l’éditeur de sites, les apps et le domaine personnalisé — plus de crédits par cycle.", topPlan: "Vous êtes déjà sur l’offre maximale — tout est débloqué.", packCredits: "crédits", perCredit: "/crédit", upgradeFlag: "UPGRADE",
+    changeTitle: "Changer d'offre", changeSub: "Dès le paiement confirmé, votre offre change aussitôt — la nouvelle période et les crédits valent déjà.", downgradeFlag: "MOINS CHER",
     },
     lead: {
       actReply: "Message d'approche", actStrategy: "Stratégie",
@@ -2543,6 +2547,7 @@ export const messages: Record<Lang, Messages> = {
       pixValid: "Gültig bis", pixAuto: "Sobald die Zahlung bestätigt ist, aktiviert sich der Tarif von selbst.",
       pixCopy: "Code kopieren", pixCopied: "Kopiert",
     yourPlan: "Dein Tarif", renewsIn: "verlängert am", creditsCycle: "Credits/Zyklus", upTitle: "Mehr Power?", upSub: "Ein Upgrade schaltet Site-Editor, Apps und eigene Domains frei — plus mehr Credits pro Zyklus.", topPlan: "Du bist im Top-Tarif — alles freigeschaltet.", packCredits: "Credits", perCredit: "/Credit", upgradeFlag: "UPGRADE",
+    changeTitle: "Tarif wechseln", changeSub: "Sobald die Zahlung bestätigt ist, wechselt dein Tarif sofort — neue Periode und Credits gelten ab jetzt.", downgradeFlag: "GÜNSTIGER",
     },
     lead: {
       actReply: "Ansprache", actStrategy: "Strategie",
@@ -3106,6 +3111,7 @@ export const messages: Record<Lang, Messages> = {
       pixValid: "Valido fino al", pixAuto: "Appena il pagamento conferma, il piano si attiva da solo.",
       pixCopy: "Copia codice", pixCopied: "Copiato",
     yourPlan: "Il tuo piano", renewsIn: "rinnova il", creditsCycle: "crediti/ciclo", upTitle: "Vuoi più potenza?", upSub: "L’upgrade sblocca editor di siti, app e dominio personalizzato — più crediti per ciclo.", topPlan: "Sei già sul piano massimo — tutto sbloccato.", packCredits: "crediti", perCredit: "/credito", upgradeFlag: "UPGRADE",
+    changeTitle: "Cambia piano", changeSub: "Appena il pagamento è confermato il piano cambia subito — nuovo periodo e crediti già validi.", downgradeFlag: "PIÙ ECONOMICO",
     },
     lead: {
       actReply: "Messaggio di approccio", actStrategy: "Strategia",

@@ -110,8 +110,10 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
   }
 
   const current = plans.find((p) => p.slug === currentPlanSlug) ?? null;
-  const upgrades = current
-    ? plans.filter((p) => p.order > current.order)
+  // Troca em qualquer direção — upgrade e downgrade entram na mesma
+  // grade; a flag do card diferencia.
+  const changes = current
+    ? plans.filter((p) => p.slug !== currentPlanSlug && p.priceCents > 0)
     : [];
   const renewDate = subEnd
     ? new Date(subEnd).toLocaleDateString(locale.lang === "pt" ? "pt-BR" : locale.lang)
@@ -177,9 +179,9 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       <CheckCircle2 size={22} className="plan-now-check" />
     </section>}
 
-    {hasSubscription && upgrades.length > 0 && <section>
-      <h3 className="pack-section-title">{t.upTitle}</h3>
-      <p className="pack-section-sub">{t.upSub}</p>
+    {hasSubscription && changes.length > 0 && <section>
+      <h3 className="pack-section-title">{t.changeTitle}</h3>
+      <p className="pack-section-sub">{t.changeSub}</p>
       <div className="payment-toggle plan-period-toggle" role="group" aria-label={t.periodGroup}>
         {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
           <CalendarClock size={14} />{periodLabel[p.id]}
@@ -187,11 +189,12 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
         </button>)}
       </div>
       <div className="plan-grid plan-grid-upgrades">
-        {upgrades.map((plan) => planCard(plan, t.upgradeFlag))}
+        {changes.map((plan) => planCard(plan,
+          plan.order > (current?.order ?? 0) ? t.upgradeFlag : t.downgradeFlag))}
       </div>
     </section>}
 
-    {hasSubscription && upgrades.length === 0 && current && (
+    {hasSubscription && changes.length === 0 && current && (
       <p className="auth-success" role="status"><CheckCircle2 size={18} /> {t.topPlan}</p>
     )}
 

@@ -51,6 +51,14 @@ async function stripeGet(path: string): Promise<Record<string, unknown>> {
   return (await res.json()) as Record<string, unknown>;
 }
 
+async function stripeDelete(path: string): Promise<void> {
+  const res = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${await requireSecret("STRIPE_SECRET_KEY")}` },
+  });
+  if (!res.ok) throw httpError(502, `Stripe respondeu ${res.status}`);
+}
+
 const epochToIso = (v: unknown): string | null =>
   typeof v === "number" && v > 0 ? new Date(v * 1000).toISOString() : null;
 
@@ -134,6 +142,17 @@ async function processEvent(
         periodEnd = fallback.toISOString();
       }
     }
+    // Troca de plano: captura a assinatura Stripe anterior ANTES do
+    // confirm (que grava o novo id na linha) para cancelá-la depois —
+    // sem isso o cartão seguiria sendo cobrado pelo plano antigo.
+    const { data: prevSub } = pack
+      ? await db.from("subscriptions")
+          .select("provider, provider_subscription_id")
+          .eq("user_id", pack.user_id)
+          .in("status", ["pending", "active", "past_due"])
+          .maybeSingle()
+      : { data: null };
+
     const cycleRef = `stripe:${subscriptionId ?? sessionId}:${periodStart ?? "checkout"}`;
     const { data, error } = await db.rpc("confirm_plan_payment", {
       p_provider: "stripe",
@@ -144,6 +163,20 @@ async function processEvent(
       p_months: months,
     });
     if (error) throw httpError(500, `confirm_plan_payment: ${error.message}`);
+
+    const oldStripeSub = isRecord(data) && data.status === "activated"
+      && prevSub?.provider === "stripe"
+      && prevSub.provider_subscription_id
+      && prevSub.provider_subscription_id !== subscriptionId
+      ? String(prevSub.provider_subscription_id) : null;
+    if (oldStripeSub) {
+      try {
+        await stripeDelete(`subscriptions/${oldStripeSub}`);
+      } catch (err) {
+        console.error("stripe-webhook: falha ao cancelar assinatura antiga", oldStripeSub, err);
+      }
+    }
+
     if (pack) await trackPlanSignup(pack);
     return data as Record<string, unknown>;
   }
