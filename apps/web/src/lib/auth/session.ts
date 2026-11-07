@@ -26,14 +26,23 @@ export const verifiedSession = cache(async () => {
     }
   }
   if (!user) {
-    const { data: { user: checked }, error } = await supabase.auth.getUser();
-    if (error || !checked || !checked.email_confirmed_at) return null;
-    user = checked;
-    const { data: { session: fresh } } = await supabase.auth.getSession();
-    accessToken = fresh?.access_token ?? null;
+    try {
+      const { data: { user: checked }, error } = await supabase.auth.getUser();
+      if (error || !checked || !checked.email_confirmed_at) return null;
+      user = checked;
+      const { data: { session: fresh } } = await supabase.auth.getSession();
+      accessToken = fresh?.access_token ?? null;
+    } catch {
+      // Auth API instável/reiniciando — degrada para "não autenticado"
+      // (redirect pro login) em vez de estourar a página.
+      return null;
+    }
   }
-  const { data: profile } = await supabase.from("profiles")
+  const { data: profile, error: profileError } = await supabase.from("profiles")
     .select("id,nome,role,consentimento_em,terms_version,onboarding_concluido,onboarding_visto_em").eq("id", user.id).single();
+  // PGRST116 = sem linha (perfil pendente). Outros erros são de rede —
+  // trata como sem sessão para não mandar o usuário pro onboarding por engano.
+  if (profileError && profileError.code !== "PGRST116") return null;
   return { supabase, user, profile, accessToken };
 });
 

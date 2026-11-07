@@ -1,13 +1,80 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { authCookieOptions, supabasePublicConfig } from "./lib/auth/config";
-import { readAccessToken, verifyAccessToken } from "./lib/auth/jwt";
+import { readAccessToken, readRefreshToken, verifyAccessToken } from "./lib/auth/jwt";
 import { callbackOrigin } from "./lib/auth/validation";
 
 // Hosts que servem a própria plataforma — todo o resto é tratado como
 // possível domínio customizado apontado para um site publicado.
 const domainCache = new Map<string, { slug: string | null; at: number }>();
 const DOMAIN_CACHE_TTL = 60_000;
+
+// Requests paralelas com o access token expirado disparavam refreshes
+// concorrentes do MESMO refresh token — o primeiro que rotaciona invalida
+// os demais (409 conflict / already_used) e envenena a sessão. Dedup por
+// refresh token faz as concorrentes compartilharem um único refresh.
+type AuthClient = ReturnType<typeof createServerClient>;
+const refreshInflight = new Map<string, ReturnType<AuthClient["auth"]["getSession"]>>();
+
+async function dedupedGetSession(supabase: AuthClient, key: string | null) {
+  if (!key) return supabase.auth.getSession();
+  const pending = refreshInflight.get(key);
+  if (pending) return pending;
+  const task = supabase.auth.getSession();
+  refreshInflight.set(key, task);
+  task.finally(() => {
+    if (refreshInflight.get(key) === task) refreshInflight.delete(key);
+  });
+  return task;
+}
+
+// Erros que indicam cookie envenenado — a sessão já não existe mais na
+// Auth API, então reenviar os mesmos cookies só repete a falha.
+function isStaleSessionError(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code ?? "";
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  return code === "refresh_token_already_used" || code === "refresh_token_not_found" ||
+    code === "conflict" || /refresh token.*(invalid|used|not found|expired)/i.test(message);
+}
+
+// Timeout curto nas chamadas à Auth API — sem ele, uma instabilidade do
+// provedor transforma cada request em espera indefinida (site "travado").
+const AUTH_CALL_TIMEOUT = 8_000;
+
+function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("auth-timeout")), AUTH_CALL_TIMEOUT);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
+// Marca todos os cookies sb-* como expirados na resposta — única forma de
+// o browser se recuperar de refresh token já usado sem limpeza manual.
+function expireAuthCookies(target: NextResponse, request: NextRequest) {
+  for (const { name } of request.cookies.getAll()) {
+    if (/^sb-/.test(name)) target.cookies.set(name, "", { ...authCookieOptions, maxAge: 0 });
+  }
+}
+
+const AUTH_COOKIE_CHUNK = 3180; // mesmo MAX_CHUNK_SIZE do @supabase/ssr
+
+// Quando o refresh veio do dedupe (outra request executou a chamada), os
+// cookies novos precisam ser gravados NESTA resposta — senão o browser
+// segue mandando o token expirado e o ciclo recomeça. Replica o formato
+// do @supabase/ssr: "base64-<base64url(JSON)>" fatiado em .0/.1/...
+function sessionCookieParts(baseName: string, session: unknown) {
+  const encoded = `base64-${Buffer.from(JSON.stringify(session), "utf8").toString("base64url")}`;
+  // base64url não tem caracteres escapáveis — as fatias saem limpas.
+  if (encoded.length <= AUTH_COOKIE_CHUNK) return [{ name: baseName, value: encoded }];
+  const parts = [];
+  for (let i = 0; i * AUTH_COOKIE_CHUNK < encoded.length; i++) {
+    parts.push({ name: `${baseName}.${i}`, value: encoded.slice(i * AUTH_COOKIE_CHUNK, (i + 1) * AUTH_COOKIE_CHUNK) });
+  }
+  return parts;
+}
 
 function appHosts(): Set<string> {
   const hosts = new Set<string>(["localhost", "127.0.0.1"]);
@@ -78,15 +145,44 @@ export async function middleware(request: NextRequest) {
   // rede na Auth API). Só quando o token expirou/faltou é que chamamos o
   // cliente — o refresh acontece aqui, único lugar que grava cookies.
   const cookieToken = readAccessToken(request.cookies.getAll());
-  let verified = cookieToken ? !!(await verifyAccessToken(cookieToken)) : false;
+  let verified = false;
+  if (cookieToken) {
+    try {
+      // JWKS vem da Auth API — sem timeout, uma instabilidade do provedor
+      // travava o fast path do mesmo jeito que o refresh travava.
+      verified = !!(await withTimeout(verifyAccessToken(cookieToken)));
+    } catch { /* JWKS indisponível — cai no fluxo de refresh/login */ }
+  }
+  let staleSession = false;
   if (!verified) {
-    const { data: { session } } = await supabase.auth.getSession();
-    const fresh = session?.access_token;
-    if (fresh && fresh !== cookieToken && (await verifyAccessToken(fresh))) {
-      verified = true;
-    } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      verified = !!user?.email_confirmed_at;
+    try {
+      const refreshKey = readRefreshToken(request.cookies.getAll()) ?? cookieToken;
+      const { data: { session }, error: sessionError } = await withTimeout(dedupedGetSession(supabase, refreshKey));
+      const fresh = session?.access_token;
+      if (fresh && fresh !== cookieToken && (await verifyAccessToken(fresh))) {
+        const projectRef = new URL(config.url).hostname.split(".")[0];
+        const baseName = `sb-${projectRef}-auth-token`;
+        const parts = sessionCookieParts(baseName, session);
+        const wanted = new Set(parts.map((p) => p.name));
+        const stale = request.cookies.getAll().map((c) => c.name)
+          .filter((n) => (n === baseName || n.startsWith(`${baseName}.`)) && !wanted.has(n));
+        for (const p of parts) request.cookies.set(p.name, p.value);
+        for (const n of stale) request.cookies.delete(n);
+        response = NextResponse.next({ request });
+        for (const p of parts) response.cookies.set(p.name, p.value, { ...authCookieOptions });
+        for (const n of stale) response.cookies.set(n, "", { ...authCookieOptions, maxAge: 0 });
+        verified = true;
+      } else {
+        if (sessionError && isStaleSessionError(sessionError)) staleSession = true;
+        const { data: { user }, error: userError } = await withTimeout(supabase.auth.getUser());
+        if (userError && isStaleSessionError(userError)) staleSession = true;
+        verified = !!user?.email_confirmed_at;
+      }
+    } catch (err) {
+      // Erro de rede/timeout da Auth API ou refresh token inválido — não
+      // deixa a exceção propagar (request travava). O usuário cai no
+      // redirect abaixo em vez de ficar preso numa página em branco.
+      staleSession = isStaleSessionError(err);
     }
   }
   if (!verified) {
@@ -95,6 +191,7 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith("/app") || path.startsWith("/admin")) url.searchParams.set("next", path);
     const redirected = NextResponse.redirect(url);
     for (const cookie of response.cookies.getAll()) redirected.cookies.set(cookie);
+    if (staleSession) expireAuthCookies(redirected, request);
     return redirected;
   }
   response.headers.set("Cache-Control", "private, no-store");

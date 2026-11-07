@@ -26,7 +26,7 @@ export async function verifyAccessToken(token: string): Promise<JWTPayload | nul
 // middleware. Os cookies podem vir quebrados em chunks (.0, .1, ...).
 const CHUNK_RE = /^sb-[a-z0-9]+-auth-token(?:\.(\d+))?$/;
 
-export function readAccessToken(cookies: { name: string; value: string }[]): string | null {
+function readSessionCookie(cookies: { name: string; value: string }[]) {
   const chunks = cookies
     .filter((c) => CHUNK_RE.test(c.name))
     .sort((a, b) => {
@@ -41,9 +41,18 @@ export function readAccessToken(cookies: { name: string; value: string }[]): str
     try { raw = Buffer.from(raw.slice(7), "base64url").toString("utf8"); } catch { return null; }
   }
   try {
-    const session = JSON.parse(raw) as { access_token?: unknown };
-    return typeof session.access_token === "string" && session.access_token ? session.access_token : null;
+    return JSON.parse(raw) as { access_token?: unknown; refresh_token?: unknown };
   } catch {
     return null;
   }
+}
+
+export function readAccessToken(cookies: { name: string; value: string }[]): string | null {
+  const token = readSessionCookie(cookies)?.access_token;
+  return typeof token === "string" && token ? token : null;
+}
+
+export function readRefreshToken(cookies: { name: string; value: string }[]): string | null {
+  const token = readSessionCookie(cookies)?.refresh_token;
+  return typeof token === "string" && token ? token : null;
 }

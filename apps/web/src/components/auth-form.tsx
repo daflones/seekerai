@@ -50,9 +50,14 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
       ...(mode === "signup" && plan ? { plan } : {}),
       next, captchaToken: token,
     };
+    // Timeout no submit: quando a Auth API está instável, o servidor retenta
+    // internamente e a requisição leva ~1min — o form parecia travado.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25_000);
     try {
       const response = await fetch(`/api/auth/${mode}`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+        signal: controller.signal,
       });
       const data = await response.json();
       if (!response.ok) { setError(data.error || tt.errGeneric); return; }
@@ -64,7 +69,7 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
       }
       else setMessage(data.message || tt.received);
     } catch { setError(tt.errConn); }
-    finally { setToken(DEV_TOKEN); setEpoch((value) => value + 1); }
+    finally { clearTimeout(timer); setToken(DEV_TOKEN); setEpoch((value) => value + 1); }
   }
 
   if (message) return <div className="auth-success" role="status"><CheckCircle2 size={30} /><h3>{tt.emailStep}</h3><p>{message}</p><Link href="/login" className="button button-primary">{tt.backLogin} <ArrowUpRight size={16} /></Link></div>;
