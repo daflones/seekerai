@@ -30,6 +30,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
+# Supabase resolve IPv6 primeiro; em host sem rota IPv6 os fetches à Auth
+# API morriam em timeout (504/522 no middleware). Força preferência por IPv4.
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
