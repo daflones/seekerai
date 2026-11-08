@@ -599,7 +599,7 @@ a.lead-action { text-decoration: none; }
 .pf-theme.selected svg { position: absolute; right: 14px; top: 14px; color: var(--violet-light); }
 .pf-theme:disabled { opacity: .6; cursor: not-allowed; }
 .pf-pro { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--warn); margin-top: 2px; }
-.pf-preview-wrap { border: 1px solid #a879d124; border-radius: 18px; overflow: hidden; max-height: 600px; overflow-y: auto; }
+.pf-preview-wrap { border: 1px solid #a879d124; border-radius: 18px; overflow: hidden; }
 .pf-done { text-align: center; padding: 50px 20px; }
 .pf-done > svg { color: var(--cyan); margin-bottom: 8px; }
 .pf-done h2 { font-size: 26px; color: var(--white); }
@@ -646,15 +646,45 @@ a.lead-action { text-decoration: none; }
 .pf-view-works { padding: 0 18px 20px; }
 .pf-view-works > small { display: block; font-size: 10px; letter-spacing: .12em; color: var(--muted); font-weight: 750; margin-bottom: 10px; text-align: center; }
 .pf-view-work { background: var(--panel); border: 1px solid #a879d118; border-radius: 12px; padding: 12px; margin-bottom: 9px; }
-.pf-view-work img { width: 100%; border-radius: 8px; margin-bottom: 9px; }
+.pf-view-work img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; margin-bottom: 9px; }
 .pf-view-work strong { font-size: 13.5px; color: var(--white); display: block; }
 .pf-view-work p { font-size: 12px; color: var(--muted); margin: 4px 0; }
 .pf-view-work span { font-size: 11px; color: var(--cyan); font-weight: 650; }
-.pf-theme-tecnologico .pf-view-hero { background: linear-gradient(180deg, #06b6d422 0%, transparent 70%); }
-.pf-theme-tecnologico .pf-view-avatar { background: linear-gradient(135deg, var(--cyan), var(--cyan)); border-radius: 8px; }
-.pf-theme-bento .pf-view-hero { background: linear-gradient(180deg, #f59e0b22 0%, transparent 70%); text-align: left; }
-.pf-theme-bento .pf-view-avatar { margin: 0 0 12px; border-radius: 14px; }
-.pf-theme-bento .pf-view-stats { border-radius: 16px; }
+/* ── Tema Tecnológico: dark, ciano, traços de grid/terminal ── */
+.pf-theme-tecnologico { background: #0a101d; border-color: #06b6d44d; }
+.pf-theme-tecnologico .pf-view-badge { color: var(--cyan); background: #06b6d412; border-color: #06b6d43d; border-radius: 6px; }
+.pf-theme-tecnologico .pf-view-hero { text-align: left; background:
+  linear-gradient(180deg, #06b6d41a 0%, transparent 75%),
+  repeating-linear-gradient(0deg, #06b6d408 0 1px, transparent 1px 26px),
+  repeating-linear-gradient(90deg, #06b6d408 0 1px, transparent 1px 26px); }
+.pf-theme-tecnologico .pf-view-avatar { margin: 0 0 12px; border-radius: 10px; background: linear-gradient(135deg, #0e7490, var(--cyan)); border: 1px solid #06b6d45e; }
+.pf-theme-tecnologico .pf-view-actions { justify-content: flex-start; }
+.pf-theme-tecnologico .pf-view-wpp { border-radius: 8px; }
+.pf-theme-tecnologico .pf-view-ig { border-color: #06b6d43d; border-radius: 8px; }
+.pf-theme-tecnologico .pf-view-stats { background: #0c1524; border-color: #06b6d433; border-radius: 10px; }
+.pf-theme-tecnologico .pf-view-stats div + div { border-left-color: #06b6d42a; }
+.pf-theme-tecnologico .pf-view-stats strong { color: var(--cyan); font-variant-numeric: tabular-nums; }
+.pf-theme-tecnologico .pf-view-quote { background: #0c1524; border-color: #06b6d433; border-left: 3px solid var(--cyan); border-radius: 8px; text-align: left; }
+.pf-theme-tecnologico .pf-view-work { background: #0c1524; border-color: #06b6d433; border-radius: 10px; }
+.pf-theme-tecnologico .pf-view-work span { color: var(--cyan); }
+
+/* ── Tema Bento: blocos tipo vitrine, âmbar, cards arredondados ── */
+.pf-theme-bento { background: var(--panel-raised); border-color: #f59e0b40; }
+.pf-theme-bento .pf-view-badge { color: var(--warn); background: #f59e0b14; border-color: #f59e0b3d; }
+.pf-theme-bento .pf-view-hero { text-align: left; padding-top: 26px; background: linear-gradient(160deg, #f59e0b26 0%, #a879d114 60%, transparent 85%); }
+.pf-theme-bento .pf-view-avatar { margin: 0 0 12px; width: 86px; height: 86px; border-radius: 26px; background: linear-gradient(135deg, #f59e0b, #b45309); }
+.pf-theme-bento .pf-view-actions { justify-content: flex-start; }
+.pf-theme-bento .pf-view-stats { display: flex; gap: 8px; background: none; border: none; border-radius: 0; margin: 0 18px; }
+.pf-theme-bento .pf-view-stats div { flex: 1; background: var(--panel); border: 1px solid #f59e0b2e; border-radius: 14px; }
+.pf-theme-bento .pf-view-stats div + div { border-left: 1px solid #f59e0b2e; }
+.pf-theme-bento .pf-view-stats strong { color: var(--warn); }
+.pf-theme-bento .pf-view-quote { background: var(--panel); border-color: #f59e0b2e; border-radius: 16px; }
+.pf-theme-bento .pf-view-quote cite { color: var(--warn); }
+.pf-theme-bento .pf-view-works { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+.pf-theme-bento .pf-view-works > small { grid-column: 1 / -1; margin-bottom: 0; }
+.pf-theme-bento .pf-view-work { margin-bottom: 0; border-radius: 14px; border-color: #f59e0b2e; }
+.pf-theme-bento .pf-view-work img { aspect-ratio: 4/3; }
+.pf-theme-bento .pf-view-work span { color: var(--warn); }
 
 /* ── Mobile ── */
 @media (max-width: 900px) {

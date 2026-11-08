@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BadgeCheck, BellRing, CheckCircle2, Copy, CreditCard, ExternalLink,
   Globe, Hourglass, Loader2, QrCode, SearchCheck, XCircle,
@@ -49,6 +49,8 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
   const [pix, setPix] = useState<(PixResult & { host: string }) | null>(null);
   const [copied, setCopied] = useState(false);
   const [notifs, setNotifs] = useState(notifications);
+  const [sugestoes, setSugestoes] = useState<{ host: string; available: boolean | null }[] | null>(null);
+  const [sugBusy, setSugBusy] = useState(false);
 
   const liveBySite = new Map(
     domains.filter((d) => d.status !== "rejected" && d.status !== "removed" && d.status !== "expired")
@@ -60,6 +62,25 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
   const host = hosts[selected] ?? live?.desired_host ?? "";
   const check = checks[selected];
   const siteName = (slug: string) => sites.find((s) => s.slug === slug)?.nome ?? slug;
+
+  // Sugestões de domínio baseadas no nome do estabelecimento, já
+  // verificadas no registro (RDAP). Busca quando troca o site.
+  useEffect(() => {
+    if (!selected || liveBySite.get(selected)) { setSugestoes(null); return; }
+    let dead = false;
+    setSugBusy(true);
+    setSugestoes(null);
+    fetch(`/api/domains/suggest?slug=${encodeURIComponent(selected)}`)
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        if (dead) return;
+        setSugestoes(Array.isArray(data.suggestions) ? data.suggestions : []);
+      })
+      .catch(() => { if (!dead) setSugestoes([]); })
+      .finally(() => { if (!dead) setSugBusy(false); });
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   async function checkDomain(siteSlug: string) {
     const host = (hosts[siteSlug] ?? "").trim().toLowerCase().replace(/^www\./, "");
@@ -138,7 +159,8 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
     {sites.length > 0 && <section className="plan-card-checkout domain-buy">
       <h3><Globe size={15} /> Domínio personalizado</h3>
       <p className="domain-buy-pitch">
-        Seu site no endereço que é só seu — tipo <strong>seunegocio.com.br</strong>.
+        Seu site no endereço que é só seu — tipo{" "}
+        <strong>{sugestoes?.find((s) => s.available === true)?.host ?? sugestoes?.[0]?.host ?? "seunegocio.com.br"}</strong>.
         Passa muito mais credibilidade e ajuda a fechar o cliente.
       </p>
 
@@ -178,6 +200,27 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
             </button>
           </div>
         </label>
+        {sugBusy && <p className="domain-check"><Loader2 size={13} className="spin" /> Buscando sugestões disponíveis…</p>}
+        {sugestoes && sugestoes.length > 0 && <div className="domain-suggest">
+          <span className="domain-suggest-label">Sugestões para {siteName(selected)}:</span>
+          <div className="domain-suggest-row">
+            {sugestoes.slice(0, 6).map((s) => (
+              <button key={s.host} type="button"
+                className={`domain-chip ${s.available === true ? "is-free" : s.available === false ? "is-taken" : ""}`}
+                aria-disabled={s.available !== true}
+                title={s.available === true ? "Disponível — usar" : s.available === false ? "Já registrado" : "Não verificado"}
+                onClick={() => {
+                  if (s.available !== true) return;
+                  setHosts((h) => ({ ...h, [selected]: s.host }));
+                  setChecks((c) => ({ ...c, [selected]: { state: "free" } }));
+                  setError("");
+                }}>
+                {s.available === true ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                {s.host}
+              </button>
+            ))}
+          </div>
+        </div>}
         {check?.state === "free" && <p className="domain-check is-free"><CheckCircle2 size={14} /> Parece disponível</p>}
         {check?.state === "taken" && <p className="domain-check is-taken"><XCircle size={14} /> Já registrado — você pode tentar outro</p>}
         {check?.state === "unknown" && <p className="domain-check"><SearchCheck size={14} /> Não conseguimos verificar — nossa equipe confere na ativação</p>}

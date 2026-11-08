@@ -22,7 +22,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   // janela de 7 dias. 'ativo' diz se a renovação ainda está valendo.
   const { data: daily } = await supabase.rpc("claim_daily_credits");
   const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
-  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }, { data: notifs }] = await Promise.all([
+  const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }, { data: allWon }, { data: notifs }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("status", "novo"),
@@ -32,6 +32,8 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
       .eq("status", "completed").order("created_at", { ascending: false }).limit(30),
     supabase.from("leads").select("id,nome,valor_fechado,updated_at")
       .eq("status", "ganho").order("updated_at", { ascending: false }).limit(20),
+    // Soma total de TODOS os ganhos — a lista acima mostra só os 20 últimos.
+    supabase.from("leads").select("valor_fechado").eq("status", "ganho"),
     supabase.from("notifications").select("id,tipo,titulo,corpo,lida")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(6),
   ]);
@@ -51,7 +53,9 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   const dateLocale = { pt: "pt-BR", en: "en-US", es: "es-ES", fr: "fr-FR", de: "de-DE", it: "it-IT" }[loc.lang];
   type WonLead = { id: string; nome: string; valor_fechado: number | null; updated_at: string };
   const ganhos = (wonLeads ?? []) as WonLead[];
-  const totalFechado = ganhos.reduce((acc, l) => acc + (l.valor_fechado ?? 0), 0);
+  const totalFechado = ((allWon ?? []) as { valor_fechado: number | null }[])
+    .reduce((acc, l) => acc + (l.valor_fechado ?? 0), 0);
+  const ganhosCount = allWon?.length ?? ganhos.length;
 
   return <>
     {params.checkout === "sucesso" && (
@@ -121,7 +125,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
         <Link href="/app/leads" aria-label={t.n2t} className="dash-icon-link"><ArrowUpRight size={18} /></Link>
       </div>
       <strong className="dash-revenue-total">{formatMoney(Math.round(totalFechado * 100), loc.currency, loc.lang)}</strong>
-      <span className="stat-sub">{t.s5sub} · {ganhos.length}</span>
+      <span className="stat-sub">{t.s5sub} · {ganhosCount}</span>
       <h3 className="dash-list-title">{t.wonTitle}</h3>
       {ganhos.length === 0
         ? <div className="dash-empty"><Users size={23} /><p>{t.wonEmpty}</p><Link className="text-link" href="/app/leads">{t.n2t}<ArrowUpRight size={14} /></Link></div>

@@ -7,6 +7,10 @@ import type { Lang } from "./index";
 export type Messages = typeof pt;
 
 const pt = {
+  meta: {
+    title: "SeekerAi — Encontre quem precisa do que você vende",
+    description: "Encontre empresas locais que precisam dos seus serviços. Veja quem não tem site, confira o WhatsApp verificado e receba a mensagem de abordagem pronta. Prospecção com contexto para freelancers e agências.",
+  },
   nav: {
     how: "Como funciona", features: "Recursos", portfolio: "Portfólio",
     plans: "Planos", login: "Entrar", start: "Começar grátis", enter: "Entrar na plataforma",
@@ -577,6 +581,10 @@ export const messages: Record<Lang, Messages> = {
   pt,
 
   en: {
+    meta: {
+      title: "SeekerAi — Find who needs what you sell",
+      description: "Find local businesses that need your services. See who has no website, check the verified WhatsApp and get a ready outreach message. Context-driven prospecting for freelancers and agencies.",
+    },
     nav: {
       how: "How it works", features: "Features", portfolio: "Portfolio",
       plans: "Pricing", login: "Sign in", start: "Start free", enter: "Sign in to the platform",
@@ -1142,6 +1150,10 @@ export const messages: Record<Lang, Messages> = {
   },
 
   es: {
+    meta: {
+      title: "SeekerAi — Encuentra quién necesita lo que vendes",
+      description: "Encuentra negocios locales que necesitan tus servicios. Mira quién no tiene sitio, verifica el WhatsApp y recibe el mensaje de contacto listo. Prospección con contexto para freelancers y agencias.",
+    },
     nav: {
       how: "Cómo funciona", features: "Funciones", portfolio: "Portafolio",
       plans: "Planes", login: "Entrar", start: "Empezar gratis", enter: "Entrar a la plataforma",
@@ -1707,6 +1719,10 @@ export const messages: Record<Lang, Messages> = {
   },
 
   fr: {
+    meta: {
+      title: "SeekerAi — Trouvez qui a besoin de ce que vous vendez",
+      description: "Trouvez des entreprises locales qui ont besoin de vos services. Voyez qui n'a pas de site, vérifiez le WhatsApp et recevez le message d'approche prêt. Prospection avec contexte pour freelances et agences.",
+    },
     nav: {
       how: "Comment ça marche", features: "Fonctionnalités", portfolio: "Portfolio",
       plans: "Tarifs", login: "Se connecter", start: "Commencer gratuitement", enter: "Accéder à la plateforme",
@@ -2271,6 +2287,10 @@ export const messages: Record<Lang, Messages> = {
   },
 
   de: {
+    meta: {
+      title: "SeekerAi — Finde, wer braucht, was du verkaufst",
+      description: "Finde lokale Unternehmen, die deine Leistungen brauchen. Sieh, wer keine Website hat, prüfe verifizierte WhatsApp-Nummern und erhalte die fertige Ansprache. Kontextbasierte Akquise für Freelancer und Agenturen.",
+    },
     nav: {
       how: "So funktioniert's", features: "Funktionen", portfolio: "Portfolio",
       plans: "Preise", login: "Anmelden", start: "Kostenlos starten", enter: "Plattform öffnen",
@@ -2835,6 +2855,10 @@ export const messages: Record<Lang, Messages> = {
   },
 
   it: {
+    meta: {
+      title: "SeekerAi — Trova chi ha bisogno di ciò che vendi",
+      description: "Trova aziende locali che hanno bisogno dei tuoi servizi. Vedi chi non ha un sito, verifica il WhatsApp e ricevi il messaggio di approccio pronto. Prospecting con contesto per freelance e agenzie.",
+    },
     nav: {
       how: "Come funziona", features: "Funzionalità", portfolio: "Portfolio",
       plans: "Piani", login: "Accedi", start: "Inizia gratis", enter: "Entra nella piattaforma",

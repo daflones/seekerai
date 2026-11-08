@@ -115,6 +115,14 @@
 .domain-check { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #90729f; margin-top: 10px; }
 .domain-check.is-free { color: #8be2a7; }
 .domain-check.is-taken { color: #ef9f9f; }
+.domain-suggest { margin-top: 12px; }
+.domain-suggest-label { font-size: 10.5px; color: #90729f; display: block; margin-bottom: 7px; }
+.domain-suggest-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.domain-chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; font-size: 11.5px; border: 1px solid #ab7bcd33; background: #a879d10a; color: #cbb3dd; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.domain-chip.is-free { border-color: #8be2a755; color: #a8ecc0; }
+.domain-chip.is-free:hover { background: #8be2a71c; border-color: #8be2a7aa; }
+.domain-chip.is-taken { opacity: .45; cursor: not-allowed; text-decoration: line-through; }
+.domain-chip:not(.is-free):not(.is-taken) { opacity: .6; cursor: not-allowed; }
 .domain-notifs { margin-bottom: 25px; }
 
 /* Compra de domínio — painel único com seletor */

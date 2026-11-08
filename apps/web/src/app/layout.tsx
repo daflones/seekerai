@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { cookies } from "next/headers";
-import { LOCALE_COOKIE, THEME_COOKIE } from "@/lib/i18n/shared";
+import { THEME_COOKIE } from "@/lib/i18n/shared";
+import { getLocale } from "@/lib/i18n";
+import { getMessages } from "@/lib/i18n/messages";
 import { MetaPixel } from "@/components/meta-pixel";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/sora";
@@ -14,11 +16,17 @@ import "./public-ui.css";
 import "./editor-ui.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
-const title = "SeekerAi — Encontre quem precisa do que você vende";
-const description =
-  "Encontre empresas locais que precisam dos seus serviços. Veja quem não tem site, confira o WhatsApp verificado e receba a mensagem de abordagem pronta. Prospecção com contexto para freelancers e agências.";
 
-export const metadata: Metadata = {
+// Título/descrição da guia seguem o idioma do visitante (Accept-Language
+// ou cookie de preferência) — um americano vê a guia em inglês etc.
+const OG_LOCALE: Record<string, string> = {
+  pt: "pt_BR", en: "en_US", es: "es_ES", fr: "fr_FR", de: "de_DE", it: "it_IT",
+};
+
+export async function generateMetadata(): Promise<Metadata> {
+  const loc = await getLocale();
+  const { title, description } = getMessages(loc.lang).meta;
+  return {
   metadataBase: new URL(appUrl),
   title: { default: title, template: "%s | SeekerAi" },
   description,
@@ -57,7 +65,7 @@ export const metadata: Metadata = {
     description,
     url: "/",
     siteName: "SeekerAi",
-    locale: "pt_BR",
+    locale: OG_LOCALE[loc.lang] ?? "pt_BR",
     type: "website",
   },
   twitter: {
@@ -66,12 +74,13 @@ export const metadata: Metadata = {
     description,
     creator: "@seekerai",
   },
-};
+  };
+}
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const jar = await cookies();
+  const [jar, loc] = await Promise.all([cookies(), getLocale()]);
   const theme = jar.get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
-  const htmlLang = (jar.get(LOCALE_COOKIE)?.value ?? "pt-BR").split("-")[0] || "pt";
+  const htmlLang = loc.lang;
   return (
     <html lang={htmlLang} data-theme={theme} suppressHydrationWarning>
       <body suppressHydrationWarning>
