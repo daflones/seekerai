@@ -277,8 +277,11 @@ async function searchSerper(query: string, regionCode: string, pages = 1): Promi
     await getSecret("SERPER_API_KEY_2"),
   ].filter((k): k is string => Boolean(k));
   if (!keys.length) throw httpError(502, "Serper não configurado");
+  // Key que falhou uma vez não vale retentar a cada página — com
+  // paginação paralela cada tentativa custava até 30s de espera morta.
+  const deadKeys = new Set<string>();
   const fetchPage = async (page: number, ll: string | null) => {
-    for (const key of keys) {
+    for (const key of keys.filter((k) => !deadKeys.has(k))) {
       const res = await fetch("https://google.serper.dev/maps", {
         method: "POST",
         headers: { "X-API-KEY": key, "Content-Type": "application/json" },
@@ -290,9 +293,10 @@ async function searchSerper(query: string, regionCode: string, pages = 1): Promi
           // Paginação do maps exige o "ll" (GPS) devolvido na pág. 1.
           ...(page > 1 ? { page, ll } : {}),
         }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(20_000),
       }).catch(() => null);
       if (res?.ok) return await res.json().catch(() => null);
+      deadKeys.add(key);
     }
     return null;
   };
@@ -593,7 +597,9 @@ async function scanWebsites(places: NormalizedPlace[]): Promise<void> {
   // Buscas grandes (plano King, até 60) capam a varredura — os demais
   // ficam sem siteCheck e ainda pontuam como "com site" neutro.
   const comSite = places.filter((p) => p.site).slice(0, 30);
-  const batch = 6;
+  // Lote maior: a varredura é I/O-bound e dominava o tempo total da busca
+  // (5 rodadas × até 8s). Com 12 são ~3 rodadas no pior caso.
+  const batch = 12;
   for (let i = 0; i < comSite.length; i += batch) {
     await Promise.all(
       comSite.slice(i, i + batch).map(async (p) => {
@@ -800,14 +806,28 @@ Deno.serve(async (req) => {
       // mascarados na rota, então o enriquecimento de IG não roda.
       if (isDemo) resultados = resultados.slice(0, 15);
       for (const place of resultados) extractInstagram(place);
+      const igCap = Math.min(16, Math.max(8, Math.ceil(planTarget / 4)));
+      // Handles já conhecidos (Apify/Maps/site=instagram.com) enriquecem
+      // EM PARALELO com a varredura de sites — antes o IG só começava
+      // depois de tudo e somava até ~55s na cauda da busca. Os @ que a
+      // varredura descobrir no HTML entram num segundo passe curto.
+      const earlyIg = resultados.filter((p) => p.instagram).slice(0, igCap);
+      const earlyHandles = new Set(earlyIg.map((p) => p.instagram!.toLowerCase()));
+      const igEarly = isDemo || !earlyIg.length ? null
+        : Promise.race([enrichInstagram(earlyIg, igCap), sleep(40_000)]);
       await Promise.all([
         checkWhatsapps(resultados, regionCode),
         scanWebsites(resultados),
       ]);
       await progress(62, "Verificando WhatsApp e sites");
       if (!isDemo) {
-        const igCap = Math.min(16, Math.max(8, Math.ceil(planTarget / 4)));
-        await Promise.race([enrichInstagram(resultados, igCap), sleep(55_000)]);
+        await igEarly;
+        const late = resultados
+          .filter((p) => p.instagram && !earlyHandles.has(p.instagram.toLowerCase()))
+          .slice(0, igCap);
+        if (late.length) {
+          await Promise.race([enrichInstagram(late, igCap), sleep(25_000)]);
+        }
       }
       await progress(80, "Enriquecendo Instagram");
       resultados.sort((a, b) => {
