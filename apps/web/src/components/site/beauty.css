@@ -189,6 +189,24 @@
 .bbeauty[data-variant="c"] .bbeauty-hero-polaroid { transform: rotate(6deg) translateY(-10px); }
 .bbeauty[data-variant="c"] .bbeauty-services { grid-template-columns: 1fr; max-width: 720px; }
 .bbeauty[data-variant="c"] .bbeauty-service-cat h3 { font-size: 36px; }
+
+/* Badges/chips por variante — a "nova versão" troca também o estilo
+   dos selos, não só layout e cores. */
+.bbeauty[data-variant="b"] .bbeauty-eyebrow::before {
+  width: 10px; height: 10px; background: var(--bb-accent); border-radius: 2px;
+}
+.bbeauty[data-variant="b"] .bbeauty-rating-chip,
+.bbeauty[data-variant="b"] .bbeauty-deal-tag {
+  border-radius: 10px; border-color: var(--bb-accent);
+}
+.bbeauty[data-variant="c"] .bbeauty-eyebrow::before {
+  width: 8px; height: 8px; background: var(--bb-accent); border-radius: 50%;
+}
+/* espresso é sempre escuro — chip preenchido legível em paleta clara e escura */
+.bbeauty[data-variant="c"] .bbeauty-rating-chip {
+  background: var(--bb-espresso); color: var(--bb-accent-ink); border-color: transparent;
+}
+.bbeauty[data-variant="c"] .bbeauty-rating-chip .stars { color: var(--bb-accent-2); }
 @media (max-width: 900px) {
   .bbeauty[data-variant="b"] .bbeauty-hero-photos { order: -1; }
 }

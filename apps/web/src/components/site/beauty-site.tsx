@@ -168,9 +168,19 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
   const anchor = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); setMenuOpen(false); scrollTo(href); };
 
   const paleta = cfg.tema?.paleta;
-  // Cores das fotos reais do lugar viram o accent do site.
+  // Cores das fotos reais (accent) ou esquema completo girado (regen) —
+  // cada chave presente vira a --bb-* correspondente.
   const themeVars = cfg.tema?.cores
-    ? { "--bb-accent": cfg.tema.cores.accent, "--bb-accent-2": cfg.tema.cores.accent2 } as React.CSSProperties
+    ? Object.fromEntries(
+      ([
+        ["accent", "--bb-accent"], ["accent2", "--bb-accent-2"], ["accentInk", "--bb-accent-ink"],
+        ["espresso", "--bb-espresso"], ["bg", "--bb-bg"], ["bg2", "--bb-bg-2"],
+        ["panel", "--bb-panel"], ["panel2", "--bb-panel-2"],
+        ["text", "--bb-text"], ["muted", "--bb-muted"],
+      ] as const)
+        .filter(([key]) => typeof cfg.tema!.cores![key] === "string")
+        .map(([key, cssVar]) => [cssVar, cfg.tema!.cores![key]]),
+    ) as React.CSSProperties
     : undefined;
   return (
     <div className="bbeauty" ref={rootRef} data-palette={paleta} data-variant={cfg.tema?.variant} style={themeVars}>

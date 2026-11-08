@@ -604,6 +604,47 @@ function hueShiftColor(color: string, deg: number): string {
   return hslToHex((hsl.h + deg + 360) % 360, hsl.s, hsl.l);
 }
 
+/** Variáveis-base de cada paleta do tema — espelho das vars do CSS
+    (bg, bg2, panel, panel2, text, muted, accent, accent2, accentInk,
+    espresso). Na regeneração o esquema inteiro é girado no matiz: a
+    "nova versão" sai com outra identidade de cor de verdade, e não só
+    com o accent trocado. Paleta desconhecida cai na base editorial. */
+const PALETTE_BASE: Record<string, string[]> = {
+  beleza:     ["#faf6ef","#f2ecdf","#fffdf8","#f7f0e3","#33291c","#8b7f6d","#a9853f","#c9a869","#fffaf0","#1b140d"],
+  padaria:    ["#faf3e6","#f3ead8","#fffaf0","#f6edda","#3a2c1e","#8d7a63","#b4531f","#d99a4e","#fff8ec","#241305"],
+  trattoria:  ["#faf5ef","#f3ebe0","#fffaf4","#f5ecdf","#2b1d16","#8a7268","#a92f26","#c86a3f","#fff5ec","#1d0f0a"],
+  cafe:       ["#f5efe7","#ede4d8","#fbf7f0","#f0e8dc","#2e241c","#86735f","#6f4e37","#a9805e","#fdf6ec","#1e140c"],
+  clinica:    ["#f3f9fb","#e9f3f6","#ffffff","#eef6f8","#1d2b33","#6d828c","#25808f","#67b7c9","#f2fbfd","#0e2126"],
+  studio:     ["#141518","#191b1f","#1e2126","#23262c","#eef1f3","#9aa3ad","#8fd14f","#b9e58a","#8fd14f","#0b0c0e"],
+  pet:        ["#f6f8f0","#eef2e4","#fcfdf7","#f1f5e6","#24301f","#75836a","#4f8f46","#86b96f","#f4faee","#17210f"],
+  flora:      ["#faf5f4","#f4eae8","#fffafa","#f6ecea","#322224","#8d7778","#b25f77","#d19cae","#fff5f7","#211114"],
+  corporativo:["#f4f6f9","#ebf0f5","#ffffff","#eff3f8","#1e2736","#6d7688","#2f4d8f","#6d8cc4","#f0f5fd","#101a30"],
+  tattoo:     ["#121114","#17161a","#1b1a1f","#211f26","#ece7df","#a29a90","#d8402f","#e8875a","#d8402f","#0a090b"],
+  carbono:    ["#131518","#181b1f","#1d2025","#23272d","#e9ecef","#98a1ab","#e09b2d","#f0c56d","#e09b2d","#0b0c0e"],
+  mercado:    ["#f4f7ee","#ecf1df","#fdfef8","#f0f4e3","#1c301d","#6c7d62","#2f8f4e","#e0a81e","#f4fbef","#152a1c"],
+  varejo:     ["#f7f4f1","#efe9e4","#fffdfb","#f3ede7","#2a1d16","#86736a","#8f5a3c","#c9a183","#fdf6f0","#221812"],
+  hotel:      ["#f5f5f1","#ecebe4","#fefefc","#f0efe8","#1a2433","#6f7886","#9a7b3f","#c9ab6a","#fdf8ec","#14202e"],
+  educacao:   ["#f3f6fa","#eaf0f7","#ffffff","#eef3f9","#17283d","#6d7a8c","#2f6fb2","#f2b53d","#f0f6fd","#132236"],
+  eventos:    ["#faf4ec","#f3e9d9","#fffdf8","#f6eddd","#33230f","#8a7458","#b8862e","#c96a5a","#fdf8ee","#2a1c0d"],
+  acougue:    ["#f9f1ec","#f1e4dc","#fefbf8","#f5e9e1","#381410","#8c6f68","#a8322f","#c98a5a","#fdf3ee","#2c100e"],
+  farmacia:   ["#f0f7f4","#e3f0ea","#fbfefd","#eaf4ef","#122a20","#5f7a6e","#1f8f6a","#6ec4a8","#eefaf5","#0e241b"],
+  otica:      ["#f2f5f8","#e8edf3","#fdfefe","#edf2f7","#152230","#64727f","#3d6b9e","#8fb4d9","#eef4fb","#101b29"],
+  assistencia:["#f1f4f8","#e6ebf2","#fbfcfe","#ebf0f6","#131f2e","#5d6c7e","#2d6fd0","#7fb0ec","#edf3fc","#0f1a28"],
+  auto:       ["#f4f3f0","#eae8e2","#fdfcfa","#f0eee8","#221d16","#746a5d","#d9762b","#8a8f98","#fdf4ea","#1c1712"],
+  construcao: ["#f7f1e9","#efe5d6","#fdfaf4","#f3ebdc","#30200f","#82725c","#b35a2e","#d9a45c","#fdf4e9","#281a0c"],
+  viagem:     ["#f0f6f9","#e2eef4","#fbfdfe","#e9f2f7","#0f2533","#5f7684","#2e8fb8","#e5b96b","#edf7fc","#0d1f2b"],
+  imobiliaria:["#f4f5f3","#ebecf1","#fdfdfe","#eff0f0","#141d2e","#67707f","#8a6d3b","#2f4a7a","#faf6ec","#10182a"],
+  arquitetura:["#f4f3f1","#eae8e4","#fdfcfb","#f0eeea","#1d1a17","#73706a","#9c5b3e","#b98d6f","#faf3ee","#181512"],
+  // Template barbearia (.bshop) — dark único, sem espresso.
+  barbearia:  ["#0b0908","#12100d","#17130f","#1d1812","#f4ecdd","#a89c88","#c9a15c","#e8c98a","#171008",""],
+};
+
+/** Esquema-base do tema — usado como ponto de partida do giro de matiz
+    na regeneração (a paleta do nicho continua a mesma, as cores mudam). */
+function siteSchemeFor(paleta: string): string[] {
+  return PALETTE_BASE[paleta] ?? PALETTE_BASE.beleza;
+}
+
 interface NichoVocab {
   /** Rótulo do nicho — eyebrow da nav/logo. */
   rotulo: string;
@@ -2566,11 +2607,31 @@ async function publishPremiumSite(
   const seed = typeof context.variantSeed === "number" && Number.isFinite(context.variantSeed)
     ? Math.trunc(context.variantSeed)
     : 0;
-  // Nova versão: além do layout, o acento gira no círculo de cor — o
-  // redesign sai com outro esquema de cor, não só posições diferentes.
-  const coresV = cores && seed > 0
-    ? { accent: hueShiftColor(cores.accent, seed * 67), accent2: hueShiftColor(cores.accent2, seed * 67) }
-    : cores;
+  // Nova versão = outra identidade visual DE VERDADE: o matiz gira em
+  // TODAS as variáveis do tema (fundo, painéis, texto, acento) — não só
+  // no accent como antes. A paleta do nicho e o contraste se preservam.
+  const shift = seed * 67;
+  let coresV: Record<string, string | undefined> | null = null;
+  if (seed > 0) {
+    const [bg, bg2, panel, panel2, text, muted, acc, acc2, accInk, espresso] =
+      siteSchemeFor(tipo === "barbearia" ? "barbearia" : paleta);
+    coresV = {
+      // Com foto real, o accent mantém a identidade do lugar girada;
+      // sem foto, vem do esquema-base da paleta.
+      accent: hueShiftColor(cores?.accent ?? acc, shift),
+      accent2: hueShiftColor(cores?.accent2 ?? acc2, shift),
+      accentInk: hueShiftColor(accInk, shift),
+      espresso: espresso ? hueShiftColor(espresso, shift) : undefined,
+      bg: hueShiftColor(bg, shift),
+      bg2: hueShiftColor(bg2, shift),
+      panel: hueShiftColor(panel, shift),
+      panel2: hueShiftColor(panel2, shift),
+      text: hueShiftColor(text, shift),
+      muted: hueShiftColor(muted, shift),
+    };
+  } else if (cores) {
+    coresV = cores;
+  }
   config.tema = { paleta, variant: variants[(h + seed) % 3], ...(coresV ? { cores: coresV } : {}) };
   const vocabBase = resolvedVocab ?? nicheVocab(paleta, asString(lead.categoria, 150));
   // Idioma do site ≠ pt: a IA devolve os campos adaptados (patch.vocab);

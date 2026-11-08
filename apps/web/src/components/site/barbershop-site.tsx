@@ -118,8 +118,23 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
   const anchor = (href: string) => (e: React.MouseEvent) => { e.preventDefault(); setMenuOpen(false); scrollTo(href); };
 
+  // Esquema de cores da config (fotos reais ou girado na regeneração) —
+  // cada chave presente vira a --bs-* correspondente; variant alterna a
+  // composição como no tema de beleza.
+  const themeVars = cfg.tema?.cores
+    ? Object.fromEntries(
+      ([
+        ["accent", "--bs-accent"], ["accent2", "--bs-accent-2"], ["accentInk", "--bs-accent-ink"],
+        ["bg", "--bs-bg"], ["bg2", "--bs-bg-2"], ["panel", "--bs-panel"], ["panel2", "--bs-panel-2"],
+        ["text", "--bs-text"], ["muted", "--bs-muted"],
+      ] as const)
+        .filter(([key]) => typeof cfg.tema!.cores![key] === "string")
+        .map(([key, cssVar]) => [cssVar, cfg.tema!.cores![key]]),
+    ) as React.CSSProperties
+    : undefined;
+
   return (
-    <div className="bshop" ref={rootRef}>
+    <div className="bshop" ref={rootRef} data-variant={cfg.tema?.variant} style={themeVars}>
       <div className="bshop-ambient" aria-hidden><i className="orb-a" /><i className="orb-b" /><i className="orb-c" /></div>
       <div className="bshop-grain" aria-hidden />
       <motion.div className="bshop-progress" style={{ scaleX: scrollYProgress }} aria-hidden />
@@ -544,7 +559,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {bookOpen && (
-            <motion.div className="bshop-book-modal-bg"
+            <motion.div className="bshop-book-modal-bg" style={themeVars}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setBookOpen(false)}>
@@ -675,7 +690,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {lightbox !== null && galeria[lightbox] && (
-            <motion.div className="bshop-lightbox"
+            <motion.div className="bshop-lightbox" style={themeVars}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
               onClick={() => setLightbox(null)}>

@@ -680,6 +680,25 @@
   30% { transform: scale(1); }
 }
 
+/* ---------- Variantes de composição/badges (nova versão ≠ clone) ---------- */
+/* b: foto do hero à esquerda com corte arco; badges quadrados. */
+.bshop[data-variant="b"] .bshop-hero-photo { order: -1; border-radius: 160px 22px 22px 22px; }
+.bshop[data-variant="b"] .bshop-rating-chip,
+.bshop[data-variant="b"] .bshop-pill { border-radius: 9px; border-color: var(--bs-accent); }
+.bshop[data-variant="b"] .bshop-eyebrow::before {
+  width: 10px; height: 10px; background: var(--bs-accent); border-radius: 2px;
+}
+/* c: foto do hero em oval; badges preenchidos com o accent. */
+.bshop[data-variant="c"] .bshop-hero-photo { border-radius: 999px 999px 22px 22px; }
+.bshop[data-variant="c"] .bshop-rating-chip {
+  background: var(--bs-accent); color: var(--bs-accent-ink); border-color: transparent;
+}
+.bshop[data-variant="c"] .bshop-rating-chip .stars { color: var(--bs-accent-ink); }
+.bshop[data-variant="c"] .bshop-pill { background: var(--bs-panel-2); border-radius: 999px; }
+.bshop[data-variant="c"] .bshop-eyebrow::before {
+  width: 8px; height: 8px; background: var(--bs-accent); border-radius: 50%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bshop-grain, .bshop-heart, .bshop-hero-scroll, .bshop-ambient i { animation: none !important; }
 }

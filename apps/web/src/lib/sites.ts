@@ -34,7 +34,15 @@ export interface SiteConfig {
     accent?: string;
     paleta?: string;
     variant?: "a" | "b" | "c" | string;
-    cores?: { accent: string; accent2: string };
+    /** Sobreposição de cor — accent/accent2 vêm das fotos reais; na
+        regeneração o esquema inteiro (superfícies+texto) vem girado no
+        matiz pra "nova versão" sair com outra identidade visual. */
+    cores?: {
+      accent: string; accent2: string;
+      accentInk?: string; espresso?: string;
+      bg?: string; bg2?: string; panel?: string; panel2?: string;
+      text?: string; muted?: string;
+    };
   };
   /** Vocabulário por nicho — rótulos e textos do tema ("O estúdio", hero em…). */
   vocab?: {

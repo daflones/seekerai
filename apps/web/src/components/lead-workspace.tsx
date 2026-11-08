@@ -216,7 +216,9 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
           // Referências do usuário entram como fotos reais do pipeline.
           ...(refImgs.length ? { imagens: refImgs } : {}),
           // Regeneração: rota a variante de layout — outro design, mesmo link.
-          ...(regen ? { variantSeed: (outputs.filter((o) => o.tipo === "generate_site").length % 3) + 1 } : {}),
+          // Seed cresce a cada versão — cada regeneração gira o esquema
+          // de cor mais um passo no círculo (nunca repete as 3 primeiras).
+          ...(regen ? { variantSeed: outputs.filter((o) => o.tipo === "generate_site").length + 1 } : {}),
         },
       }),
     }).catch(() => null);

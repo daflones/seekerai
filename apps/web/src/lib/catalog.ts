@@ -35,7 +35,7 @@ function ufGroup(
   };
 }
 
-export const cityGroups: { region: string; cities: DemoCity[] }[] = [
+const brCityGroups: { region: string; cities: DemoCity[] }[] = [
   ufGroup("AC", "Acre", "Norte", [
     ["Rio Branco", 6000], ["Cruzeiro do Sul", 1500],
   ]),
@@ -235,7 +235,45 @@ export const cityGroups: { region: string; cities: DemoCity[] }[] = [
   ]),
 ];
 
-export const cities = cityGroups.flatMap((group) => group.cities);
+// As cidades que os usuários realmente buscam ficam no topo — primeiro o
+// grupo fixo das metrópoles mais usadas, depois os estados em ordem de
+// frequência/população (não alfabética). O grupo repete cidades que
+// também constam no próprio estado — a lista flat deduplica por label.
+const TOP_CITIES: [string, string, number][] = [
+  ["São Paulo", "SP", 120000], ["Rio de Janeiro", "RJ", 86000],
+  ["Belo Horizonte", "MG", 42000], ["Salvador", "BA", 38000],
+  ["Fortaleza", "CE", 36000], ["Brasília", "DF", 34000],
+  ["Curitiba", "PR", 32000], ["Porto Alegre", "RS", 30000],
+  ["Recife", "PE", 28000], ["Campinas", "SP", 28000],
+  ["Goiânia", "GO", 21000], ["Manaus", "AM", 18000],
+  ["Florianópolis", "SC", 14000], ["Belém", "PA", 12000],
+];
+
+const UF_PRIORITY = [
+  "SP", "RJ", "MG", "BA", "RS", "PR", "SC", "PE", "CE", "GO", "DF", "ES",
+  "PA", "MA", "AM", "MT", "MS", "RN", "PB", "AL", "PI", "SE", "TO", "RO",
+  "AC", "RR", "AP",
+];
+
+const ufRank = (region: string) => {
+  const uf = /\(([A-Z]{2})\)$/.exec(region)?.[1];
+  const i = uf ? UF_PRIORITY.indexOf(uf) : -1;
+  return i < 0 ? UF_PRIORITY.length : i;
+};
+
+export const cityGroups: { region: string; cities: DemoCity[] }[] = [
+  {
+    region: "Mais buscadas",
+    cities: TOP_CITIES.map(([city, uf, businesses]) => ({
+      label: `${city}, ${uf}`, region: "Nacional", businesses,
+    })),
+  },
+  ...[...brCityGroups].sort((a, b) => ufRank(a.region) - ufRank(b.region)),
+];
+
+export const cities = [...new Map(
+  cityGroups.flatMap((group) => group.cities).map((c) => [c.label, c]),
+).values()];
 
 // Participação aproximada do nicho no comércio local (fração ilustrativa).
 const nicheWeight: Record<string, number> = {
