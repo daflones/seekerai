@@ -316,6 +316,8 @@ a.lead-action { text-decoration: none; }
 .pay-banner-close { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; flex-shrink: 0; display: grid; place-items: center; }
 .pay-banner-close:hover { color: var(--cyan); }
 .pay-banner-warn { background: #f5a62314; border-color: #f5a62333; }
+.pay-banner-error { background: #f5656514; border-color: #f5656540; }
+.pay-banner-error .pay-banner-icon, .pay-banner-error .pay-banner-text strong { color: #f47c7c; }
 .dash-notifs { margin-bottom: 18px; }
 .dash-notifs-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .dash-notifs-head h2 { margin: 0; display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted, #a7a3b8); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }

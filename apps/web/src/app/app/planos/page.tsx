@@ -4,15 +4,22 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { publicPlanCards } from "@/lib/plans/server";
 import { CREDIT_PACKS, parseCreditPacks } from "@/lib/i18n/shared";
 import { PlanCheckout } from "@/components/plan-checkout";
+import { PayFailBanner } from "@/components/pay-fail-banner";
+import { lastDeclineDetail } from "@/lib/payments/decline";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Planos", robots: { index: false } };
 
-export default async function PlanosPage() {
-  const [{ supabase, user }, loc] = await Promise.all([requireSession("/app/planos"), getLocale()]);
+export default async function PlanosPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+  const [params, { supabase, user }, loc] = await Promise.all([
+    searchParams, requireSession("/app/planos"), getLocale(),
+  ]);
   const t = getMessages(loc.lang).plansPage;
+  const tDash = getMessages(loc.lang).dash;
+  const decline = params.checkout === "cancelado"
+    ? await lastDeclineDetail(supabase, user.id) : null;
   const admin = createSupabaseAdminClient();
   const [{ plans }, { data: subscriptions }, { data: discRow }, { data: prevPaid }, { data: planRows }, { data: packsRow }] = await Promise.all([
     publicPlanCards(),
@@ -35,6 +42,7 @@ export default async function PlanosPage() {
     : 0;
 
   return <>
+    {params.checkout === "cancelado" && <PayFailBanner detail={decline} t={tDash} />}
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.title}<span className="gradient-text">.</span></h1>
     <p className="private-intro">{loc.isBrazil ? t.intro : t.introIntl}</p>

@@ -6,6 +6,8 @@ import { getLocale, formatMoney } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { AnimatedNumber } from "@/components/animated-number";
 import { DashNotifications } from "@/components/dash-notifications";
+import { PayFailBanner } from "@/components/pay-fail-banner";
+import { lastDeclineDetail } from "@/lib/payments/decline";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
   const [params, loc, { supabase, user, profile }] = await Promise.all([
@@ -57,9 +59,16 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
     .reduce((acc, l) => acc + (l.valor_fechado ?? 0), 0);
   const ganhosCount = allWon?.length ?? ganhos.length;
 
+  // Motivo da recusa do cartão (webhook grava status_detail no metadata).
+  const decline = params.checkout === "cancelado"
+    ? await lastDeclineDetail(supabase, user.id) : null;
+
   return <>
     {params.checkout === "sucesso" && (
       <p className="shell-notice" role="status">{t.success}</p>
+    )}
+    {params.checkout === "cancelado" && (
+      <PayFailBanner detail={decline} t={t} />
     )}
     <DashNotifications items={notifs ?? []} title={t.notifT} markAll={t.notifMarkAll} />
     {assinatura && (wallet?.saldo ?? 0) <= 0 && (

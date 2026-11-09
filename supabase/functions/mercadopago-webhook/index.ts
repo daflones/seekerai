@@ -208,8 +208,17 @@ Deno.serve(async (req) => {
       }
 
       if (status === "rejected" || status === "cancelled") {
-        await db.from("payments").update({ status: "failed" })
-          .eq("id", payment.id).eq("status", "pending");
+        // Guarda o motivo da recusa (status_detail do MP: cc_rejected_*,
+        // rejected_by_bank…) no metadata — o app exibe pro usuário.
+        const prevMeta = isRecord(payment.metadata) ? payment.metadata : {};
+        await db.from("payments").update({
+          status: "failed",
+          metadata: {
+            ...prevMeta,
+            mp_status: status,
+            mp_status_detail: typeof mpPay.status_detail === "string" ? mpPay.status_detail : null,
+          },
+        }).eq("id", payment.id).eq("status", "pending");
         await finish(db, eventId, null);
         return json({ received: true, result: { status: "failed", mpStatus: status } });
       }
