@@ -25,6 +25,7 @@ export const verifiedSession = cache(async () => {
       accessToken = token;
     }
   }
+  if (!token) return null; // sem token no cookie, getUser sempre 401 — evita o roundtrip
   if (!user) {
     try {
       const { data: { user: checked }, error } = await supabase.auth.getUser();

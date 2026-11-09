@@ -10,16 +10,16 @@ export const metadata: Metadata = { title: "Minha plataforma", robots: { index: 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [session, loc, theme] = await Promise.all([requireSession(), getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
-  // Completa a cota diária (13) de quem nunca pagou antes de ler o saldo.
-  await session.supabase.rpc("claim_daily_credits");
-  const { data: wallet } = await session.supabase
-    .from("credit_wallets").select("saldo").eq("user_id", session.user.id).maybeSingle();
+  // O claim da cota diária (escrita) acontece 1x/dia no middleware — aqui
+  // basta ler o estado (saldo já vem na resposta).
+  const { data: daily } = await session.supabase.rpc("daily_credit_state");
+  const saldo = (daily as { saldo?: number } | null)?.saldo ?? null;
   return (
     <PrivateShell
       admin={session.profile.role === "admin"}
       name={session.profile.nome}
       email={session.user.email ?? ""}
-      credits={wallet?.saldo ?? null}
+      credits={saldo}
       t={t.shell}
       locale={loc}
       theme={theme}

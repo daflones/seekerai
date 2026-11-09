@@ -15,7 +15,7 @@ export default async function CriarPage() {
   const [{ data: subs }, { data: daily }, planSlug] = await Promise.all([
     supabase.from("subscriptions").select("status")
       .eq("user_id", user.id).eq("status", "active").limit(1),
-    supabase.rpc("claim_daily_credits"),
+    supabase.rpc("daily_credit_state"),
     userPlanSlug(supabase, user.id),
   ]);
   const t = getMessages(loc.lang).studio;

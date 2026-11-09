@@ -30,11 +30,15 @@ export default async function Home() {
   const [loc, theme] = await Promise.all([getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
   const h = t.home;
-  const pricing = await publicPlanCards();
-  // Desconto de primeira compra — na landing todo mundo é visitante
-  // (logado vai pro /app), então a promoção aparece para todos.
-  const { data: discRow } = await createSupabaseAdminClient()
-    .from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle();
+  // Cards de preço desligados (SHOW_LANDING_PRICES=false): as duas
+  // queries que só os alimentam ficam puladas — 2 roundtrips a menos
+  // no TTFB da landing.
+  const pricing: Awaited<ReturnType<typeof publicPlanCards>> = SHOW_LANDING_PRICES
+    ? await publicPlanCards()
+    : { plans: [], source: "preview" };
+  const { data: discRow } = SHOW_LANDING_PRICES ? await createSupabaseAdminClient()
+    .from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle()
+    : { data: null };
   const discountPct = Math.min(90, Math.max(0, Math.trunc(Number(discRow?.value ?? 0)) || 0));
   const disc = (cents: number) =>
     discountPct > 0 ? Math.max(100, Math.round(cents * (100 - discountPct) / 100)) : cents;

@@ -4,6 +4,7 @@ import { SearchConsole } from "@/components/search-console";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { serviceCategory, serviceName } from "@/lib/catalog-i18n";
+import { getServicesCatalog } from "@/lib/catalog-cache";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Buscar oportunidades", robots: { index: false } };
@@ -15,14 +16,15 @@ export default async function BuscarPage() {
   const t = getMessages(loc.lang).seek;
   // Renova a cota diária antes de calcular saldo/buscas restantes —
   // 'ativo' diz se a janela de 7 dias ainda está aberta.
-  const { data: daily } = await supabase.rpc("claim_daily_credits");
+  const { data: daily } = await supabase.rpc("daily_credit_state");
   const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
-  const [{ data: services }, { data: subs }, { data: wallet }] = await Promise.all([
-    supabase.from("services_catalog").select("slug,nome,categoria").eq("ativo", true).order("nome"),
+  const [catalog, { data: subs }, { data: wallet }] = await Promise.all([
+    getServicesCatalog(),
     supabase.from("subscriptions").select("status").eq("user_id", user.id)
       .in("status", ["active"]).limit(1),
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
   ]);
+  const services = catalog.filter((s) => s.ativo);
   const subscribed = Boolean(subs?.length);
   const saldo = wallet?.saldo ?? 0;
   // Trial: créditos de boas-vindas liberam a busca — a edge cobra

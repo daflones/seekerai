@@ -6,6 +6,7 @@ import type { LeadRow } from "@/lib/app-client";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { serviceName } from "@/lib/catalog-i18n";
+import { getCreditActionRules, getServicesCatalog } from "@/lib/catalog-cache";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Meus leads", robots: { index: false } };
@@ -13,10 +14,10 @@ export const metadata: Metadata = { title: "Meus leads", robots: { index: false 
 export default async function LeadsPage() {
   const [{ supabase }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang).leadsPage;
-  const [{ data: leads }, { data: services }, { data: rules }, { data: outputs }] = await Promise.all([
+  const [{ data: leads }, services, rules, { data: outputs }] = await Promise.all([
     supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(500),
-    supabase.from("services_catalog").select("slug,nome,enabled_actions"),
-    supabase.from("credit_action_rules").select("action,cost,enabled"),
+    getServicesCatalog(),
+    getCreditActionRules(),
     supabase.from("lead_outputs").select("lead_id,tipo").limit(2000),
   ]);
   type Service = { slug: string; nome: string; enabled_actions: string[] | null };

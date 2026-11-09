@@ -11,6 +11,11 @@ const config: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
   poweredByHeader: false,
+  // Cache de navegação no client (RSC): voltar/avançar e reabrir a mesma
+  // aba em até 30s não refaz o fetch — e o prefetch de <Link> passa a
+  // funcionar nas rotas dinâmicas. Mutações usam router.refresh() que
+  // ignora esse cache.
+  experimental: { staleTimes: { dynamic: 30 } },
   logging: { incomingRequests: { ignore: [/\/auth\/(?:confirm|callback)/] } },
   async headers() {
     return [{

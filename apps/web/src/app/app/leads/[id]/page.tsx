@@ -8,6 +8,7 @@ import type { LeadRow } from "@/lib/app-client";
 import { getLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { serviceName } from "@/lib/catalog-i18n";
+import { getServicesCatalog } from "@/lib/catalog-cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { siteEditorAllowed } from "@/lib/site-editor";
 import { userPlanSlug } from "@/lib/plans/capabilities";
@@ -19,14 +20,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const [{ supabase, user, profile: sessionProfile }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang);
-  const [{ data: lead }, { data: outputs }, { data: services }, { data: profile }, { data: subs }, { data: daily }] = await Promise.all([
+  const [{ data: lead }, { data: outputs }, services, { data: profile }, { data: subs }, { data: daily }] = await Promise.all([
     supabase.from("leads").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
     supabase.from("lead_outputs").select("id,tipo,conteudo,modelo,created_at")
       .eq("lead_id", id).order("created_at", { ascending: false }),
-    supabase.from("services_catalog").select("slug,nome,enabled_actions"),
+    getServicesCatalog(),
     supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
     supabase.from("subscriptions").select("status").eq("user_id", user.id).eq("status", "active").limit(1),
-    supabase.rpc("claim_daily_credits"),
+    supabase.rpc("daily_credit_state"),
   ]);
   if (!lead) notFound();
   const planSlug = await userPlanSlug(supabase, user.id);

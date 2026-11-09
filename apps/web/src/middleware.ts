@@ -146,6 +146,7 @@ export async function middleware(request: NextRequest) {
   // cliente — o refresh acontece aqui, único lugar que grava cookies.
   const cookieToken = readAccessToken(request.cookies.getAll());
   let verified = false;
+  let bearer = cookieToken;
   if (cookieToken) {
     try {
       // JWKS vem da Auth API — sem timeout, uma instabilidade do provedor
@@ -172,6 +173,7 @@ export async function middleware(request: NextRequest) {
         for (const p of parts) response.cookies.set(p.name, p.value, { ...authCookieOptions });
         for (const n of stale) response.cookies.set(n, "", { ...authCookieOptions, maxAge: 0 });
         verified = true;
+        bearer = fresh;
       } else {
         if (sessionError && isStaleSessionError(sessionError)) staleSession = true;
         const { data: { user }, error: userError } = await withTimeout(supabase.auth.getUser());
@@ -194,6 +196,27 @@ export async function middleware(request: NextRequest) {
     if (staleSession) expireAuthCookies(redirected, request);
     return redirected;
   }
+
+  // Cota diária: a escrita (claim_daily_credits faz FOR UPDATE na wallet)
+  // acontece no máximo 1x/dia por usuário — as páginas leem o estado pela
+  // função read-only daily_credit_state(). O cookie-marca evita a
+  // chamada em cada navegação.
+  const DAILY_COOKIE = "sk-daily";
+  const todaySP = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  if (bearer && request.cookies.get(DAILY_COOKIE)?.value !== todaySP) {
+    try {
+      const res = await fetch(`${config.url}/rest/v1/rpc/claim_daily_credits`, {
+        method: "POST",
+        headers: { apikey: config.key, Authorization: `Bearer ${bearer}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(4_000),
+        body: "{}",
+      });
+      if (res.ok) {
+        response.cookies.set(DAILY_COOKIE, todaySP, { ...authCookieOptions, maxAge: 60 * 60 * 48 });
+      }
+    } catch { /* tenta de novo no próximo request */ }
+  }
+
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
