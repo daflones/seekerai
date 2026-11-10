@@ -7,11 +7,16 @@ import { wipePrefix } from "@/lib/storage-wipe";
 // pra agendador externo (EasyPanel cron / Supabase scheduled edge) manter
 // o banco limpo sem depender de tráfego.
 export async function GET(request: NextRequest) {
-  const secret = process.env.INTERNAL_CRON_SECRET;
-  if (!secret || request.headers.get("x-internal-key") !== secret) {
-    return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  }
   const admin = createSupabaseAdminClient();
+  // Aceita o secret de ambiente OU a chave do pg_cron (internal_kv).
+  const key = request.headers.get("x-internal-key");
+  if (key !== process.env.INTERNAL_CRON_SECRET) {
+    const { data } = await admin.from("internal_kv")
+      .select("value").eq("key", "cron_auth").maybeSingle();
+    if (!data || key !== data.value) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
+  }
   const { data, error } = await admin.rpc("expire_lead_sites");
   if (error) {
     return NextResponse.json({ error: "Falha ao expirar sites." }, { status: 500 });
