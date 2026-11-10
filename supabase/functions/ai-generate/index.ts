@@ -2729,7 +2729,7 @@ REGRAS ABSOLUTAS:
 - 100% responsivo com mobile-first real (media queries, layout que adapta de verdade).
 
 PROIBIDO (deduz qualidade):
-- EMOJIS na interface. Ícones = SEMPRE SVG inline OU Lucide via <script src="https://unpkg.com/lucide@latest"> + <i data-lucide="nome"> + lucide.createIcons().
+- EMOJIS em QUALQUER lugar da interface — incluindo botões, listas, badges, nav e mensagens de feedback. Casos frequentes que NÃO podem ser emoji: telefone/WhatsApp/celular (use ícone "phone" ou "message-circle" do Lucide, ou o glyph oficial do WhatsApp em SVG), checkmark/seleção (ícone "check"/"check-circle" ou :checked estilizado), setas e chevrons ("arrow-right", "chevron-down"), estrelas de avaliação (SVG "star" preenchido), localização ("map-pin"), redes sociais (SVG da marca), câmera/imagem ("camera", "image"), lixeira/editar ("trash-2", "pencil"). Ícones = SEMPRE SVG inline OU Lucide via <script src="https://unpkg.com/lucide@latest"> + <i data-lucide="nome"> + lucide.createIcons().
 - Cores primárias chapadas/sem intenção (vermelho #f00, azul default, coral aleatório). Toda cor sai de uma paleta desenhada pro nicho.
 - alert(), confirm(), console.log solto. Links mortos (href="#") sem handler.
 - <img> sem src real ou com URL inventada. Sem imagem real? Use gradientes, padrões SVG inline, formas CSS.
@@ -2759,7 +2759,11 @@ CHECKLIST ANTES DE FINALIZAR: todo botão faz algo? Algum emoji escapou? Paleta 
 function extractHtml(raw: string): string | null {
   const text = raw.trim();
   const fenced = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
-  const html = (fenced ? fenced[1] : text).trim();
+  const html = (fenced ? fenced[1] : text).trim()
+    // Rede de segurança: remove emoji/dingbats que o modelo deixar escapar
+    // (prompt proíbe, mas garantimos aqui — setas/bolinhas/estrelas unicode
+    // também saem porque o padrão visual é SVG/Lucide).
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu, "");
   const start = html.search(/<!doctype html|<html[\s>]/i);
   if (start < 0) return null;
   const end = html.search(/<\/html>\s*$/i);
