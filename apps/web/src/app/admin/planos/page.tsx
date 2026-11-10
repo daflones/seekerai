@@ -4,6 +4,7 @@ import { defaultCardContent } from "@/lib/plans/preview";
 import { CREDIT_PACKS, parseCreditPacks } from "@/lib/i18n/shared";
 import { PlanEditor } from "@/components/plan-editor";
 import { AdminPacks } from "@/components/admin-packs";
+import { AdminCheckoutVisibility } from "@/components/admin-checkout-visibility";
 
 export default async function PlanAdminPage() {
   const { supabase } = await requireSession("/admin/planos", { admin: true });
@@ -11,9 +12,14 @@ export default async function PlanAdminPage() {
     .select("id,slug,nome,preco_centavos,ordem,destaque,landing_visible,card_content,card_revision").order("ordem");
   const { data: packsRow } = await supabase.from("app_settings")
     .select("value").eq("key", "credit_packs").maybeSingle();
+  const { data: hiddenRow } = await supabase.from("app_settings")
+    .select("value").eq("key", "checkout_hidden").maybeSingle();
   const packs = parseCreditPacks(packsRow?.value).length
     ? parseCreditPacks(packsRow?.value)
     : CREDIT_PACKS;
+  const hiddenRaw = hiddenRow?.value as { plans?: unknown; packs?: unknown } | null;
+  const hiddenPlans = (Array.isArray(hiddenRaw?.plans) ? hiddenRaw.plans : []) as string[];
+  const hiddenPacks = (Array.isArray(hiddenRaw?.packs) ? hiddenRaw.packs : []) as string[];
   const plans: PlanCard[] = [];
   for (const row of data || []) {
     const slug = planSlug.safeParse(row.slug);
@@ -31,5 +37,8 @@ export default async function PlanAdminPage() {
     <p className="private-intro">Configure o preço real do plano e a apresentação do card. A prévia usa o mesmo componente da landing.</p>
     {error ? <p role="alert" className="auth-error">Não foi possível carregar os planos.</p> : plans.length ? <PlanEditor initialPlans={plans} /> : <p className="auth-notice">Nenhum plano inicial foi provisionado. Execute o seed antes de editar.</p>}
     <AdminPacks initial={packs} />
+    <AdminCheckoutVisibility
+      plans={plans.map((p) => ({ slug: p.slug, name: p.name }))}
+      packs={packs} hiddenPlans={hiddenPlans} hiddenPacks={hiddenPacks} />
   </>;
 }

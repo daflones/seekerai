@@ -16,8 +16,11 @@ interface PlanItem {
   featured: boolean;
   order: number;
   content: {
+    badge?: string;
     description?: string;
     features?: { id: string; text: string; visible: boolean }[];
+    theme?: "cream" | "teal" | "violet" | "gold";
+    buttonStyle?: "solid" | "light" | "outline";
   };
 }
 
@@ -29,9 +32,11 @@ interface PixResult {
   error?: string;
 }
 
-export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t,
+export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t,
   subEnd = null, subMonths = 1, planCredits = {}, packs = CREDIT_PACKS }: {
   plans: PlanItem[];
+  /** Lista completa (sem filtro de visibilidade) pra resolver o plano atual. */
+  allPlans?: PlanItem[];
   hasSubscription: boolean;
   currentPlanSlug: string | null;
   discountPct?: number;
@@ -87,7 +92,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
     const payload = pack
       ? { creditPack: true, packId: pack.id, method, currency: locale.currency, ...metaCookies() }
       : { planSlug, method, currency: locale.currency, period, ...metaCookies() };
-    const valueCents = pack ? packCents(pack) : disc(totalFor(plans.find((p) => p.slug === planSlug)!));
+    const valueCents = pack ? packCents(pack) : disc(totalFor(lookup.find((p) => p.slug === planSlug)!));
     trackMeta("InitiateCheckout", {
       value: valueCents / 100,
       currency: locale.currency.toUpperCase(),
@@ -109,7 +114,9 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
     setTimeout(() => setCopied(false), 2500);
   }
 
-  const current = plans.find((p) => p.slug === currentPlanSlug) ?? null;
+  // Lookup contra a lista completa — o plano atual pode estar oculto da vitrine.
+  const lookup = allPlans ?? plans;
+  const current = lookup.find((p) => p.slug === currentPlanSlug) ?? null;
   // Troca em qualquer direção — upgrade e downgrade entram na mesma
   // grade; a flag do card diferencia.
   const changes = current
@@ -136,8 +143,9 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
 
   function planCard(plan: PlanItem, flag?: string | null) {
     const isFree = plan.priceCents === 0;
-    return <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}`}>
+    return <article key={plan.slug} className={`plan-card-checkout plan-theme-${plan.content.theme ?? "violet"}${plan.featured ? " featured" : ""}`}>
       {flag && <span className="plan-flag">{flag}</span>}
+      {plan.content.badge && <span className="plan-tag">{plan.content.badge}</span>}
       <h3>{plan.name}</h3>
       <p className="plan-price">
         {!isFree && discountPct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}
@@ -194,7 +202,8 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       </div>
     </section>}
 
-    {hasSubscription && changes.length === 0 && current && (
+    {hasSubscription && changes.length === 0 && current
+      && lookup.every((p) => p.slug === current.slug || p.order <= current.order) && (
       <p className="auth-success" role="status"><CheckCircle2 size={18} /> {t.topPlan}</p>
     )}
 
@@ -210,7 +219,7 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       </div>
     </>}
 
-    {hasSubscription && <section id="creditos" className="pack-section">
+    {hasSubscription && packs.length > 0 && <section id="creditos" className="pack-section">
       <h3 className="pack-section-title">{t.packTitle}</h3>
       <p className="pack-section-sub">{t.packSub}</p>
       <div className="pack-rows">
@@ -242,11 +251,11 @@ export function PlanCheckout({ plans, hasSubscription, currentPlanSlug, discount
       onClick={() => setPix(null)}>
       <section className="pix-panel pix-modal" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="pix-close" aria-label="×" onClick={() => setPix(null)}>×</button>
-        <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : plans.find((p) => p.slug === pix.plan)?.name}</h2>
-        <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : disc(priceFor(plans.find((p) => p.slug === pix.plan)!)))}{!pix.pack && <small>{t.perMonth}</small>}</p>
+        <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : lookup.find((p) => p.slug === pix.plan)?.name}</h2>
+        <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : disc(priceFor(lookup.find((p) => p.slug === pix.plan)!)))}{!pix.pack && <small>{t.perMonth}</small>}</p>
         {!pix.pack && def.months > 1 && (
           <p className="plan-billed-caption">
-            {money(disc(totalFor(plans.find((p) => p.slug === pix.plan)!)))}
+            {money(disc(totalFor(lookup.find((p) => p.slug === pix.plan)!)))}
             {" "}{period === "trimestral" ? t.billedTri : t.billedYear}
           </p>
         )}

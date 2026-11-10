@@ -21,7 +21,7 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
   const decline = params.checkout === "cancelado"
     ? await lastDeclineDetail(supabase, user.id) : null;
   const admin = createSupabaseAdminClient();
-  const [{ plans }, { data: subscriptions }, { data: discRow }, { data: prevPaid }, { data: planRows }, { data: packsRow }] = await Promise.all([
+  const [{ plans }, { data: subscriptions }, { data: discRow }, { data: prevPaid }, { data: planRows }, { data: packsRow }, { data: hiddenRow }] = await Promise.all([
     publicPlanCards(),
     supabase.from("subscriptions").select("id,status,plan_id,billing_months,current_period_end,plans:plan_id(slug)")
       .eq("user_id", user.id).in("status", ["pending", "active", "past_due"]).limit(1),
@@ -29,8 +29,9 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
     admin.from("payments").select("id").eq("user_id", user.id).eq("status", "paid").limit(1),
     supabase.from("plans").select("slug,creditos_mensais").eq("ativo", true),
     admin.from("app_settings").select("value").eq("key", "credit_packs").maybeSingle(),
+    admin.from("app_settings").select("value").eq("key", "checkout_hidden").maybeSingle(),
   ]);
-  const packs = parseCreditPacks(packsRow?.value).length
+  const allPacks = parseCreditPacks(packsRow?.value).length
     ? parseCreditPacks(packsRow?.value)
     : CREDIT_PACKS;
   const sub = subscriptions?.[0];
@@ -40,15 +41,22 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
   const discountPct = (prevPaid ?? []).length === 0
     ? Math.min(90, Math.max(0, Math.trunc(Number(discRow?.value ?? 0)) || 0))
     : 0;
+  // Itens ocultos pelo admin somem da vitrine; o plano atual do assinante
+  // continua resolvido pela lista completa (allPlans no checkout).
+  const hiddenRaw = hiddenRow?.value as { plans?: unknown; packs?: unknown } | null;
+  const hiddenPlans = Array.isArray(hiddenRaw?.plans) ? hiddenRaw.plans : [];
+  const hiddenPacks = Array.isArray(hiddenRaw?.packs) ? hiddenRaw.packs : [];
+  const visiblePlans = plans.filter((p) => !hiddenPlans.includes(p.slug));
+  const packs = allPacks.filter((p) => !hiddenPacks.includes(p.id));
 
   return <>
     {params.checkout === "cancelado" && <PayFailBanner detail={decline} t={tDash} />}
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.title}<span className="gradient-text">.</span></h1>
     <p className="private-intro">{loc.isBrazil ? t.intro : t.introIntl}</p>
-    {plans.length === 0
+    {visiblePlans.length === 0 && !(subscriptions ?? []).length
       ? <p className="private-intro">{t.empty}</p>
-      : <PlanCheckout plans={plans} hasSubscription={(subscriptions ?? []).length > 0}
+      : <PlanCheckout plans={visiblePlans} allPlans={plans} hasSubscription={(subscriptions ?? []).length > 0}
           currentPlanSlug={currentPlanSlug} discountPct={discountPct} locale={loc} t={t}
           subEnd={sub?.current_period_end ?? null} subMonths={sub?.billing_months ?? 1}
           planCredits={planCredits} packs={packs} />}
