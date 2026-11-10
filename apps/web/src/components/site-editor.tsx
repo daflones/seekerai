@@ -593,6 +593,12 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
       setAiMsgs((cur) => [...cur, { role: "ai", text: t.aiTooBig }]);
       return;
     }
+    // Página inteira grande: a IA precisaria devolver o HTML todo de volta,
+    // o que estoura o tempo/limite de saída — pede pra selecionar a seção.
+    if (!comp && targetHtml.length > 60_000) {
+      setAiMsgs((cur) => [...cur, { role: "ai", text: t.aiPickTarget }]);
+      return;
+    }
     setAiBusy(true);
     setAiMsgs((cur) => [...cur, { role: "user", text: instr }]);
     setAiInput("");

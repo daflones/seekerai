@@ -2993,7 +2993,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      const model = action === "generate_image" ? IMAGE_MODEL : TEXT_MODEL;
+      // editor_assist edita HTML estruturado — usa o modelo de patch
+      // (gpt-4.1-mini), mais preciso em edição de marcação que o mini de chat.
+      const model = action === "generate_image" ? IMAGE_MODEL
+        : action === "editor_assist" ? PATCH_MODEL : TEXT_MODEL;
 
       // Imagem avulsa: o pedido do usuário vira prompt em inglês otimizado
       // com a identidade do estabelecimento embutida.
@@ -3034,14 +3037,14 @@ Deno.serve(async (req) => {
       let modelo = model;
       const systemPrompt = systemPromptFor(action, lang);
 
-      // Copiloto do lead é ação gratuita (cost 0) — provedores free
-      // primeiro: Groq (rápido) → NVIDIA → OpenRouter só como último
-      // recurso, pra não queimar crédito pago num recurso de graça.
-      // enhance_reply entra no grupo gratuito: ferramenta interna de
-      // suporte não pode queimar crédito pago enquanto houver free.
-      if (action === "lead_assist" || action === "editor_assist" || action === "enhance_reply") {
-        // Edição de HTML precisa de espaço pra devolver o trecho inteiro.
-        const cap = action === "editor_assist" ? 8192 : action === "lead_assist" ? 1200 : 1500;
+      // Copiloto do lead e enhance_reply são gratuitos pra todos — provedores
+      // free primeiro pra não queimar crédito pago num recurso de graça.
+      // editor_assist NÃO entra aqui: é exclusivo Pro/King e a cadeia free
+      // serial (60+45+45s, depois de novo no fallback) estourava o timeout
+      // da borda → 524 no editor. Vai direto no modelo pago.
+      const freeFirst = action === "lead_assist" || action === "enhance_reply";
+      if (freeFirst) {
+        const cap = action === "lead_assist" ? 1200 : 1500;
         const g = await groqChat(systemPrompt, userContent, cap, 60_000);
         const f = g ?? await orFreeChat(systemPrompt, userContent, cap, 45_000);
         const nv = f ?? await nvidiaChat(systemPrompt, userContent, cap, 45_000);
@@ -3078,8 +3081,9 @@ Deno.serve(async (req) => {
           ],
         }),
         // Sem timeout o OpenRouter pode segurar a conexão até o gateway cortar.
-        // Site precisa de mais tempo: o HTML completo são milhares de tokens.
-        signal: AbortSignal.timeout(60_000),
+        // editor_assist tem budget apertado (borda corta ~100s): o resto do
+        // tempo fica pros fallbacks rápidos abaixo.
+        signal: AbortSignal.timeout(action === "editor_assist" ? 45_000 : 60_000),
       }).catch(() => null);
       const orStatus = res?.status ?? 0;
       if (res?.ok) {
@@ -3107,16 +3111,18 @@ Deno.serve(async (req) => {
         }
       } else if (!data) {
         // Qualquer falha do OpenRouter (rede, 402, 5xx, resposta vazia)
-        // cai nos gratuitos: Groq → modelo ":free" do OR → NVIDIA.
-        const g = await groqChat(systemPrompt, userContent, 8192, 60_000);
-        const f = g ?? await orFreeChat(systemPrompt, userContent, 8192, 45_000);
+        // cai nos gratuitos — timeouts curtos pra caber no budget da borda.
+        // lead_assist/enhance_reply já tentaram essa cadeia: só a NVIDIA
+        // pode ter entrado depois (breaker de 3min entre instâncias).
+        const g = freeFirst ? null : await groqChat(systemPrompt, userContent, 8192, 20_000);
+        const f = g ?? (freeFirst ? null : await orFreeChat(systemPrompt, userContent, 8192, 15_000));
         const elapsed = Date.now() - t0;
-        const nv = f ?? (elapsed < 100_000
+        const nv = f ?? (elapsed < 80_000
           ? await nvidiaChat(
             systemPrompt,
             userContent,
             action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
-            45_000,
+            15_000,
           )
           : null);
         const hit = g ?? f ?? nv;
