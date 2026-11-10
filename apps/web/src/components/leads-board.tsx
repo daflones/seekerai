@@ -234,22 +234,27 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               {!lead.site && <span className="seek-badge seek-badge-gap">{t.siteNo}</span>}
               {lead.site && <span className="seek-badge seek-badge-ok"><Globe size={10} />{t.siteYes}</span>}
               {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok">WhatsApp</span>}
-              {lead.instagram && !ig && <span className="seek-badge">{lead.instagram}</span>}
             </p>
-            {ig && igUrl(lead.instagram) && <a className="seek-ig" href={igUrl(lead.instagram)!}
-              target="_blank" rel="noopener noreferrer" title={ig.bio ?? ""}>
-              {ig.foto
-                // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
-                ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
-                : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
-              <span className="seek-ig-handle">@{igHandle(lead.instagram)}</span>
-              {ig.seguidores !== null && ig.seguidores !== undefined &&
-                <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
-              {ig.posts !== null && ig.posts !== undefined &&
-                <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} {t.igPosts}</span>}
-              {ig.curtidas !== null && ig.curtidas !== undefined &&
-                <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)} {t.igLikes}</span>}
+            {lead.instagram && igUrl(lead.instagram) && <a className="seek-ig" href={igUrl(lead.instagram)!}
+              target="_blank" rel="noopener noreferrer" title={ig?.bio ?? lead.instagram}>
+              <span className="seek-ig-head">
+                {ig?.foto
+                  // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
+                  ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
+                  : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
+                <span className="seek-ig-handle">@{igHandle(lead.instagram)}</span>
+                <ArrowUpRight className="seek-ig-ext" size={11} />
+              </span>
+              {ig && (ig.seguidores != null || ig.posts != null || ig.curtidas != null) && <span className="seek-ig-stats">
+                {ig.seguidores != null &&
+                  <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
+                {ig.posts != null &&
+                  <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} {t.igPosts}</span>}
+                {ig.curtidas != null &&
+                  <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)} {t.igLikes}</span>}
+              </span>}
             </a>}
+            {!lead.instagram && <div className="seek-ig seek-ig-miss"><Instagram size={13} /><span>{t.igMiss}</span></div>}
             {ig?.bio && <p className="lead-ig-bio">{ig.bio}</p>}
             <p className="lead-tip"><Sparkles size={12} />{suggestion(lead)}</p>
 

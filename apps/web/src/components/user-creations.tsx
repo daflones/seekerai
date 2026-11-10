@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check, ChevronLeft, ChevronRight, Copy, Download, ExternalLink,
   Globe, Image as ImageIcon, Loader2, MessageSquareText, Monitor,
-  Smartphone, Sparkles, FileText, Brain, Eye,
+  Smartphone, Sparkles, FileText, Brain, Eye, Trophy,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
 import type { CreationItem } from "@/app/api/criacoes/route";
@@ -172,8 +172,21 @@ export function UserCreations({ t, lang }: { t: T; lang: string }) {
                 return <><Icon size={12} />{textLabel(item.sub)}</>;
               })()}
             </span>
+            {item.ganho && <span className="cre-badge cre-b-ganho"><Trophy size={10} />{t.wonTag}</span>}
             <time className="cre-date" dateTime={item.createdAt}>{fmtDate(item.createdAt)}</time>
           </div>
+
+          {(item.kind === "site" || item.kind === "app") && (
+            <div className="cre-visual" aria-hidden>
+              <div className="cre-visual-bar"><i /><i /><i />
+                <span>{item.siteSlug ? `seekerai.digital/site/${item.siteSlug}` : item.title || "…"}</span>
+              </div>
+              <div className="cre-visual-stage">
+                {item.kind === "site" ? <Globe size={20} />
+                  : item.sub === "app_mobile" ? <Smartphone size={20} /> : <Monitor size={20} />}
+              </div>
+            </div>
+          )}
 
           <h3 className="cre-title">{item.title || "—"}</h3>
           <div className="cre-meta">

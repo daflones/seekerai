@@ -553,8 +553,8 @@ export function SearchConsole({
               {p.avaliacao !== null && <span className="seek-score"><Star size={12} />{p.avaliacao.toFixed(1)}{p.totalAvaliacoes ? ` (${p.totalAvaliacoes})` : ""}</span>}
             </div>
             {p.categoria && <span className="seek-category">{p.categoria}</span>}
-            {p.endereco && <p className="seek-line"><MapPin size={12} />{[p.endereco, p.cidade, p.uf].filter(Boolean).join(" · ")}</p>}
-            {p.telefone && <p className="seek-line"><Phone size={12} />{p.telefone}</p>}
+            {p.endereco && <p className="seek-line"><MapPin size={12} /><span>{[p.endereco, p.cidade, p.uf].filter(Boolean).join(" · ")}</span></p>}
+            {p.telefone && <p className="seek-line"><Phone size={12} /><span>{p.telefone}</span></p>}
             <div className="seek-badges">
               {p.site && check
                 ? <a className={`seek-badge ${check.cls}`} href={p.site} target="_blank" rel="noopener noreferrer" title={check.sinais}><Globe size={11} />{check.label}</a>
@@ -565,21 +565,26 @@ export function SearchConsole({
                 <span className="seek-badge seek-site-note" title={check.sinais}>{check.sinais.split(" · ")[0]}</span>}
               {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.waOk}</span>}
               {p.whatsapp === false && p.telefone && <span className="seek-badge">{t.waNo}</span>}
-              {p.instagram && !p.ig && igUrl(p.instagram) && <a className="seek-badge" href={igUrl(p.instagram)!} target="_blank" rel="noopener noreferrer"><Instagram size={11} />@{igHandle(p.instagram)}</a>}
               {p.sitePronto && <span className="seek-badge seek-badge-ok">{t.siteDone}</span>}
               {p.status === "CLOSED_PERMANENTLY" && <span className="seek-badge">{t.closed}</span>}
             </div>
-            {p.ig && igUrl(p.instagram) && <a className="seek-ig" href={igUrl(p.instagram)!}
-              target="_blank" rel="noopener noreferrer" title={p.ig.bio ?? p.instagram ?? ""}>
-              {p.ig.foto
-                // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
-                ? <img className="seek-ig-pic" src={p.ig.foto} alt="" loading="lazy" />
-                : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
-              <span className="seek-ig-handle">@{igHandle(p.instagram)}</span>
-              {p.ig.seguidores !== null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(p.ig.seguidores, lang)} {t.igFollowers}</span>}
-              {p.ig.posts !== null && <span className="seek-ig-stat">{fmtCompact(p.ig.posts, lang)} {t.igPosts}</span>}
-              {p.ig.curtidas !== null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(p.ig.curtidas, lang)} {t.igLikes}</span>}
+            {p.instagram && igUrl(p.instagram) && <a className="seek-ig" href={igUrl(p.instagram)!}
+              target="_blank" rel="noopener noreferrer" title={p.ig?.bio ?? p.instagram ?? ""}>
+              <span className="seek-ig-head">
+                {p.ig?.foto
+                  // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
+                  ? <img className="seek-ig-pic" src={p.ig.foto} alt="" loading="lazy" />
+                  : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
+                <span className="seek-ig-handle">@{igHandle(p.instagram)}</span>
+                <ExternalLink className="seek-ig-ext" size={11} />
+              </span>
+              {p.ig && (p.ig.seguidores !== null || p.ig.posts !== null || p.ig.curtidas !== null) && <span className="seek-ig-stats">
+                {p.ig.seguidores !== null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(p.ig.seguidores, lang)} {t.igFollowers}</span>}
+                {p.ig.posts !== null && <span className="seek-ig-stat">{fmtCompact(p.ig.posts, lang)} {t.igPosts}</span>}
+                {p.ig.curtidas !== null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(p.ig.curtidas, lang)} {t.igLikes}</span>}
+              </span>}
             </a>}
+            {!p.instagram && <div className="seek-ig seek-ig-miss"><Instagram size={13} /><span>{t.igMiss}</span></div>}
             <div className="seek-card-actions">
               {saved[i]
                 ? <Link className="button button-glass button-small" href={`/app/leads/${saved[i]}`}><CheckCircle2 size={14} />{t.viewLead}</Link>

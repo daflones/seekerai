@@ -15,15 +15,16 @@ export interface CreationItem {
   erro: string | null;
   model: string | null;
   excerpt: string | null;
+  ganho: boolean;
   createdAt: string;
 }
 
 interface OutputRow { id: string; lead_id: string; tipo: string; modelo: string | null; created_at: string }
-interface LeadRow { id: string; nome: string | null; dados: unknown }
+interface LeadRow { id: string; nome: string | null; dados: unknown; status: string | null }
 interface ProjectRow {
   id: string; nome: string | null; target: string; status: string;
   erro: string | null; site_slug: string | null; created_at: string;
-  lead_id: string | null;
+  lead_id: string | null; ganho_em: string | null;
 }
 
 const TEXT_KINDS = new Set(["sales_reply", "deep_strategy", "image_prompt"]);
@@ -46,10 +47,10 @@ export async function GET(request: NextRequest) {
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false }).limit(1000),
     session.supabase.from("leads")
-      .select("id,nome,dados")
+      .select("id,nome,dados,status")
       .eq("user_id", session.user.id).limit(2000),
     session.supabase.from("studio_projects")
-      .select("id,nome,target,status,erro,site_slug,created_at,lead_id")
+      .select("id,nome,target,status,erro,site_slug,created_at,lead_id,ganho_em")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false }).limit(500),
   ]);
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
     const base = {
       id: o.id, title: lead?.nome ?? "", leadId: o.lead_id, leadName: lead?.nome ?? null,
       siteSlug: slug, status: "done" as const, erro: null, model: o.modelo, excerpt: null,
-      createdAt: o.created_at,
+      ganho: lead?.status === "ganho", createdAt: o.created_at,
     };
     if (o.tipo === "generate_site") items.push({ ...base, kind: "site", sub: "site" });
     else if (o.tipo === "generate_image") items.push({ ...base, kind: "image", sub: "image" });
@@ -77,7 +78,8 @@ export async function GET(request: NextRequest) {
       leadName: p.lead_id ? leadById.get(p.lead_id)?.nome ?? null : null,
       siteSlug: p.site_slug,
       status: p.status === "running" ? "running" : p.status === "error" ? "error" : "done",
-      erro: p.erro, model: null, excerpt: null, createdAt: p.created_at,
+      erro: p.erro, model: null, excerpt: null,
+      ganho: p.ganho_em != null, createdAt: p.created_at,
     });
   }
 

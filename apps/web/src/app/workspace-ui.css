@@ -313,7 +313,7 @@
 .shell-workspace .lead-next-stage:hover { border-color: color-mix(in srgb, var(--violet) 40%, transparent); color: var(--violet-light); }
 .shell-workspace .lead-won-value { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
 .shell-workspace .lead-contacts .seek-badge { border-radius: 8px; }
-.shell-workspace .lead-actions { background: var(--panel); border-color: var(--border); border-radius: 12px; }
+.shell-workspace section.lead-actions { background: var(--panel); border-color: var(--border); border-radius: 12px; }
 .shell-workspace .lead-journey { background: var(--panel); border-color: var(--border); border-radius: 16px; padding: 26px; box-shadow: var(--workspace-shadow); }
 .shell-workspace .lead-step { background: var(--ink); border-color: var(--border); border-radius: 12px; transition: border-color .2s; }
 .shell-workspace .lead-step.is-active { border-color: color-mix(in srgb, var(--violet) 35%, transparent); }
