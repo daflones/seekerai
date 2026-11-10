@@ -464,3 +464,48 @@
   .shell-workspace *, .shell-workspace *::before, .shell-workspace *::after { transition: none !important; scroll-behavior: auto; }
   .shell-workspace :is(.dash-insight, .seek-card, .lead-card, .cre-card, .button):hover { transform: none; }
 }
+
+/* Minha conta — /app/conta */
+.acct-grid { display: flex; flex-direction: column; gap: 18px; margin-top: 26px; max-width: 720px; }
+.acct-panel { padding: 24px; }
+.acct-title { display: flex; align-items: center; gap: 9px; margin: 0 0 16px; font-size: 15px; font-weight: 650; color: var(--white); }
+.acct-title svg { color: var(--violet-light); flex-shrink: 0; }
+.acct-sub { margin: -6px 0 14px; font-size: 12.5px; color: var(--muted); }
+.acct-label { display: block; margin-bottom: 7px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.acct-name-row { display: flex; gap: 10px; margin-bottom: 4px; }
+.acct-name-row input { flex: 1; min-width: 0; padding: 11px 13px; color: var(--white); background: var(--bg); border: 1px solid var(--border); border-radius: 9px; font-size: 13px; font-family: inherit; }
+.acct-name-row input:focus { outline: none; border-color: var(--violet); }
+.acct-name-row .button { flex-shrink: 0; }
+.acct-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-top: 1px solid var(--border); }
+.acct-row .acct-key { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.acct-row .acct-key svg { color: var(--violet-light); }
+.acct-row strong { font-size: 13px; font-weight: 600; color: var(--fg2); word-break: break-all; text-align: right; }
+.acct-hint { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
+.acct-support-link { display: inline-flex; align-items: center; gap: 5px; color: var(--violet-light); font-weight: 600; }
+.acct-support-link:hover { text-decoration: underline; }
+.acct-help { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.acct-help-card { display: flex; align-items: center; gap: 12px; padding: 15px; border: 1px solid var(--border); border-radius: 12px; background: #ffffff04; transition: border-color .15s, background .15s; }
+.acct-help-card:hover { border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: #ffffff07; }
+.acct-help-card > span:last-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.acct-help-card strong { font-size: 13px; color: var(--white); }
+.acct-help-card small { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.acct-help-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; color: var(--violet-light); background: color-mix(in srgb, var(--violet) 14%, transparent); border: 1px solid color-mix(in srgb, var(--violet) 25%, transparent); }
+.acct-danger { border-color: color-mix(in srgb, var(--danger) 28%, transparent); }
+.acct-danger-title, .acct-danger-title svg { color: var(--danger); }
+.acct-danger-row { display: flex; align-items: flex-start; gap: 13px; padding: 15px; border-radius: 12px; background: color-mix(in srgb, var(--danger) 6%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 16%, transparent); }
+.acct-danger-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.acct-danger-text { flex: 1; min-width: 0; }
+.acct-danger-text strong { font-size: 13.5px; color: var(--fg2); }
+.acct-danger-text p { margin: 5px 0 0; font-size: 12px; line-height: 1.65; color: var(--muted); }
+.acct-del-btn { flex-shrink: 0; padding: 9px 15px; font-size: 12px; font-weight: 650; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); border-radius: 9px; }
+.acct-del-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 20%, transparent); border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+.acct-confirm { flex: 1; min-width: 0; }
+.acct-confirm strong { font-size: 13.5px; color: var(--danger); }
+.acct-confirm > p { margin: 5px 0 12px; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.acct-confirm-btns { display: flex; flex-wrap: wrap; gap: 9px; }
+.acct-confirm .auth-error { margin: 10px 0 0; }
+@media (max-width: 560px) {
+  .acct-help { grid-template-columns: 1fr; }
+  .acct-danger-row { flex-wrap: wrap; }
+  .acct-name-row { flex-direction: column; }
+}

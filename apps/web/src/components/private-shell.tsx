@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ChevronDown, CircleDollarSign, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, Users, Zap } from "lucide-react";
+import { Activity, ChevronDown, CircleDollarSign, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, UserRound, Users, Zap } from "lucide-react";
 import { Brand } from "./brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
@@ -101,6 +101,7 @@ export function PrivateShell({
               {locale && <LocaleSwitcher current={locale} />}
               {admin && !adminArea && <Link href="/admin" className="shell-admin-link"><ShieldCheck size={15} />{t.adminPanel}</Link>}
               {adminArea && <Link href="/app" className="shell-admin-link"><Compass size={15} />{t.backToApp}</Link>}
+              {!adminArea && <Link href="/app/conta" className="shell-admin-link"><UserRound size={15} />{t.myAccount}</Link>}
               {!adminArea && <Link href="/app/suporte" className="shell-admin-link"><Headset size={15} />{t.support}</Link>}
               <button type="button" onClick={() => void doLogout()} className="shell-logout"><LogOut size={15} />{t.logout}</button>
             </div>
