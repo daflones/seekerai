@@ -57,19 +57,19 @@ const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 // reasoning_content e estoura o budget de ~150s da function.
 const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
 const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-labs/flux.2-klein-4b";
-// Modelos de visão pra descrever fotos reais — gemini pago primeiro;
-// free do OpenRouter cobre quando a conta está sem crédito.
+// Modelos de visão pra descrever fotos reais — gemma ":free" primeiro
+// (custo zero), gemini pago só quando os gratuitos não respondem.
 const VISION_MODELS = (optionalEnv("VISION_MODEL")
-  ?? "google/gemini-2.5-flash,google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free")
+  ?? "google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,google/gemini-2.5-flash")
   .split(",").map((s) => s.trim()).filter(Boolean);
 // Groq (api.groq.com) — gratuito, OpenAI-compatible, latência baixa.
 const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
 // Modelo ":free" do próprio OpenRouter — não consome crédito pago e
 // responde rápido (~10s). Rede de segurança quando a NVIDIA está fora.
 const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
-// Patch de config do site (copy + serviços + FAQ + SEO) — 4.1-mini escreve
-// conteúdo mais rico que o 4o-mini pelo mesmo prompt.
-const PATCH_MODEL = optionalEnv("AI_PATCH_MODEL") ?? "openai/gpt-4.1-mini";
+// Patch de config do site (copy + serviços + FAQ + SEO) — JSON estruturado
+// de ~2.5k tokens; 4o-mini resolve pela metade do custo do 4.1-mini.
+const PATCH_MODEL = optionalEnv("AI_PATCH_MODEL") ?? "openai/gpt-4o-mini";
 
 // Circuit breaker: a conta free da NVIDIA derruba modelos sem aviso
 // (404/410) e os que aceitam a requisição travam até o timeout — sem o
@@ -388,12 +388,16 @@ function systemPromptFor(action: string, lang: string): string {
   }
 }
 
-/** Gera imagem via OpenRouter; se falhar (ou não houver chave), cai pra NVIDIA. */
+/** Gera imagem: NVIDIA FLUX (gratuito) primeiro — Gemini do OpenRouter
+ * (~$0,04/img) só quando o gratuito falha. Barateia o preenchimento de
+ * fotos do site do lead, que pode chegar a 5 imagens por geração. */
 async function generateSiteImage(
   apiKey: string | null,
   imagePrompt: string,
   errors?: string[],
 ): Promise<string | null> {
+  const free = await nvidiaImage(imagePrompt, errors);
+  if (free) return free;
   const res = apiKey
     ? await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -427,7 +431,7 @@ async function generateSiteImage(
     console.error("[site-image] openrouter falhou:", res?.status ?? "network");
     errors?.push(`openrouter:${res?.status ?? "network"}`);
   }
-  return nvidiaImage(imagePrompt, errors);
+  return null;
 }
 
 const REF_DESCRIBE_PROMPT =
