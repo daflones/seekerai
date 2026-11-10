@@ -42,7 +42,9 @@ const ACTIONS = new Set([
 
 const TEXT_MODEL = optionalEnv("AI_TEXT_MODEL") ?? "openai/gpt-4o-mini";
 const IMAGE_MODEL = optionalEnv("AI_IMAGE_MODEL") ?? "google/gemini-2.5-flash-image";
-const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "anthropic/claude-sonnet-4.5";
+// Geração de site/app: 4.1-mini escreve páginas completas (~30KB/7 seções);
+// o 4o-mini entregava esqueleto de ~5KB. Custo ~5x mas ainda centavos.
+const SITE_MODEL = optionalEnv("AI_SITE_MODEL") ?? "openai/gpt-4.1-mini";
 const MAX_SITE_IMAGES = 8;
 // Alvo de mídia do site premium: 1 hero + galeria p/ corredor 3D e masonry.
 // O que o lead não tiver de imagem real a IA gera (até o teto abaixo).
@@ -65,8 +67,8 @@ const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versati
 // Modelo ":free" do próprio OpenRouter — não consome crédito pago e
 // responde rápido (~10s). Rede de segurança quando a NVIDIA está fora.
 const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
-// Patch de config do site é JSON estruturado de ~2.5k tokens — modelo
-// mid-tier resolve sobrando; Sonnet fica só pro generate_app (HTML cheio).
+// Patch de config do site (copy + serviços + FAQ + SEO) — 4.1-mini escreve
+// conteúdo mais rico que o 4o-mini pelo mesmo prompt.
 const PATCH_MODEL = optionalEnv("AI_PATCH_MODEL") ?? "openai/gpt-4.1-mini";
 
 // Circuit breaker: a conta free da NVIDIA derruba modelos sem aviso
@@ -2719,9 +2721,11 @@ async function publishPremiumSite(
 const APP_SYSTEM = `Você é o motor do SeekerAi Studio: gera aplicações completas em UM arquivo HTML, com nível visual de produto pago/premium.
 
 REGRAS ABSOLUTAS:
+- O PEDIDO DO USUÁRIO MANDA: se qualquer regra abaixo conflitar com o que ele pediu explicitamente (cores, layout, conteúdo, fontes, idioma), a instrução dele vence.
 - Responda SOMENTE com o documento HTML completo (<!doctype html>…</html>). Nenhum texto fora, nenhum markdown, nenhuma explicação.
 - TUDO inline: um <style> no <head> e um <script> antes de </body>. Bibliotecas externas SÓ via CDN confiável quando essenciais (Google Fonts, lucide via unpkg). Nada de React/build tools.
 - Conteúdo REAL e completo, no idioma do pedido (default: português brasileiro): nomes, serviços, preços em R$, avaliações, FAQ — nada de "lorem" ou placeholders vagos.
+- ENTREGA COMPLETA, não esqueleto — o produto final tem estrutura de página real. Pedido de site/landing: entregue NO MÍNIMO navbar, hero, faixa de prova social/stats, a seção central do pedido (menu, serviços, produtos), galeria ou destaques, depoimentos/avaliações, FAQ, CTA final e footer rico — cada uma com conteúdo real e completo. App/fluxo: telas completas com estados, não mockups.
 - 100% responsivo com mobile-first real (media queries, layout que adapta de verdade).
 
 PROIBIDO (deduz qualidade):
@@ -2791,7 +2795,7 @@ async function generateAppHtml(
         "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital", "X-Title": "SeekerAi Studio",
       },
       body: JSON.stringify({
-        model: SITE_MODEL, max_tokens: 24000, temperature: 0.7,
+        model: SITE_MODEL, max_tokens: 16384, temperature: 0.6,
         messages: [
           { role: "system", content: APP_SYSTEM },
           { role: "user", content: user },
@@ -2993,10 +2997,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // editor_assist edita HTML estruturado — usa o modelo de patch
-      // (gpt-4.1-mini), mais preciso em edição de marcação que o mini de chat.
-      const model = action === "generate_image" ? IMAGE_MODEL
-        : action === "editor_assist" ? PATCH_MODEL : TEXT_MODEL;
+      // Um modelo só pras ações de texto: gpt-4o-mini (TEXT_MODEL) — rápido,
+      // barato e preciso o bastante pra edição de HTML do editor.
+      const model = action === "generate_image" ? IMAGE_MODEL : TEXT_MODEL;
 
       // Imagem avulsa: o pedido do usuário vira prompt em inglês otimizado
       // com a identidade do estabelecimento embutida.
