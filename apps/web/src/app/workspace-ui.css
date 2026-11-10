@@ -364,6 +364,17 @@
 .shell-workspace .st-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; font-size: 11.5px; }
 .shell-workspace .st-btn-edit { color: var(--violet-light); border-color: color-mix(in srgb, var(--violet) 38%, transparent); background: color-mix(in srgb, var(--violet) 8%, var(--panel)); }
 .shell-workspace .st-btn-edit:hover { background: color-mix(in srgb, var(--violet) 16%, var(--panel)); }
+/* Marcar como ganho: badge + painel de vínculo com o cliente. */
+.shell-workspace .st-btn-won { color: #ffd88a; border-color: color-mix(in srgb, #e8b34f 40%, transparent); background: color-mix(in srgb, #e8b34f 9%, var(--panel)); }
+.shell-workspace .st-btn-won:hover { background: color-mix(in srgb, #e8b34f 18%, var(--panel)); }
+.shell-workspace .st-won-badge { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 8px; font-size: 11.5px; font-weight: 700; color: #8ff0b8; background: color-mix(in srgb, #34c777 12%, var(--panel)); border: 1px solid color-mix(in srgb, #34c777 38%, transparent); }
+.shell-workspace .st-won { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.shell-workspace .st-won-t { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--fg2); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.shell-workspace .st-won-t small { font-weight: 500; color: var(--muted); }
+.shell-workspace .st-won-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.shell-workspace .st-won-row select, .shell-workspace .st-won-row input { height: 34px; padding: 0 10px; border-radius: 8px; background: var(--ink); border: 1px solid var(--border); color: var(--fg); font-size: 12.5px; min-width: 180px; flex: 1; max-width: 320px; }
+.shell-workspace .st-won-row select:focus-visible, .shell-workspace .st-won-row input:focus-visible { border-color: var(--violet); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 16%, transparent); }
+.shell-workspace .st-won-or { color: var(--muted); font-size: 11.5px; }
 .shell-workspace .st-stage { padding: 30px; display: flex; justify-content: center; background-color: var(--ink); background-image: radial-gradient(color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1px); background-size: 18px 18px; }
 .shell-workspace .st-device { width: 100%; background: #fff; box-shadow: 0 24px 70px #00000038; overflow: hidden; }
 .shell-workspace .st-device-browser { border-radius: 13px; border: 1px solid var(--border); }

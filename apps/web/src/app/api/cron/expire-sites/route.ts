@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { wipePrefix } from "@/lib/storage-wipe";
 
 // Expiração em lote dos sites de lead com +7 dias sem fechar.
 // Opcional: a leitura em lib/sites.ts já expira lazy — esta rota existe
@@ -20,5 +21,16 @@ export async function GET(request: NextRequest) {
   if (graceErr) {
     return NextResponse.json({ error: "Falha ao aplicar expirações." }, { status: 500 });
   }
-  return NextResponse.json({ expired: data ?? 0, grace: grace ?? null });
+  // Purga de 7 dias: apaga sites/outputs de leads não-ganhos e projetos
+  // do estúdio sem "ganho" — e as pastas deles no bucket site-assets.
+  const { data: purge, error: purgeErr } = await admin.rpc("purge_unwon_assets");
+  if (purgeErr) {
+    return NextResponse.json({ error: "Falha ao purgar assets expirados." }, { status: 500 });
+  }
+  const p = (purge ?? {}) as Record<string, unknown>;
+  const slugs = Array.isArray(p.site_slugs) ? p.site_slugs as string[] : [];
+  for (const slug of slugs) {
+    await wipePrefix(admin, "site-assets", slug).catch(() => null);
+  }
+  return NextResponse.json({ expired: data ?? 0, grace: grace ?? null, purge: p });
 }

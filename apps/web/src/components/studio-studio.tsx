@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Clapperboard, Copy, Check, Download, FilePlus2, Image as ImageIcon,
-  Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, X,
+  Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, Trophy, X,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
@@ -16,6 +16,8 @@ interface Project {
   id: string; status: "running" | "done" | "error";
   html: string | null; erro: string | null; nome: string;
   target: Target; site_slug: string | null; created_at: string;
+  lead_id?: string | null; ganho_em?: string | null;
+  leads?: { nome?: string } | null;
 }
 
 const MAX_IMG = 6;
@@ -50,6 +52,13 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [preview, setPreview] = useState<Target | null>(null);
+  const [wonOpen, setWonOpen] = useState(false);
+  const [wonBusy, setWonBusy] = useState(false);
+  const [wonLeads, setWonLeads] = useState<{ id: string; nome: string }[]>([]);
+  const [wonLeadId, setWonLeadId] = useState("");
+  const [wonNewName, setWonNewName] = useState("");
+  const [wonError, setWonError] = useState("");
+  const [wonClient, setWonClient] = useState("");
   const imgInput = useRef<HTMLInputElement>(null);
   const vidInput = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,6 +84,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
           const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${openId}`);
           if (!p) return;
           setProject(p);
+          setWonClient("");
           if (p.status === "running") { setRunning(true); startPoll(p.id); }
           else if (p.status === "error") setError(p.erro ?? t.failed);
           else setPreview(p.target);
@@ -179,6 +189,35 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
     a.download = `${project.nome.slice(0, 40).replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "app"}.html`;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  async function openWon() {
+    setWonOpen(v => !v);
+    if (wonLeads.length === 0) {
+      try {
+        const d = await api<{ leads?: { id: string; nome: string }[] }>("/api/criacoes?size=6");
+        setWonLeads(d.leads ?? []);
+      } catch { /* seletor fica vazio — ainda dá pra criar cliente novo */ }
+    }
+  }
+
+  async function markWon() {
+    if (!project || wonBusy) return;
+    setWonBusy(true);
+    setWonError("");
+    try {
+      const { lead } = await api<{ lead: { id: string; nome: string } }>("/api/studio/won", {
+        projectId: project.id,
+        ...(wonLeadId ? { leadId: wonLeadId } : { clientName: wonNewName.trim() }),
+      });
+      setWonClient(lead.nome);
+      setProject({ ...project, ganho_em: new Date().toISOString(), lead_id: lead.id });
+      setWonOpen(false);
+    } catch (e) {
+      setWonError(e instanceof Error ? e.message : t.wonErr);
+    } finally {
+      setWonBusy(false);
+    }
   }
 
   async function copyLink() {
@@ -304,11 +343,46 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
           <button type="button" className="st-btn" onClick={() => void generate()} disabled={running} title={t.regenerate}>
             <RotateCcw size={14} /><span>{t.regenerate}</span>
           </button>
+          {project.ganho_em
+            ? <span className="st-won-badge" title={t.wonBadge}>
+              <Trophy size={14} />
+              <span>{t.wonBadge}{(wonClient || project.leads?.nome) ? ` · ${wonClient || project.leads?.nome}` : ""}</span>
+            </span>
+            : <button type="button" className="st-btn st-btn-won" onClick={() => void openWon()} title={t.won}>
+              <Trophy size={14} /><span>{t.won}</span>
+            </button>}
           <button type="button" className="st-btn" onClick={reset} title={t.newApp}>
             <FilePlus2 size={14} /><span>{t.newApp}</span>
           </button>
         </div>
       </div>
+      {wonOpen && !project.ganho_em && <div className="st-won">
+        <p className="st-won-t">{t.wonT} <small>{t.wonHint}</small></p>
+        <div className="st-won-row">
+          <select
+            value={wonLeadId}
+            onChange={e => { setWonLeadId(e.target.value); if (e.target.value) setWonNewName(""); }}
+            aria-label={t.wonPick}
+          >
+            <option value="">{t.wonPick}</option>
+            {wonLeads.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
+          </select>
+          <span className="st-won-or">{t.wonOr}</span>
+          <input
+            value={wonNewName}
+            onChange={e => { setWonNewName(e.target.value); if (e.target.value) setWonLeadId(""); }}
+            placeholder={t.wonNamePh}
+            maxLength={200}
+          />
+          <button type="button" className="st-btn st-btn-primary"
+            disabled={wonBusy || (!wonLeadId && !wonNewName.trim())}
+            onClick={() => void markWon()}>
+            {wonBusy ? <Loader2 size={14} className="spin" /> : <Trophy size={14} />}
+            <span>{wonBusy ? t.wonSaving : t.wonSave}</span>
+          </button>
+        </div>
+        {wonError && <p className="st-err" role="alert">{wonError}</p>}
+      </div>}
       <div className={`st-stage st-stage-${viewTarget}`}>
         {viewTarget === "mobile"
           ? <div className="st-device st-device-phone">
@@ -332,7 +406,10 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
         {history.map(p => <li key={p.id}>
           <button type="button" onClick={async () => {
             const { project: full } = await api<{ project: Project | null }>(`/api/studio/generate?id=${p.id}`);
-            if (full) { setProject(full); setPreview(full.target); window.scrollTo({ top: 0, behavior: "smooth" }); }
+            if (full) {
+              setProject(full); setPreview(full.target); setWonClient(""); setWonOpen(false);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
           }}>
             {p.target === "mobile" ? <Smartphone size={14} /> : <Monitor size={14} />}
             <span className="st-h-name">{p.nome || t.untitled}</span>

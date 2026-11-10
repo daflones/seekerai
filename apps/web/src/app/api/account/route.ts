@@ -4,6 +4,7 @@ import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { wipePrefix } from "@/lib/storage-wipe";
 
 const patchSchema = z.object({
   nome: z.string().trim().min(2, "Informe um nome válido.").max(60),
@@ -50,6 +51,22 @@ export async function DELETE(request: NextRequest) {
       { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
   }
   const admin = createSupabaseAdminClient();
+
+  // O cascade cobre as linhas do banco; os arquivos no Storage ficariam
+  // órfãos — varre os buckets antes de derrubar a conta:
+  //   studio-refs/<uid>/…      uploads do Estúdio e refs de site
+  //   site-assets/<slug>/…     imagens dos sites publicados do usuário
+  const { data: slugs } = await admin.from("sites")
+    .select("slug").eq("owner_id", session.user.id);
+  try {
+    await wipePrefix(admin, "studio-refs", session.user.id);
+    for (const { slug } of slugs ?? []) {
+      await wipePrefix(admin, "site-assets", slug);
+    }
+  } catch (e) {
+    console.error("[account] falha ao limpar storage:", e);
+  }
+
   const { error } = await admin.auth.admin.deleteUser(session.user.id);
   if (error) {
     return NextResponse.json({ error: "Não foi possível excluir agora." }, { status: 400 });

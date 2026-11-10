@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ projects: list ?? [] }, { headers: { "Cache-Control": "no-store" } });
   }
   const { data } = await session.supabase.from("studio_projects")
-    .select("id,status,html,erro,nome,target,site_slug,modelo,created_at")
+    .select("id,status,html,erro,nome,target,site_slug,modelo,created_at,lead_id,ganho_em,leads:lead_id(nome)")
     .eq("id", id).maybeSingle();
   if (data?.status === "running" && Date.now() - new Date(data.created_at).getTime() > STALE_MS) {
     const admin = createSupabaseAdminClient();

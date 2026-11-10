@@ -23,6 +23,7 @@ interface LeadRow { id: string; nome: string | null; dados: unknown }
 interface ProjectRow {
   id: string; nome: string | null; target: string; status: string;
   erro: string | null; site_slug: string | null; created_at: string;
+  lead_id: string | null;
 }
 
 const TEXT_KINDS = new Set(["sales_reply", "deep_strategy", "image_prompt"]);
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       .select("id,nome,dados")
       .eq("user_id", session.user.id).limit(2000),
     session.supabase.from("studio_projects")
-      .select("id,nome,target,status,erro,site_slug,created_at")
+      .select("id,nome,target,status,erro,site_slug,created_at,lead_id")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false }).limit(500),
   ]);
@@ -72,7 +73,9 @@ export async function GET(request: NextRequest) {
   for (const p of (projectsRes.data ?? []) as ProjectRow[]) {
     items.push({
       id: p.id, kind: "app", sub: p.target === "mobile" ? "app_mobile" : "app_web",
-      title: p.nome ?? "", leadId: null, leadName: null, siteSlug: p.site_slug,
+      title: p.nome ?? "", leadId: p.lead_id,
+      leadName: p.lead_id ? leadById.get(p.lead_id)?.nome ?? null : null,
+      siteSlug: p.site_slug,
       status: p.status === "running" ? "running" : p.status === "error" ? "error" : "done",
       erro: p.erro, model: null, excerpt: null, createdAt: p.created_at,
     });
