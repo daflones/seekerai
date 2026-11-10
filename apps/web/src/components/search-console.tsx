@@ -20,8 +20,11 @@ const PAGE_SIZE = 9;
 const STORE_KEY = "seekerai_search_v1";
 // Proteção de espera: avisa aos 40s (busca continua), cancela aos 90s —
 // job que morre no edge ficaria "running" pra sempre sem isso.
-const SLOW_MS = 40_000;
-const DEAD_MS = 90_000;
+// O aviso de demora espera a busca trabalhar: Serper + enriquecimento
+// demoram ~1-2min, então só avisa depois de 1:10 sem resultado — e o
+// cancelamento automático dá folga de 3min antes de desistir.
+const SLOW_MS = 70_000;
+const DEAD_MS = 180_000;
 
 interface SearchResponse {
   resultados: PlaceResult[];
