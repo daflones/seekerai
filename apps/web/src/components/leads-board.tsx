@@ -8,6 +8,7 @@ import {
   MessageSquareText, Phone, Sparkles, Star, Target, Users, FileCode2,
 } from "lucide-react";
 import { callAction, fmtCompact, igHandle, igUrl, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
+import { isCreditsError, OutOfCredits } from "./out-of-credits";
 import { promptFor } from "@/lib/ai-prompts";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import type { Lang } from "@/lib/i18n/shared";
@@ -30,13 +31,15 @@ const KIND_LABEL: Record<ActionKind, keyof Messages["leadsPage"]> = {
   generate_image: "actImage",
 };
 
-export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, lang = "pt", t = getMessages("pt").leadsPage }: {
+export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, lang = "pt", trial = false, dailyActive = true, t = getMessages("pt").leadsPage }: {
   initialLeads: LeadRow[];
   serviceNames: Record<string, string>;
   serviceActions: Record<string, string[]>;
   costs: Record<string, number | null>;
   doneByLead?: Record<string, string[]>;
   lang?: Lang;
+  trial?: boolean;
+  dailyActive?: boolean;
   t?: Messages["leadsPage"];
 }) {
   const [leads, setLeads] = useState(initialLeads);
@@ -188,7 +191,9 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
         <button key={value} className={filter === value ? "active" : ""} onClick={() => pick(value)}>
           {statusLabel(value)} ({counts[value]})</button> : null)}
     </div>
-    {error && <p role="alert" className="auth-error">{error}</p>}
+    {error && (isCreditsError(error)
+      ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
+      : <p role="alert" className="auth-error">{error}</p>)}
     {visible.length === 0 && <p className="seek-empty">{t.noneHere}</p>}
 
     <div className="lead-grid">

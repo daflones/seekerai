@@ -8,6 +8,7 @@ import {
   Search, Send, Settings2, Smartphone, Sparkles, Tablet, Trash2, Undo2, X, Paintbrush,
 } from "lucide-react";
 import { callAction } from "@/lib/app-client";
+import { isCreditsError, OutOfCredits } from "./out-of-credits";
 import type grapesjs from "grapesjs";
 import type { Component } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
@@ -155,6 +156,7 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
   // Assistente de IA do editor: chat que aplica edições no HTML — com
   // elemento selecionado edita só ele; sem seleção, a página inteira.
   const [aiMsgs, setAiMsgs] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [aiNoCredits, setAiNoCredits] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiImgs, setAiImgs] = useState<string[]>([]);
   const [aiBusy, setAiBusy] = useState(false);
@@ -600,6 +602,7 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
       return;
     }
     setAiBusy(true);
+    setAiNoCredits(false);
     setAiMsgs((cur) => [...cur, { role: "user", text: instr }]);
     setAiInput("");
     const reply = (text: string) => setAiMsgs((cur) => [...cur, { role: "ai", text }]);
@@ -617,6 +620,7 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
         imagens: aiImgs,
       },
     });
+    if (!res.ok && isCreditsError(res.error)) { setAiNoCredits(true); setAiBusy(false); return; }
     const raw = res.ok ? res.data.conteudo : null;
     const cleaned = (raw ?? "").replace(/```(?:json)?|```/g, "").trim();
     const s = cleaned.indexOf("{");
@@ -636,6 +640,9 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
         prompt: dec.imagePrompt,
         context: { nome },
       });
+      if (!img.ok && isCreditsError(img.error)) {
+        setAiNoCredits(true); setAiImgs([]); setAiBusy(false); return;
+      }
       const url = img.ok ? img.data.imagens?.[0] : null;
       if (url) {
         insertAiImage(ed, url);
@@ -772,6 +779,7 @@ export function SiteEditor({ slug, nome, lang, t }: { slug: string; nome: string
             {aiMsgs.map((m, i) => <div key={i} className={`se-ai-msg is-${m.role}`}>{m.text}</div>)}
             {aiBusy && <div className="se-ai-msg is-ai"><Loader2 size={13} className="spin" /></div>}
           </div>
+          {aiNoCredits && <OutOfCredits lang={lang} />}
           {aiImgs.length > 0 && <div className="se-ai-imgs">
             {aiImgs.map((u) => <span key={u} className="se-ai-thumb">
               {/* eslint-disable-next-line @next/next/no-img-element */}
