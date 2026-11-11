@@ -115,6 +115,15 @@ export async function middleware(request: NextRequest) {
   const privatePath = path === "/app" || path.startsWith("/app/") || path === "/admin" || path.startsWith("/admin/") ||
     path === "/completar-cadastro" || path === "/redefinir-senha";
 
+  // Acesso do Brasil ao .digital → .com.br. O header cf-ipcountry só é
+  // confiável atrás do Cloudflare (quem bate direto não tem o header e
+  // segue no .digital). Exceções: /auth/* precisa completar no domínio
+  // que iniciou o fluxo (cookie PKCE vive lá) e POST/ação não vira 302.
+  if (host === "seekerai.digital" && request.headers.get("cf-ipcountry") === "BR" &&
+      (request.method === "GET" || request.method === "HEAD") && !path.startsWith("/auth/")) {
+    return NextResponse.redirect(`https://seekerai.com.br${path}${request.nextUrl.search}`, 302);
+  }
+
   // Domínio customizado: qualquer rota serve o site publicado correspondente.
   if (host && !appHosts().has(host) && config) {
     const apex = host.startsWith("www.") ? host.slice(4) : host;
