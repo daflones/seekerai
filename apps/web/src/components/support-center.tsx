@@ -17,6 +17,8 @@ export interface TicketRow {
   atendente?: string;
   created_at: string;
   cliente?: string;
+  /** Admin: id do dono do chamado — alimenta o painel do cliente. */
+  user_id?: string;
 }
 
 // Lista de chamados + conversa em tempo real ao clicar.

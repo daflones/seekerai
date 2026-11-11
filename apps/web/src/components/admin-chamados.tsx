@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Bot, CheckCircle2, ChevronLeft, ChevronRight, Hourglass, Loader2, MessageCircle, XCircle } from "lucide-react";
 import { TicketChat, TICKET_STATUS_LABEL } from "@/components/ticket-chat";
+import { CustomerPanel } from "@/components/customer-panel";
 import type { TicketRow } from "@/components/support-center";
 
 const FILTROS = [
@@ -102,6 +103,7 @@ export function AdminChamados({ tickets: initial, initialOpen = null }: { ticket
           </button>
           {openId === t.id && (
             <div className="ticket-chat-wrap">
+              {t.user_id && <CustomerPanel userId={t.user_id} cliente={t.cliente} />}
               <div className="chamados-actions">
                 <span>Status:</span>
                 {ACOES.map(([s, Icon]) => (

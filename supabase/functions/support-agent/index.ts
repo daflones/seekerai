@@ -100,6 +100,12 @@ DÚVIDAS COMUNS:
 - "Meu domínio não funciona" → após pagar, a ativação é manual em até 48h; o DNS precisa apontar pro servidor; se passou de 48h, escalate.
 - "Quanto custa X?" → use a TABELA VIVA no contexto.
 - "Atualizar/editar o site criado" → três caminhos: editor visual manual (Pro/King, grátis), assistente de IA dentro do editor (Pro/King — descreve a mudança e a IA aplica, grátis pra texto/HTML; gerar imagem custa a ação de imagem), ou "Nova versão" no workspace do lead (recria tudo pela IA no mesmo link, custo de geração da TABELA VIVA).
+
+REEMBOLSO — você NUNCA autoriza, promete nem agenda reembolso:
+- Sempre verifique o USO nos DADOS DO CLIENTE antes de responder um pedido de reembolso.
+- Cliente que USOU o serviço (buscas, leads salvos, sites/apps gerados — uso > 0): explique com empatia que a política não prevê reembolso de serviços já consumidos — os créditos/cotas utilizados não retornam — e que isso consta nos termos aceitos no cadastro. NÃO escale só por isso: responda com o dado ("você realizou X buscas e gerou Y sites") e ofereça caminho real: cancelar a renovação pra não ser cobrado de novo. Se o cliente insistir depois disso, aí escale pro time avaliar.
+- Cliente que pagou e NÃO usou nada (uso zerado), ou cobrança duplicada/erro de pagamento confirmado → escale pro time analisar, dizendo que o caso vai pra avaliação humana.
+- NUNCA prometa ganhos: o SeekerAi é uma ferramenta — resultado/venda depende do esforço, da abordagem e da execução de cada usuário. Se o cliente reclamar que "pagou e não vendeu", reconheça a frustração, explique que a plataforma não garante faturamento e proponha orientação prática de uso (onde buscar, como abordar, o que gerar). Isso é atendimento — não confunda com pedido de reembolso.
 - "Quero mudar só uma parte/cor/foto" → assistente de IA do editor (Pro/King) ou edição manual — não precisa regerar o site inteiro.
 - "Geração de IA temporariamente indisponível/erro ao gerar" → explique que é instabilidade pontual do provedor, que crédito cobrado com falha é estornado automaticamente, peça pra tentar de novo; se persistir depois de nova tentativa, aí sim escale.
 
@@ -336,7 +342,7 @@ Deno.serve(async (req) => {
 
     const uid = ticket.user_id as string;
     const [profileRes, subRes, walletRes, leadsRes, outputsRes, studioRes, domainsRes, paymentRes,
-      plansRes, rulesRes, settingsRes, paidRes] =
+      plansRes, rulesRes, settingsRes, paidRes, searchesRes] =
       await Promise.all([
         db.from("profiles").select("nome,created_at").eq("id", uid).maybeSingle(),
         db.from("subscriptions")
@@ -360,6 +366,7 @@ Deno.serve(async (req) => {
           .in("key", ["first_purchase_discount_pct", "domain_price_cents", "credit_packs"]),
         db.from("payments").select("id", { count: "exact", head: true })
           .eq("user_id", uid).eq("status", "paid"),
+        db.from("search_jobs").select("id", { count: "exact", head: true }).eq("user_id", uid),
       ]);
 
     const nome = (profileRes.data?.nome as string | undefined)?.split(" ")[0] ?? "cliente";
@@ -377,7 +384,7 @@ Deno.serve(async (req) => {
       `DADOS DO CLIENTE (reais): nome: ${nome} | ` +
       `plano: ${plan ? `${plan} (ativo${periodEnd ? ` até ${periodEnd}` : ""})` : "sem assinatura"} | ` +
       `saldo: ${walletRes.data?.saldo ?? 0} créditos | ` +
-      `leads salvos: ${leadsRes.count ?? 0} | criações de leads: ${outputsRes.count ?? 0} | ` +
+      `USO: ${searchesRes.count ?? 0} buscas | leads salvos: ${leadsRes.count ?? 0} | criações de leads: ${outputsRes.count ?? 0} | ` +
       `projetos do Estúdio: ${studioRes.count ?? 0} | domínios: ${domains} | ` +
       `último pagamento: ${lastPay}.`;
 

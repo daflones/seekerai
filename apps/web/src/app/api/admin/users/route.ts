@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { verifiedSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { wipePrefix } from "@/lib/storage-wipe";
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_plan"), userId: z.string().uuid(), planSlug: z.string().min(1).max(60) }),
   z.object({ action: z.literal("cancel_sub"), userId: z.string().uuid() }),
+  z.object({ action: z.literal("delete_account"), userId: z.string().uuid() }),
   z.object({
     action: z.literal("adjust_credits"),
     userId: z.string().uuid(),
@@ -30,6 +32,26 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   const { userId, action } = parsed.data;
   const admin = createSupabaseAdminClient();
+
+  if (action === "delete_account") {
+    if ("session" in auth && auth.session?.user.id === userId) {
+      return NextResponse.json({ error: "Você não pode excluir a própria conta." }, { status: 400 });
+    }
+    // Mesmo caminho da autoexclusão: storage dos sites/estúdio primeiro,
+    // depois o auth user (cascata cobre leads, sites, créditos, tickets).
+    const { data: slugs } = await admin.from("sites").select("slug").eq("owner_id", userId);
+    const { data: tickets } = await admin.from("support_tickets").select("id").eq("user_id", userId);
+    try {
+      await wipePrefix(admin, "studio-refs", userId);
+      for (const { slug } of slugs ?? []) await wipePrefix(admin, "site-assets", slug);
+      for (const { id } of tickets ?? []) await wipePrefix(admin, "support-files", id);
+    } catch (e) {
+      console.error("[admin/users] falha ao limpar storage:", e);
+    }
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) return NextResponse.json({ error: "Não foi possível excluir agora." }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
 
   if (action === "set_plan") {
     const { data: plan } = await admin.from("plans").select("id,slug,nome,creditos_mensais").eq("slug", parsed.data.planSlug).single();

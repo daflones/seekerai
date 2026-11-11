@@ -462,7 +462,32 @@ a.lead-action { text-decoration: none; }
 .ticket-cancelado { background: #f871711c; color: var(--danger); }
 .ticket-expirado { background: #94a3b81c; color: var(--muted); }
 .ticket-ia { font-size: 9.5px; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 999px; background: linear-gradient(120deg, #a879d1, #6be3cc); color: var(--panel); }
-.chat-ia-seal { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: .05em; margin-left: 5px; padding: 1px 6px; border-radius: 999px; background: linear-gradient(120deg, #a879d1, #6be3cc); color: var(--panel); vertical-align: middle; }
+/* ── Painel do cliente (admin, dentro do chamado) ── */
+.cust-panel { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 11px; background: #a879d10a; overflow: hidden; }
+.cust-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 13px; background: none; border: none; color: var(--violet-light); font-size: 12px; font-weight: 700; letter-spacing: .03em; cursor: pointer; text-align: left; }
+.cust-toggle span { flex: 1; color: var(--fg2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cust-toggle .flip { transform: rotate(180deg); }
+.cust-body { padding: 4px 13px 13px; border-top: 1px solid #a879d114; }
+.cust-grid { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; margin-top: 8px; font-size: 12.5px; color: var(--fg2); }
+.cust-grid b { color: var(--white); font-weight: 700; }
+.cust-grid small { display: block; font-size: 10.5px; color: var(--muted); }
+.cust-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.cust-pill.ok { border-color: #6be3cc55; color: var(--cyan); }
+.cust-usage { margin-top: 7px; font-size: 11.5px; color: var(--muted); }
+.cust-pays { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--fg2); }
+.cust-pays li { display: flex; align-items: center; gap: 6px; }
+.cust-pays b { font-weight: 700; }
+.pay-paid { color: var(--cyan); } .pay-pending { color: #e8c96b; } .pay-failed, .pay-canceled { color: #e86b6b; }
+.cust-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 10px; }
+.cust-actions label { display: flex; flex-direction: column; gap: 3px; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.cust-actions label.grow { flex: 1; min-width: 120px; }
+.cust-actions select, .cust-actions input { background: var(--ink); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-size: 12px; padding: 7px 9px; min-width: 0; }
+.cust-actions select { min-width: 210px; }
+.cust-actions input[type="number"] { width: 90px; }
+.cust-note { margin: 8px 0 0; font-size: 12px; color: var(--cyan); }
+.cust-danger { margin-top: 12px; }
+.cust-del { border-color: #e86b6b55 !important; color: #e86b6b !important; }
+.cust-del-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--fg2); }
 .ticket-open { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: none; border: none; padding: 0; text-align: left; cursor: pointer; color: inherit; }
 .ticket-open > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .ticket-open:hover strong, .ticket-open.active strong { color: var(--violet-light); }

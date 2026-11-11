@@ -204,6 +204,8 @@ export function TicketChat({
   }
 
   const open = ticketOpen(currentStatus);
+  // No admin, mensagens do cliente mostram o nome dele — não "Você".
+  const userLabel = enhanceable ? (chatContext?.cliente ?? "Cliente") : tt.you;
 
   return <div className="chat">
     <div className="chat-messages" ref={boxRef}>
@@ -228,12 +230,11 @@ export function TicketChat({
             </span>
           )}
           <span className="chat-msg-from">
-            {m.sender_role === "user" ? tt.you : "SeekerAi"}
-            {m.sender_role === "ia" && <em className="chat-ia-seal">IA</em>}
+            {m.sender_role === "user" ? userLabel : "SeekerAi"}
           </span>
           {quoted && (
             <span className="chat-quote">
-              <b>{quoted.sender_role === "user" ? tt.you : "SeekerAi"}</b>
+              <b>{quoted.sender_role === "user" ? userLabel : "SeekerAi"}</b>
               {quoted.mensagem.slice(0, 140) || "…"}
             </span>
           )}
@@ -258,7 +259,7 @@ export function TicketChat({
         {replyTo && (
           <div className="chat-replying">
             <span>
-              <b>{replyTo.sender_role === "user" ? tt.you : "SeekerAi"}</b>
+              <b>{replyTo.sender_role === "user" ? userLabel : "SeekerAi"}</b>
               {replyTo.mensagem.slice(0, 120) || "…"}
             </span>
             <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancelar"><X size={13} /></button>
