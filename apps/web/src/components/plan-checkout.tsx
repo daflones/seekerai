@@ -135,9 +135,8 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
 
   function planCard(plan: PlanItem, flag?: string | null) {
     const isFree = plan.priceCents === 0;
-    return <article key={plan.slug} className={`plan-card-checkout plan-theme-${plan.content.theme ?? "violet"}${plan.featured ? " featured" : ""}`}>
+    return <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}`}>
       {flag && <span className="plan-flag">{flag}</span>}
-      {plan.content.badge && <span className="plan-tag">{plan.content.badge}</span>}
       <h3>{plan.name}</h3>
       <p className="plan-price">
         {!isFree && discountPct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}

@@ -153,7 +153,7 @@
 .shell-workspace .lead-action-done { color: var(--ok); }
 .shell-workspace :is(.lead-open, .cre-lead) { color: var(--violet-light); }
 .shell-workspace .plan-card-checkout { padding: 30px; }
-.shell-workspace .plan-card-checkout.featured { box-shadow: 0 0 42px color-mix(in srgb, var(--plan-accent, var(--violet)) 22%, transparent); }
+.shell-workspace .plan-card-checkout.featured { border-color: color-mix(in srgb, var(--violet) 45%, transparent); background: linear-gradient(155deg, color-mix(in srgb, var(--violet) 9%, var(--panel)), var(--panel) 55%); box-shadow: var(--workspace-shadow); }
 .shell-workspace .plan-card-checkout.current { border-color: var(--ok); }
 .shell-workspace .plan-price { font-family: var(--font-heading); font-weight: 450; letter-spacing: -.04em; font-size: 38px; color: var(--white); }
 .shell-workspace .plan-features li { font-size: 12px; }
@@ -201,28 +201,7 @@
 .shell-workspace .plan-flag { border-radius: 8px; letter-spacing: .08em; }
 .shell-workspace .plan-off-tag { border-radius: 8px; }
 
-/* Cards de checkout temáticos — mesmas cores/efeitos do card da landing
-   e da prévia do admin (violeta Pro, âmbar King etc.). */
-.shell-workspace .plan-card-checkout { --plan-accent: var(--violet-light); --plan-text: var(--fg2); --plan-dim: var(--muted); --plan-line: color-mix(in srgb, var(--violet-light) 18%, transparent); --plan-btn-bg: var(--violet); --plan-btn-fg: #fff; }
-.shell-workspace .plan-card-checkout.plan-theme-violet { --plan-accent: #e1c6ff; --plan-text: #e1ccf2; --plan-dim: #b69aca; --plan-line: #d3acff2e; --plan-btn-bg: #9a62e6; background: radial-gradient(ellipse at 25% -10%, #a75cff60, transparent 70%), linear-gradient(150deg, #7131c9 0%, #47206f 48%, #110c1c 100%); border-color: #ab6de29c; }
-.shell-workspace .plan-card-checkout.plan-theme-gold { --plan-accent: #eed28d; --plan-text: #dfd0b2; --plan-dim: #b4a180; --plan-line: #d6b67425; --plan-btn-bg: #efce74; --plan-btn-fg: #34260c; background: radial-gradient(ellipse at 0% 90%, #4e26523d, transparent 60%), linear-gradient(140deg, #3e2d17, #100d16 65%); border-color: #b99a5952; }
-.shell-workspace .plan-card-checkout.plan-theme-teal { --plan-accent: #7ee8d4; --plan-text: #c1ded8; --plan-dim: #8cafaa; --plan-line: #8bcdbd24; --plan-btn-bg: #74e4ca; --plan-btn-fg: #132e2a; background: radial-gradient(ellipse at 110% 95%, #52297066, transparent 53%), linear-gradient(150deg, #123b39, #0b141b 75%); border-color: #649f8d55; }
-.shell-workspace .plan-card-checkout.plan-theme-cream { --plan-accent: #8255af; --plan-text: #584366; --plan-dim: #8b779d; --plan-line: #9775b52b; --plan-btn-bg: #8255af; background: linear-gradient(150deg, #fffcff, #ede5f4); border-color: #e6d8ef; }
-.shell-workspace .plan-card-checkout h3 { color: var(--plan-accent); }
-.shell-workspace .plan-card-checkout .plan-price { color: var(--plan-text); }
-.shell-workspace .plan-card-checkout :is(.plan-price small, .plan-tagline, .plan-billed-caption, .plan-current-note) { color: var(--plan-dim); }
-.shell-workspace .plan-card-checkout .plan-features li { color: var(--plan-text); }
-.shell-workspace .plan-card-checkout .plan-features li::before { background: var(--plan-accent); }
-.shell-workspace .plan-card-checkout .plan-tag { display: inline-flex; align-items: center; width: fit-content; padding: 5px 10px; font-size: 8px; font-weight: 750; letter-spacing: .04em; color: var(--plan-accent); border: 1px solid var(--plan-line); background: #ffffff07; border-radius: 99px; }
-.shell-workspace .plan-card-checkout.plan-theme-cream .plan-tag { background: #9261c00a; }
-.shell-workspace .plan-card-checkout .plan-flag { background: var(--plan-accent); color: #140d22; }
-.shell-workspace .plan-card-checkout.plan-theme-cream .plan-flag { color: #fff; }
-.shell-workspace .plan-card-checkout .plan-more > summary { color: var(--plan-accent); border-color: var(--plan-line); }
-.shell-workspace .plan-card-checkout .plan-actions { display: flex; gap: 9px; }
-.shell-workspace .plan-card-checkout .plan-actions .button { flex: 1; justify-content: center; white-space: nowrap; }
-.shell-workspace .plan-card-checkout .plan-actions .button-primary { background: var(--plan-btn-bg); border-color: transparent; color: var(--plan-btn-fg); box-shadow: 0 7px 20px #00000020; }
-.shell-workspace .plan-card-checkout .plan-actions .button-glass { color: var(--plan-accent); background: #ffffff08; border-color: var(--plan-line); }
-.shell-workspace .plan-card-checkout.plan-theme-cream .plan-actions .button-glass { background: #9261c00a; }
+/* Cards de checkout no modelo neutro (painel padrão do workspace). */
 
 /* Estúdio: alvo selecionado herda o texto do estado ativo. */
 .shell-workspace .st-target { border-radius: 12px; }
