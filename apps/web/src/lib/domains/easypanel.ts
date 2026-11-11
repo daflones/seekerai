@@ -1,11 +1,23 @@
 import "server-only";
 
-// Anexa/remove hosts no serviço web do EasyPanel (API tRPC com Bearer
-// token). updateDomains tem semântica PUT — substitui a lista inteira —
-// então sempre lemos os domínios atuais e mandamos a lista mesclada.
+// Anexa/remove hosts no serviço web do EasyPanel (API tRPC, Bearer token).
+// Domínios são entidades próprias (domains.*): cada host customizado entra
+// como apex + www clonando a config do domínio principal do serviço —
+// Traefik passa a rotear o host e o middleware do app resolve o slug.
 
 export interface EpConfig { url: string; token: string; project: string; service: string }
-interface EpDomain { host: string; https?: boolean; port?: number; path?: string }
+
+interface EpDomain {
+  id: string;
+  host: string;
+  https: boolean;
+  certificateResolver: string;
+  middlewares: unknown[];
+  path: string;
+  wildcard: boolean;
+  destinationType: string;
+  serviceDestination?: { projectName: string; serviceName: string; port: number; protocol: string; path: string };
+}
 
 export function easypanelConfig(): EpConfig | null {
   const url = process.env.EASYPANEL_URL?.trim().replace(/\/+$/, "");
@@ -16,8 +28,8 @@ export function easypanelConfig(): EpConfig | null {
 }
 
 function unwrap<T>(payload: unknown): T {
-  const p = payload as { result?: { data?: { json?: unknown } } };
-  return (p?.result?.data?.json ?? payload) as T;
+  const p = payload as { result?: { data?: { json?: unknown } }; json?: unknown };
+  return (p?.result?.data?.json ?? p?.json ?? payload) as T;
 }
 
 async function epQuery<T>(cfg: EpConfig, proc: string, input: unknown): Promise<T> {
@@ -42,33 +54,49 @@ async function epMutation<T>(cfg: EpConfig, proc: string, input: unknown): Promi
 }
 
 async function listDomains(cfg: EpConfig): Promise<EpDomain[]> {
-  const svc = await epQuery<Record<string, unknown>>(cfg, "services.app.inspectService", {
+  const list = await epQuery<EpDomain[]>(cfg, "domains.listDomains", {
     projectName: cfg.project, serviceName: cfg.service,
   });
-  const domains = (svc?.domains ?? (svc?.service as Record<string, unknown> | undefined)?.domains) as EpDomain[] | undefined;
-  return Array.isArray(domains) ? domains : [];
+  const all = Array.isArray(list) ? list : [];
+  return all.filter((d) =>
+    d.destinationType === "service" &&
+    d.serviceDestination?.projectName === cfg.project &&
+    d.serviceDestination?.serviceName === cfg.service);
 }
 
-// Anexa o host clonando a config (porta/https/path) do domínio principal.
+const apexWww = (host: string) => [host, `www.${host}`];
+const newId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 16)}`;
+
+// Anexa apex + www clonando a config do domínio principal do serviço.
 export async function attachServiceDomain(host: string): Promise<void> {
   const cfg = easypanelConfig();
   if (!cfg) throw new Error("EasyPanel não configurado.");
   const domains = await listDomains(cfg);
-  if (domains.some((d) => d.host === host)) return;
-  const ref = domains.find((d) => d.host === cfg.service) ?? domains[0];
-  domains.push({ host, https: ref?.https ?? true, port: ref?.port ?? 3000, path: ref?.path ?? "/" });
-  await epMutation(cfg, "services.app.updateDomains", {
-    projectName: cfg.project, serviceName: cfg.service, domains,
-  });
+  const ref = domains.find((d) => !d.host.endsWith(".easypanel.host")) ?? domains[0];
+  if (!ref?.serviceDestination) throw new Error("Serviço sem domínio de referência.");
+  const missing = apexWww(host).filter((h) => !domains.some((d) => d.host === h));
+  for (const h of missing) {
+    await epMutation(cfg, "domains.createDomain", {
+      id: newId(),
+      destinationType: "service",
+      host: h,
+      https: ref.https,
+      certificateResolver: ref.certificateResolver ?? "",
+      middlewares: ref.middlewares ?? [],
+      path: ref.path ?? "/",
+      wildcard: false,
+      serviceDestination: ref.serviceDestination,
+    });
+  }
 }
 
 export async function detachServiceDomain(host: string): Promise<void> {
   const cfg = easypanelConfig();
   if (!cfg) return;
-  const domains = await listDomains(cfg);
-  const next = domains.filter((d) => d.host !== host);
-  if (next.length === domains.length) return;
-  await epMutation(cfg, "services.app.updateDomains", {
-    projectName: cfg.project, serviceName: cfg.service, domains: next,
-  });
+  const drop = new Set(apexWww(host));
+  for (const d of await listDomains(cfg)) {
+    if (drop.has(d.host)) {
+      await epMutation(cfg, "domains.deleteDomain", { id: d.id }).catch(() => null);
+    }
+  }
 }
