@@ -69,3 +69,7 @@ verify_jwt = false
 # Chamada interna do app (x-internal-key), sem JWT de usuário.
 [functions.support-agent]
 verify_jwt = false
+
+# Endpoint isolado do Recrutamento F.SOCIETY.DEV (wizard + checkout PIX/Cartão + status)
+[functions.fsociety-recruitment]
+verify_jwt = false
