@@ -39,7 +39,9 @@ export function CheckoutSuccess({ features, fallback, t }: {
         const res = await fetch("/api/billing-status", { cache: "no-store" });
         if (res.ok) {
           const data = (await res.json()) as BillingStatus;
-          if (data.active) {
+          // Confirma pelo pagamento recente, não só pela assinatura
+          // ativa — quem faz upgrade já tem active=true antes de pagar.
+          if (data.status === "paid" || (data.status === null && data.active)) {
             setPaid(data);
             if (!refreshed.current) { refreshed.current = true; router.refresh(); }
             return;

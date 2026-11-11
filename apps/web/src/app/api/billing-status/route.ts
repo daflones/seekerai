@@ -33,6 +33,18 @@ export async function GET(request: NextRequest) {
     credits = typeof metaCredits === "number" && metaCredits > 0
       ? metaCredits
       : (pay?.plans as { creditos_mensais?: number } | null)?.creditos_mensais ?? null;
+  } else {
+    // Sem ref (retorno do checkout de cartão): olha o pagamento mais
+    // recente — num upgrade quem já tinha assinatura ativa teria
+    // active=true com status=null e a tela confirmava a compra errada.
+    const { data: pay } = await session.supabase.from("payments")
+      .select("status,metadata,plans:plan_id(creditos_mensais)")
+      .eq("user_id", session.user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    status = pay?.status ?? null;
+    const metaCredits = (pay?.metadata as { credits?: unknown } | null)?.credits;
+    credits = typeof metaCredits === "number" && metaCredits > 0
+      ? metaCredits
+      : (pay?.plans as { creditos_mensais?: number } | null)?.creditos_mensais ?? null;
   }
 
   return NextResponse.json({

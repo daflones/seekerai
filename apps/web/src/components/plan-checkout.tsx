@@ -71,7 +71,10 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
         const res = await fetch(`/api/billing-status?ref=${encodeURIComponent(ref!)}`, { cache: "no-store" });
         if (res.ok) {
           const data = (await res.json()) as BillingStatus;
-          if (data.status === "paid" || data.active) {
+          // Só o status DESTE pagamento conta — quem já tem assinatura
+          // ativa (upgrade/troca) sempre teria active=true e o QR virava
+          // "pagamento confirmado" no primeiro poll, antes de pagar.
+          if (data.status === "paid") {
             setPaid(data);
             router.refresh();
             trackMeta("Purchase", { content_name: pix!.pack ? `credit-pack-${pix!.pack.id}` : `plan-${pix!.plan}` });
