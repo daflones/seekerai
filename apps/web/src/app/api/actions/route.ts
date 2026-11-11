@@ -141,7 +141,9 @@ export async function POST(request: NextRequest) {
       await refundCreditAction(createSupabaseAdminClient(), session.user.id, requestRef);
     }
     const obj = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
-    const raw = obj?.error ?? obj?.erro;
+    // 'message' cobre erros de gateway do Supabase (Invalid JWT, 429) —
+    // sem ele o cliente via "não pôde ser concluída" sem saber por quê.
+    const raw = obj?.error ?? obj?.erro ?? obj?.message;
     const message = typeof raw === "string" && raw ? raw : "A ação não pôde ser concluída.";
     // Cloudflare mascara respostas 502/504 do origin com a página HTML dele —
     // respostas >=500 saem como 500 para o JSON de erro sempre chegar ao cliente.

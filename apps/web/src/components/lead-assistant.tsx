@@ -38,7 +38,7 @@ export function LeadAssistant({ lead, serviceName, lang = "pt", statusLabel, t }
     setError("");
     setBusy(true);
     setMsgs((m) => [...m, { autor: "user", texto: pergunta }]);
-    const res = await callAction<{ conteudo?: string; creditosCobrados?: number }>(
+    const ask = () => callAction<{ conteudo?: string; creditosCobrados?: number }>(
       "ai-generate",
       {
         action: "lead_assist",
@@ -60,6 +60,13 @@ export function LeadAssistant({ lead, serviceName, lang = "pt", statusLabel, t }
         },
       },
     );
+    // Provedores gratuitos oscilam — uma segunda tentativa silenciosa
+    // cobre timeout/502 transitório sem o usuário perceber.
+    let res = await ask();
+    if (!res.ok || !res.data.conteudo) {
+      await new Promise((r) => setTimeout(r, 1800));
+      res = await ask();
+    }
     setBusy(false);
     if (!res.ok || !res.data.conteudo) {
       setMsgs((m) => [...m, { autor: "ia", texto: res.ok ? tt.err : `Erro: ${res.error}` }]);

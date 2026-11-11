@@ -321,13 +321,53 @@ const COUNTRY_ADJ: Record<string, string> = {
   FR: "French", DE: "German", IT: "Italian", JP: "Japanese",
 };
 
+// Tom humano, texto puro: a saída vai pra chat/WhatsApp e telas que não
+// renderizam markdown — #, **, -- e tabelas aparecem como lixo literal.
+const NO_MARKDOWN = [
+  "FORMATO OBRIGATÓRIO: texto puro e natural, como uma pessoa escreveria.",
+  "PROIBIDO markdown: sem #, ##, ###, *, **, ***, _, __, ---, >, |, `,",
+  "tabelas e linhas de separação. Títulos de seção vão como frase simples",
+  "seguida de dois-pontos (ex.: \"Oportunidades:\"). Itens vão como frases",
+  "numeradas \"1. \" ou parágrafos — nunca bullets com * ou -.",
+].join("\n");
+
+/** Remove resíduos de markdown que o modelo emite apesar da instrução. */
+function stripMarkdown(text: string): string {
+  return text
+    // títulos ###/##/# → mantém o texto
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    // negrito/itálico → texto puro
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/(?<![\w])_([^_\n]+)_(?![\w])/g, "$1")
+    // código inline/bloco → texto
+    .replace(/`{3}[\s\S]*?`{3}/g, (m) => m.replace(/`/g, ""))
+    .replace(/`([^`\n]+)`/g, "$1")
+    // linha de separação ---/***/___ → some
+    .replace(/^\s*([-*_])\1{2,}\s*$/gm, "")
+    // blockquote > → vira texto
+    .replace(/^\s*>\s?/gm, "")
+    // bullets - /* / + → marcador simples
+    .replace(/^(\s*)[-*+]\s+/gm, "$1• ")
+    // colapsa 3+ linhas vazias
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function systemPromptFor(action: string, lang: string): string {
   const L = langName(lang);
   switch (action) {
     case "deep_strategy":
-      return `Você é um estrategista de vendas B2B experiente. Analise o estabelecimento e produza: diagnóstico, oportunidades, ângulos de abordagem e próximos passos práticos. Responda OBRIGATORIAMENTE em ${L}, direto e acionável.`;
+      return [
+        `Você é um estrategista de vendas B2B experiente conversando com um colega.`,
+        `Analise o estabelecimento e produza: diagnóstico, oportunidades, ângulos de`,
+        `abordagem e próximos passos práticos. Responda OBRIGATORIAMENTE em ${L},`,
+        `direto e acionável, como quem explica pessoalmente — sem jargão de slide.`,
+        NO_MARKDOWN,
+      ].join("\n");
     case "sales_reply":
-      return `Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em ${L} para o estabelecimento descrito. Sem emojis excessivos, sem promessas irreais.`;
+      return `Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em ${L} para o estabelecimento descrito — como um WhatsApp que uma pessoa real mandaria. Sem emojis excessivos, sem promessas irreais, sem qualquer formatação markdown (nada de *, **, #, -, >, listas).`;
     case "enhance_reply":
       return [
         "Você reescreve mensagens de atendimento ao cliente da SeekerAi.",
@@ -338,17 +378,19 @@ function systemPromptFor(action: string, lang: string): string {
         "promessas que o contexto não sustente. Escreva em português (pt-BR),",
         "tom humano de suporte bom — direto mas gentil. Saída: só o texto da",
         "mensagem, nada mais.",
+        NO_MARKDOWN,
       ].join("\n");
     case "lead_assist":
       return [
         "Você é o copiloto de conversão do SeekerAi: um closer B2B experiente",
-        "acompanhando este lead específico em tempo real.",
+        "acompanhando este lead específico em tempo real — conversa, não relatório.",
         "Use TODOS os dados do contexto (estabelecimento, avaliações, site, WhatsApp, status",
         "do funil e o que já foi gerado) para responder de forma concreta.",
         "Ajude a converter: sugira ângulos de abordagem, mensagens prontas para copiar,",
         "respostas para objeções, próximos passos e o que fazer em cada etapa do funil",
         "(novo → contatado → respondeu → proposta → ganho).",
         `Respostas curtas e diretas OBRIGATORIAMENTE em ${L}, com mensagens prontas entre aspas quando fizer sentido.`,
+        NO_MARKDOWN,
       ].join("\n");
     case "editor_assist":
       return [
@@ -3118,9 +3160,12 @@ Deno.serve(async (req) => {
       const freeFirst = action === "lead_assist" || action === "enhance_reply";
       if (freeFirst) {
         const cap = action === "lead_assist" ? 1200 : 1500;
-        const g = await groqChat(systemPrompt, userContent, cap, 60_000);
-        const f = g ?? await orFreeChat(systemPrompt, userContent, cap, 45_000);
-        const nv = f ?? await nvidiaChat(systemPrompt, userContent, cap, 45_000);
+        // Copiloto é conversa ao vivo: timeouts curtos mantêm o pior caso
+        // (~65s) abaixo do corte da borda — antes eram 150s e virava 524.
+        const copilot = action === "lead_assist";
+        const g = await groqChat(systemPrompt, userContent, cap, copilot ? 25_000 : 60_000);
+        const f = g ?? await orFreeChat(systemPrompt, userContent, cap, copilot ? 20_000 : 45_000);
+        const nv = f ?? await nvidiaChat(systemPrompt, userContent, cap, copilot ? 20_000 : 45_000);
         if (nv) {
           data = nv;
           modelo = g ? GROQ_TEXT_MODEL : f ? OR_FREE_TEXT_MODEL : NVIDIA_TEXT_MODEL;
@@ -3226,6 +3271,12 @@ Deno.serve(async (req) => {
         : [];
 
       let conteudo = typeof message.content === "string" ? message.content : null;
+
+      // Texto vivo pra chat/WhatsApp/tela: nunca renderiza markdown —
+      // limpa os resíduos mesmo com o prompt proibindo.
+      if (conteudo && action !== "editor_assist") {
+        conteudo = stripMarkdown(conteudo);
+      }
 
       // Abordagem vai pro WhatsApp — markdown [texto](url) vira literal
       // quebrado. Achata pra "texto url" e deduplica URL repetida seguida.
