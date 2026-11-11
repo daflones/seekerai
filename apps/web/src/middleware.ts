@@ -115,13 +115,16 @@ export async function middleware(request: NextRequest) {
   const privatePath = path === "/app" || path.startsWith("/app/") || path === "/admin" || path.startsWith("/admin/") ||
     path === "/completar-cadastro" || path === "/redefinir-senha";
 
-  // Acesso do Brasil ao .digital → .com.br. O header cf-ipcountry só é
-  // confiável atrás do Cloudflare (quem bate direto não tem o header e
-  // segue no .digital). Exceções: /auth/* precisa completar no domínio
-  // que iniciou o fluxo (cookie PKCE vive lá) e POST/ação não vira 302.
-  if (host === "seekerai.digital" && request.headers.get("cf-ipcountry") === "BR" &&
-      (request.method === "GET" || request.method === "HEAD") && !path.startsWith("/auth/")) {
-    return NextResponse.redirect(`https://seekerai.com.br${path}${request.nextUrl.search}`, 302);
+  // Cada país no seu domínio: Brasil → .com.br, resto do mundo → .digital.
+  // O cf-ipcountry só existe atrás do Cloudflare — sem ele não dá pra
+  // saber o país e o visitante segue no domínio em que chegou. Exceções:
+  // /auth/* completa no domínio que iniciou o fluxo (cookie PKCE vive
+  // lá) e POST/ação não pode virar 302.
+  const country = request.headers.get("cf-ipcountry");
+  if (country && (request.method === "GET" || request.method === "HEAD") && !path.startsWith("/auth/")) {
+    const mirror = host === "seekerai.digital" && country === "BR" ? "seekerai.com.br" :
+      (host === "seekerai.com.br" || host === "www.seekerai.com.br") && country !== "BR" ? "seekerai.digital" : null;
+    if (mirror) return NextResponse.redirect(`https://${mirror}${path}${request.nextUrl.search}`, 302);
   }
 
   // Domínio customizado: qualquer rota serve o site publicado correspondente.
