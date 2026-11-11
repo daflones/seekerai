@@ -331,6 +331,16 @@ const NO_MARKDOWN = [
   "numeradas \"1. \" ou parágrafos — nunca bullets com * ou -.",
 ].join("\n");
 
+/** Texto do primeiro choice — null quando o modelo respondeu vazio
+ *  (modelo de raciocínio que gastou o budget em reasoning_content). */
+function chatContent(data: Record<string, unknown> | null): string | null {
+  const ch = data && Array.isArray(data.choices) ? data.choices : [];
+  const c = isRecord(ch[0]) && isRecord(ch[0].message)
+    ? ch[0].message.content
+    : null;
+  return typeof c === "string" && c.trim() ? c : null;
+}
+
 /** Remove resíduos de markdown que o modelo emite apesar da instrução. */
 function stripMarkdown(text: string): string {
   return text
@@ -370,14 +380,16 @@ function systemPromptFor(action: string, lang: string): string {
       return `Você é um copiloto de vendas. Escreva uma mensagem de abordagem curta, personalizada e natural em ${L} para o estabelecimento descrito — como um WhatsApp que uma pessoa real mandaria. Sem emojis excessivos, sem promessas irreais, sem qualquer formatação markdown (nada de *, **, #, -, >, listas).`;
     case "enhance_reply":
       return [
-        "Você reescreve mensagens de atendimento ao cliente da SeekerAi.",
-        "Receba o rascunho do atendente e o contexto da conversa, e devolva UMA",
-        "mensagem pronta pra enviar: clara, cordial, profissional e completa —",
-        "corrigindo português, organizando a informação e respondendo tudo o",
-        "que o cliente perguntou. Sem markdown, sem saudação robotizada, sem",
-        "promessas que o contexto não sustente. Escreva em português (pt-BR),",
-        "tom humano de suporte bom — direto mas gentil. Saída: só o texto da",
-        "mensagem, nada mais.",
+        "Você escreve mensagens de atendimento ao cliente da SeekerAi.",
+        "Você recebe o contexto da conversa e um rascunho do atendente:",
+        "com rascunho, reescreva-o numa mensagem pronta pra enviar — clara,",
+        "cordial, profissional e completa, corrigindo português e respondendo",
+        "tudo o que o cliente perguntou. Sem rascunho, ESCREVA a resposta do",
+        "zero: leia a conversa e responda a MENSAGEM MARCADA (ou a última dúvida",
+        "do cliente) como um suporte humano bom faria. Sem saudação robotizada,",
+        "sem promessas que o contexto não sustente, sem inventar política de",
+        "reembolso/prazo. Escreva em português (pt-BR), tom humano — direto",
+        "mas gentil. Saída: só o texto da mensagem, nada mais.",
         NO_MARKDOWN,
       ].join("\n");
     case "lead_assist":
@@ -2966,7 +2978,8 @@ Deno.serve(async (req) => {
     const requestRef = asString(body.requestRef, 150);
     const prompt = asString(body.prompt, 20_000);
     let lang = asString(body.lang, 10) || "pt";
-    if (!action || !ACTIONS.has(action) || !service || !businessRef || !requestRef || !prompt) {
+    if (!action || !ACTIONS.has(action) || !service || !businessRef || !requestRef
+      || (!prompt && action !== "enhance_reply")) {
       throw httpError(400, "Informe action, serviceSlug, businessRef, requestRef e prompt");
     }
     notifyCtx.contexto = `ação ${action} · serviço ${service} · ref ${businessRef}`;
@@ -3123,13 +3136,20 @@ Deno.serve(async (req) => {
         ? enhancedImagePrompt!
         : action === "enhance_reply"
           ? [
-            `RASCUNHO DO ATENDENTE: ${prompt}`,
+            prompt
+              ? `RASCUNHO DO ATENDENTE: ${prompt}`
+              : "RASCUNHO DO ATENDENTE: (vazio — escreva a resposta do zero)",
             asString(context.assunto) ? `ASSUNTO DO CHAMADO: ${asString(context.assunto, 140)}` : "",
             asString(context.cliente) ? `CLIENTE: ${asString(context.cliente, 120)}` : "",
+            asString(context.marcada)
+              ? `MENSAGEM MARCADA PELO ATENDENTE (responda especificamente a ela): ${asString(context.marcada, 1200)}`
+              : "",
             Array.isArray(context.mensagens) && context.mensagens.length
               ? `ÚLTIMAS MENSAGENS DA CONVERSA:\n${(context.mensagens as unknown[]).map((m) => `- ${asString(m, 600)}`).join("\n")}`
               : "",
-            "Reescreva o rascunho numa única mensagem pronta pra enviar.",
+            prompt
+              ? "Reescreva o rascunho numa única mensagem pronta pra enviar."
+              : "Escreva a melhor resposta possível pro cliente, pronta pra enviar.",
           ].filter(Boolean).join("\n\n")
         : action === "editor_assist"
           ? [
@@ -3160,12 +3180,18 @@ Deno.serve(async (req) => {
       const freeFirst = action === "lead_assist" || action === "enhance_reply";
       if (freeFirst) {
         const cap = action === "lead_assist" ? 1200 : 1500;
-        // Copiloto é conversa ao vivo: timeouts curtos mantêm o pior caso
-        // (~65s) abaixo do corte da borda — antes eram 150s e virava 524.
-        const copilot = action === "lead_assist";
-        const g = await groqChat(systemPrompt, userContent, cap, copilot ? 25_000 : 60_000);
-        const f = g ?? await orFreeChat(systemPrompt, userContent, cap, copilot ? 20_000 : 45_000);
-        const nv = f ?? await nvidiaChat(systemPrompt, userContent, cap, copilot ? 20_000 : 45_000);
+        // Conversa ao vivo (copiloto e aprimoramento no chat): timeouts
+        // curtos mantêm o pior caso (~65s) abaixo do corte da borda —
+        // antes eram 150s e virava 524/erro genérico.
+        // valid(): resposta HTTP 200 com content vazio não é acerto —
+        // modelo ":free" de raciocínio pode gastar os tokens em
+        // reasoning_content e devolver nada. Sem isso a resposta saía
+        // como {"conteudo":null} e o front mostrava erro genérico.
+        const valid = (d: Record<string, unknown> | null) =>
+          chatContent(d) ? d : null;
+        const g = valid(await groqChat(systemPrompt, userContent, cap, 25_000));
+        const f = g ?? valid(await orFreeChat(systemPrompt, userContent, cap, 20_000));
+        const nv = f ?? valid(await nvidiaChat(systemPrompt, userContent, cap, 20_000));
         if (nv) {
           data = nv;
           modelo = g ? GROQ_TEXT_MODEL : f ? OR_FREE_TEXT_MODEL : NVIDIA_TEXT_MODEL;
@@ -3205,7 +3231,10 @@ Deno.serve(async (req) => {
       }).catch(() => null);
       const orStatus = res?.status ?? 0;
       if (res?.ok) {
-        data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+        const parsed = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+        // Ação de texto com content vazio vale como falha — libera o
+        // fallback em vez de devolver {"conteudo":null} pro front.
+        if (action === "generate_image" || chatContent(parsed)) data = parsed;
       } else {
         console.error("[openrouter] falhou:", orStatus || "network");
       }
@@ -3232,16 +3261,18 @@ Deno.serve(async (req) => {
         // cai nos gratuitos — timeouts curtos pra caber no budget da borda.
         // lead_assist/enhance_reply já tentaram essa cadeia: só a NVIDIA
         // pode ter entrado depois (breaker de 3min entre instâncias).
-        const g = freeFirst ? null : await groqChat(systemPrompt, userContent, 8192, 20_000);
-        const f = g ?? (freeFirst ? null : await orFreeChat(systemPrompt, userContent, 8192, 15_000));
+        const valid = (d: Record<string, unknown> | null) =>
+          chatContent(d) ? d : null;
+        const g = freeFirst ? null : valid(await groqChat(systemPrompt, userContent, 8192, 20_000));
+        const f = g ?? (freeFirst ? null : valid(await orFreeChat(systemPrompt, userContent, 8192, 15_000)));
         const elapsed = Date.now() - t0;
         const nv = f ?? (elapsed < 80_000
-          ? await nvidiaChat(
+          ? valid(await nvidiaChat(
             systemPrompt,
             userContent,
             action === "lead_assist" ? 1200 : action === "editor_assist" ? 8192 : undefined,
             15_000,
-          )
+          ))
           : null);
         const hit = g ?? f ?? nv;
         if (hit) {
@@ -3271,6 +3302,13 @@ Deno.serve(async (req) => {
         : [];
 
       let conteudo = typeof message.content === "string" ? message.content : null;
+
+      // Ação de texto com content vazio mesmo depois dos fallbacks:
+      // estorna e devolve erro claro em vez de {"conteudo":null}.
+      if (!conteudo && images.length === 0 && action !== "generate_image") {
+        await settleAction(db, user.id, requestRef, "refunded");
+        throw httpError(502, "A IA respondeu vazio — tente novamente.");
+      }
 
       // Texto vivo pra chat/WhatsApp/tela: nunca renderiza markdown —
       // limpa os resíduos mesmo com o prompt proibindo.

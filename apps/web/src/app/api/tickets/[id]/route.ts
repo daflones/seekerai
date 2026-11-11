@@ -7,7 +7,17 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { triggerSupportAgent } from "@/lib/support/agent";
 
 const OPEN = ["aberto", "em_andamento", "pendente"];
-const messageSchema = z.object({ mensagem: z.string().trim().min(1).max(4000) });
+const anexoSchema = z.object({
+  path: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(png|jpg|webp|gif|pdf)$/i),
+  nome: z.string().trim().min(1).max(160),
+  tipo: z.string().max(80),
+  tamanho: z.number().int().min(0).max(10_000_000).optional(),
+});
+const messageSchema = z.object({
+  mensagem: z.string().trim().max(4000).optional().default(""),
+  reply_to: z.string().uuid().nullish(),
+  anexos: z.array(anexoSchema).max(4).optional(),
+});
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -32,7 +42,7 @@ export async function GET(request: NextRequest, ctx: Params) {
   if ("error" in found) return found.error;
   const { data: mensagens } = await found.session.supabase
     .from("ticket_messages")
-    .select("id,sender_role,mensagem,created_at")
+    .select("id,sender_role,mensagem,anexos,reply_to,created_at")
     .eq("ticket_id", found.ticket.id)
     .order("created_at", { ascending: true })
     .limit(300);
@@ -61,12 +71,26 @@ export async function POST(request: NextRequest, ctx: Params) {
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   }
   const parsed = messageSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Escreva uma mensagem (até 4000 caracteres)." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Revise a mensagem (até 4000 caracteres) e os anexos." }, { status: 400 });
+  const anexos = (parsed.data.anexos ?? []).filter((a) =>
+    a.path.startsWith(`${ticket.id}/`));
+  if (!parsed.data.mensagem && anexos.length === 0) {
+    return NextResponse.json({ error: "Escreva uma mensagem ou anexe um arquivo." }, { status: 400 });
+  }
+  // A citação precisa apontar pra uma mensagem DESTE chamado.
+  const replyTo = parsed.data.reply_to ?? null;
+  if (replyTo) {
+    const { count } = await session.supabase.from("ticket_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("ticket_id", ticket.id).eq("id", replyTo);
+    if (!count) return NextResponse.json({ error: "Mensagem citada inválida." }, { status: 400 });
+  }
 
   const role = isAdmin ? "admin" : "user";
   const { data, error } = await session.supabase.from("ticket_messages").insert({
-    ticket_id: ticket.id, sender_id: session.user.id, sender_role: role, mensagem: parsed.data.mensagem,
-  }).select("id,sender_role,mensagem,created_at").single();
+    ticket_id: ticket.id, sender_id: session.user.id, sender_role: role,
+    mensagem: parsed.data.mensagem, reply_to: replyTo, anexos,
+  }).select("id,sender_role,mensagem,anexos,reply_to,created_at").single();
   if (error) return NextResponse.json({ error: "Não foi possível enviar a mensagem." }, { status: 500 });
 
   // Resposta humana assume o chamado (a IA para de falar) e marca em andamento.

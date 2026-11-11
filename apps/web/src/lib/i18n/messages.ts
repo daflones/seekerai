@@ -556,6 +556,8 @@ const pt = {
     status: { aberto: "Aberto", em_andamento: "Em andamento", pendente: "Pendente", resolvido: "Resolvido", cancelado: "Cancelado", expirado: "Expirado" },
     loading: "Carregando conversa…", noMsgs: "Nenhuma mensagem ainda.", you: "Você", write: "Escreva sua mensagem…",
     closed: "não é possível enviar novas mensagens.", sendBtn: "Enviar",
+    attach: "Anexar imagem ou PDF", attachType: "Só imagens (PNG/JPG/WebP/GIF) ou PDF, até 8 MB.",
+    attachFail: "Não foi possível anexar.", replyBtn: "Responder",
   },
 
   access: {
@@ -1184,6 +1186,8 @@ export const messages: Record<Lang, Messages> = {
       status: { aberto: "Open", em_andamento: "In progress", pendente: "Pending", resolvido: "Resolved", cancelado: "Canceled", expirado: "Expired" },
       loading: "Loading conversation…", noMsgs: "No messages yet.", you: "You", write: "Write your message…",
       closed: "you can't send new messages.", sendBtn: "Send",
+      attach: "Attach image or PDF", attachType: "Images (PNG/JPG/WebP/GIF) or PDF only, up to 8 MB.",
+      attachFail: "Couldn't attach.", replyBtn: "Reply",
     },
 
     access: {
@@ -1809,6 +1813,8 @@ export const messages: Record<Lang, Messages> = {
       status: { aberto: "Abierto", em_andamento: "En curso", pendente: "Pendiente", resolvido: "Resuelto", cancelado: "Cancelado", expirado: "Expirado" },
       loading: "Cargando conversación…", noMsgs: "Ningún mensaje aún.", you: "Tú", write: "Escribe tu mensaje…",
       closed: "no puedes enviar nuevos mensajes.", sendBtn: "Enviar",
+      attach: "Adjuntar imagen o PDF", attachType: "Solo imágenes (PNG/JPG/WebP/GIF) o PDF, hasta 8 MB.",
+      attachFail: "No se pudo adjuntar.", replyBtn: "Responder",
     },
 
     access: {
@@ -2433,6 +2439,8 @@ export const messages: Record<Lang, Messages> = {
       status: { aberto: "Ouvert", em_andamento: "En cours", pendente: "En attente", resolvido: "Résolu", cancelado: "Annulé", expirado: "Expiré" },
       loading: "Chargement de la conversation…", noMsgs: "Aucun message pour l'instant.", you: "Vous", write: "Écrivez votre message…",
       closed: "vous ne pouvez plus envoyer de messages.", sendBtn: "Envoyer",
+      attach: "Joindre image ou PDF", attachType: "Images (PNG/JPG/WebP/GIF) ou PDF uniquement, jusqu'à 8 Mo.",
+      attachFail: "Impossible de joindre.", replyBtn: "Répondre",
     },
 
     access: {
@@ -3057,6 +3065,8 @@ export const messages: Record<Lang, Messages> = {
       status: { aberto: "Offen", em_andamento: "In Bearbeitung", pendente: "Ausstehend", resolvido: "Gelöst", cancelado: "Storniert", expirado: "Abgelaufen" },
       loading: "Konversation wird geladen…", noMsgs: "Noch keine Nachrichten.", you: "Sie", write: "Ihre Nachricht schreiben…",
       closed: "Sie können keine neuen Nachrichten senden.", sendBtn: "Senden",
+      attach: "Bild oder PDF anhängen", attachType: "Nur Bilder (PNG/JPG/WebP/GIF) oder PDF, bis 8 MB.",
+      attachFail: "Anhang fehlgeschlagen.", replyBtn: "Antworten",
     },
 
     access: {
@@ -3681,6 +3691,8 @@ export const messages: Record<Lang, Messages> = {
       status: { aberto: "Aperto", em_andamento: "In corso", pendente: "In attesa", resolvido: "Risolto", cancelado: "Annullato", expirado: "Scaduto" },
       loading: "Caricamento conversazione…", noMsgs: "Nessun messaggio per ora.", you: "Tu", write: "Scrivi il tuo messaggio…",
       closed: "non puoi inviare nuovi messaggi.", sendBtn: "Invia",
+      attach: "Allega immagine o PDF", attachType: "Solo immagini (PNG/JPG/WebP/GIF) o PDF, fino a 8 MB.",
+      attachFail: "Impossibile allegare.", replyBtn: "Rispondi",
     },
 
     access: {
