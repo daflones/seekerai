@@ -23,7 +23,7 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
   const decline = params.checkout === "cancelado"
     ? await lastDeclineDetail(supabase, user.id) : null;
   const admin = createSupabaseAdminClient();
-  const [{ plans }, { data: subscriptions }, { data: discRow }, { data: prevPaid }, { data: planRows }, { data: packsRow }, { data: hiddenRow }] = await Promise.all([
+  const [{ plans }, { data: subscriptions }, { data: discRow }, { data: prevPaid }, { data: planRows }, { data: packsRow }, { data: hiddenRow }, { data: upgRow }] = await Promise.all([
     publicPlanCards(),
     supabase.from("subscriptions").select("id,status,plan_id,billing_months,current_period_end,plans:plan_id(slug)")
       .eq("user_id", user.id).in("status", ["pending", "active", "past_due"]).limit(1),
@@ -32,6 +32,7 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
     supabase.from("plans").select("slug,creditos_mensais").eq("ativo", true),
     admin.from("app_settings").select("value").eq("key", "credit_packs").maybeSingle(),
     admin.from("app_settings").select("value").eq("key", "checkout_hidden").maybeSingle(),
+    admin.from("app_settings").select("value").eq("key", "upgrade_discounts").maybeSingle(),
   ]);
   const allPacks = parseCreditPacks(packsRow?.value).length
     ? parseCreditPacks(packsRow?.value)
@@ -69,6 +70,8 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
   const hiddenPacks = Array.isArray(hiddenRaw?.packs) ? hiddenRaw.packs : [];
   const visiblePlans = plans.filter((p) => !hiddenPlans.includes(p.slug));
   const packs = allPacks.filter((p) => !hiddenPacks.includes(p.id));
+  // Desconto de upgrade por transição "de:para" → % (configurável no admin).
+  const upgradeDisc = (upgRow?.value ?? {}) as Record<string, number>;
 
   return <>
     {params.checkout === "cancelado" && <PayFailBanner detail={decline} t={tDash} />}
@@ -80,6 +83,6 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
       : <PlanCheckout plans={visiblePlans} allPlans={lookupPlans} hasSubscription={(subscriptions ?? []).length > 0}
           currentPlanSlug={currentPlanSlug} discountPct={discountPct} locale={loc} t={t}
           subEnd={sub?.current_period_end ?? null} subMonths={sub?.billing_months ?? 1}
-          planCredits={planCredits} packs={packs} />}
+          planCredits={planCredits} packs={packs} upgradeDisc={upgradeDisc} />}
   </>;
 }

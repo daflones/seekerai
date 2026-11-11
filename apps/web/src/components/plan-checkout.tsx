@@ -37,13 +37,15 @@ interface PixResult {
 }
 
 export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug, discountPct = 0, locale, t,
-  subEnd = null, subMonths = 1, planCredits = {}, packs = CREDIT_PACKS }: {
+  subEnd = null, subMonths = 1, planCredits = {}, packs = CREDIT_PACKS, upgradeDisc = {} }: {
   plans: PlanItem[];
   /** Lista completa (sem filtro de visibilidade) pra resolver o plano atual. */
   allPlans?: PlanItem[];
   hasSubscription: boolean;
   currentPlanSlug: string | null;
   discountPct?: number;
+  /** Desconto de upgrade por transição "de:para" → % (admin). */
+  upgradeDisc?: Record<string, number>;
   locale: Locale;
   t: Messages["plansPage"];
   subEnd?: string | null;
@@ -175,20 +177,23 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
     </div>;
   }
 
-  function planCard(plan: PlanItem, flag?: string | null) {
+  function planCard(plan: PlanItem, flag?: string | null, offPct = 0, offLabel = "") {
     const isFree = plan.priceCents === 0;
+    // Desconto exibido = upgrade (transição) ou primeira compra — nunca os dois.
+    const pct = offPct > 0 ? offPct : discountPct;
+    const off = (cents: number) => pct > 0 ? Math.max(100, Math.round(cents * (100 - pct) / 100)) : cents;
     return <article key={plan.slug} className={`plan-card-checkout${plan.featured ? " featured" : ""}`}>
       {flag && <span className="plan-flag">{flag}</span>}
       <h3>{plan.name}</h3>
       <p className="plan-price">
-        {!isFree && discountPct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}
-        {isFree ? money(0) : money(disc(priceFor(plan)))}
+        {!isFree && pct > 0 && <s className="plan-price-was">{money(priceFor(plan))}</s>}
+        {isFree ? money(0) : money(off(priceFor(plan)))}
         {!isFree && <small>{t.perMonth}</small>}
       </p>
-      {!isFree && discountPct > 0 && <span className="plan-off-tag">{discountPct}% {t.firstBuy}</span>}
+      {!isFree && pct > 0 && <span className="plan-off-tag">{pct}% {offLabel || t.firstBuy}</span>}
       {!isFree && def.months > 1 && (
         <p className="plan-billed-caption">
-          {money(disc(totalFor(plan)))} {period === "trimestral" ? t.billedTri : t.billedYear}
+          {money(off(totalFor(plan)))} {period === "trimestral" ? t.billedTri : t.billedYear}
         </p>
       )}
       {plan.content.description && <p className="plan-tagline">{plan.content.description}</p>}
@@ -228,8 +233,12 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
         </button>)}
       </div>
       <div className="plan-grid plan-grid-upgrades">
-        {changes.map((plan) => planCard(plan,
-          plan.order > (current?.order ?? 0) ? t.upgradeFlag : t.downgradeFlag))}
+        {changes.map((plan) => {
+          const isUpgrade = plan.order > (current?.order ?? 0);
+          // Desconto por transição — vale só na evolução, não no downgrade.
+          const upgPct = isUpgrade ? (upgradeDisc[`${currentPlanSlug}:${plan.slug}`] ?? 0) : 0;
+          return planCard(plan, isUpgrade ? t.upgradeFlag : t.downgradeFlag, upgPct, t.upgradeOff);
+        })}
       </div>
     </section>}
 

@@ -5,6 +5,7 @@ import { CREDIT_PACKS, parseCreditPacks } from "@/lib/i18n/shared";
 import { PlanEditor } from "@/components/plan-editor";
 import { AdminPacks } from "@/components/admin-packs";
 import { AdminCheckoutVisibility } from "@/components/admin-checkout-visibility";
+import { AdminUpgradeDiscount } from "@/components/admin-upgrade-discount";
 
 export default async function PlanAdminPage() {
   const { supabase } = await requireSession("/admin/planos", { admin: true });
@@ -14,6 +15,9 @@ export default async function PlanAdminPage() {
     .select("value").eq("key", "credit_packs").maybeSingle();
   const { data: hiddenRow } = await supabase.from("app_settings")
     .select("value").eq("key", "checkout_hidden").maybeSingle();
+  const { data: upgRow } = await supabase.from("app_settings")
+    .select("value").eq("key", "upgrade_discounts").maybeSingle();
+  const upgradeDisc = (upgRow?.value ?? {}) as Record<string, number>;
   const packs = parseCreditPacks(packsRow?.value).length
     ? parseCreditPacks(packsRow?.value)
     : CREDIT_PACKS;
@@ -37,6 +41,9 @@ export default async function PlanAdminPage() {
     <p className="private-intro">Configure o preço real do plano e a apresentação do card. A prévia usa o mesmo componente da landing.</p>
     {error ? <p role="alert" className="auth-error">Não foi possível carregar os planos.</p> : plans.length ? <PlanEditor initialPlans={plans} /> : <p className="auth-notice">Nenhum plano inicial foi provisionado. Execute o seed antes de editar.</p>}
     <AdminPacks initial={packs} />
+    <AdminUpgradeDiscount
+      plans={plans.map((p) => ({ slug: p.slug, name: p.name, order: p.order }))}
+      initial={upgradeDisc} />
     <AdminCheckoutVisibility
       plans={plans.filter((p) => p.slug !== "gratis").map((p) => ({ slug: p.slug, name: p.name }))}
       packs={packs} hiddenPlans={hiddenPlans} hiddenPacks={hiddenPacks} />

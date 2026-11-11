@@ -254,11 +254,11 @@ async function createMercosulPackPix(
   }, "pack PIX");
 }
 
-// Cupom do desconto de primeira compra — "once" desconta só a primeira
-// fatura; a renovação já sai pelo preço cheio da assinatura.
-async function ensureStripeCoupon(pct: number): Promise<string> {
+// Cupom de desconto único — "once" desconta só a primeira fatura; a
+// renovação sai pelo preço cheio. Serve pra primeira compra e upgrade.
+async function ensureStripeCoupon(pct: number, prefix = "first-purchase"): Promise<string> {
   const key = await requireSecret("STRIPE_SECRET_KEY");
-  const id = `first-purchase-${pct}`;
+  const id = `${prefix}-${pct}`;
   const headers = { Authorization: `Bearer ${key}` };
   const res = await fetch(`https://api.stripe.com/v1/coupons/${encodeURIComponent(id)}`, { headers });
   if (res.ok) {
@@ -274,7 +274,7 @@ async function ensureStripeCoupon(pct: number): Promise<string> {
     headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       id,
-      name: `Primeira compra -${pct}%`,
+      name: `${prefix === "upgrade" ? "Upgrade" : "Primeira compra"} -${pct}%`,
       percent_off: String(pct),
       duration: "once",
     }).toString(),
@@ -725,11 +725,24 @@ Deno.serve(async (req) => {
         .select("id").eq("user_id", user.id).eq("status", "paid").limit(1);
       if (!prevPaid || prevPaid.length === 0) discountPct = settingPct;
     }
-    const chargedCents = discountPct > 0
-      ? Math.max(100, Math.round(amountCents * (100 - discountPct) / 100))
+    // Desconto de upgrade (admin > planos): por transição "de:para" — só
+    // vale na evolução de plano, nunca em downgrade nem extensão de
+    // período. No Stripe entra como cupom "once": a renovação cobra
+    // o preço cheio do plano novo.
+    let upgradePct = 0;
+    if (planChange === "upgrade") {
+      const { data: upgRow } = await db.from("app_settings")
+        .select("value").eq("key", "upgrade_discounts").maybeSingle();
+      const raw = isRecord(upgRow?.value) ? upgRow.value[`${curPlan?.slug ?? ""}:${plan.slug}`] : null;
+      upgradePct = Math.min(90, Math.max(0, Math.trunc(Number(raw)) || 0));
+    }
+    const effPct = upgradePct > 0 ? upgradePct : discountPct;
+    const chargedCents = effPct > 0
+      ? Math.max(100, Math.round(amountCents * (100 - effPct) / 100))
       : amountCents;
-    const discMeta = discountPct > 0
-      ? { discount_pct: discountPct, full_amount_cents: amountCents }
+    const discMeta = effPct > 0
+      ? { discount_pct: effPct, full_amount_cents: amountCents,
+          ...(upgradePct > 0 ? { upgrade_discount: true } : {}) }
       : {};
 
     // Checkouts de plano abandonados: se o usuário gerar um novo, os antigos
@@ -768,7 +781,7 @@ Deno.serve(async (req) => {
           throw err;
         }
       }
-      const couponId = discountPct > 0 ? await ensureStripeCoupon(discountPct) : undefined;
+      const couponId = effPct > 0 ? await ensureStripeCoupon(effPct, upgradePct > 0 ? "upgrade" : "first-purchase") : undefined;
       const customerId = await ensureStripeCustomer(db, user.id, user.email);
       const session = await createStripeSession(
         plan, user.id, customerId, currency, amountCents, periodDef.months, periodDef.label, couponId,

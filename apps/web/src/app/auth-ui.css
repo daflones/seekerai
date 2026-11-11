@@ -1038,6 +1038,9 @@ a.lead-action { text-decoration: none; }
 .cred-name strong { font-size: 12.5px; color: var(--white); }
 .cred-name small { font-size: 10px; color: var(--muted); font-family: ui-monospace, monospace; }
 .cred-unit { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.upgrade-discount-input { display: inline-flex; align-items: center; gap: 5px; }
+.upgrade-discount-input input { width: 58px; padding: 6px 8px; border-radius: 8px; border: 1px solid #b387d133; background: var(--panel); color: var(--white); font-size: 12px; font-weight: 700; text-align: center; }
+.upgrade-discount-input em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--violet-light); }
 .cred-num { width: 96px; flex-shrink: 0; background: var(--ink); border: 1px solid #ab7bcd33; border-radius: 8px; padding: 7px 10px; color: var(--white); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .cred-num:focus { outline: none; border-color: var(--violet); }
 .cred-save { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; font-size: 11px; font-weight: 650; color: #fff; background: var(--violet); border: none; border-radius: 8px; cursor: pointer; white-space: nowrap; }
