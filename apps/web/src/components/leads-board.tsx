@@ -90,7 +90,11 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       body: JSON.stringify({ status }),
     });
     setBusy(null);
-    if (!res.ok) { setError(t.noneHere); return; }
+    if (!res.ok) {
+      const data = await res.json().catch(() => null) as { error?: string } | null;
+      setError(data?.error ?? t.saveErr);
+      return;
+    }
     setLeads((list) => list.map((l) => l.id === id ? { ...l, status } : l));
   }
 
@@ -118,7 +122,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
     const data = res ? (await res.json().catch(() => null)) as { jobId?: string; error?: string } | null : null;
     if (!res?.ok || !data?.jobId) {
       setBusy(null);
-      setError(data?.error ?? t.noneHere);
+      setError(data?.error ?? t.saveErr);
       return;
     }
     notice(lead.id, `${t.actSite}…`);

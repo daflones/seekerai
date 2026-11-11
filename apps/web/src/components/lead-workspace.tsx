@@ -351,12 +351,13 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     setNotice(kind === "image_prompt" ? t.promptDone : t.genDone);
   }
 
-  async function patch(body: Record<string, unknown>) {
-    await fetch(`/api/leads/${lead.id}`, {
+  async function patch(body: Record<string, unknown>): Promise<boolean> {
+    const res = await fetch(`/api/leads/${lead.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }).catch(() => null);
+    return res?.ok === true;
   }
 
   function changeStatus(next: LeadRow["status"]) {
@@ -366,8 +367,11 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       setWonOpen(true);
       return;
     }
+    const prev = lead.status;
     setLead((l) => ({ ...l, status: next }));
-    void patch({ status: next });
+    void patch({ status: next }).then((ok) => {
+      if (!ok) { setLead((l) => ({ ...l, status: prev })); setError(t.saveErr); }
+    });
   }
 
   function advanceStage() {
@@ -383,10 +387,12 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     setWonOpen(false);
     const patchBody: Record<string, unknown> = { status };
     if (withValue && Number.isFinite(value) && value! >= 0) patchBody.valor_fechado = value;
+    const prev = lead;
     setLead((l) => ({ ...l, status, valor_fechado: (patchBody.valor_fechado as number | undefined) ?? l.valor_fechado }));
     setBusyKey("stage", true);
-    await patch(patchBody);
+    const ok = await patch(patchBody);
     setBusyKey("stage", false);
+    if (!ok) { setLead(prev); setError(t.saveErr); return; }
     router.refresh();
   }
 
@@ -758,7 +764,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       <div className="lead-notes-foot">
         <button type="button" className="button button-glass button-small"
           disabled={notas === (lead.notas ?? "")}
-          onClick={() => { void patch({ notas }); setLead((l) => ({ ...l, notas })); setNotice(t.notesSaved); }}>
+          onClick={() => void patch({ notas }).then((ok) => {
+            if (!ok) { setError(t.saveErr); return; }
+            setLead((l) => ({ ...l, notas })); setNotice(t.notesSaved);
+          })}>
           {t.notesSave}
         </button>
       </div>
