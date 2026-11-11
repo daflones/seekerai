@@ -1167,3 +1167,16 @@ a.lead-action { text-decoration: none; }
 /* Botão de remoção em linhas de admin/editor — antes sem estilo */
 .editor-remove { display: inline-flex; align-items: center; gap: 5px; color: var(--danger); font-size: 11px; font-weight: 600; background: none; border: 1px solid #f0a1a140; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-family: inherit; }
 .editor-remove:hover { background: #f0a1a112; }
+
+/* Checklist de provisionamento do domínio (admin) */
+.dom-steps { margin-top: 10px; display: grid; gap: 7px; padding: 11px 12px; background: var(--ink); border: 1px solid var(--border); border-radius: 12px; }
+.dom-step { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.dom-step > span { width: 17px; height: 17px; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: var(--panel); background: linear-gradient(120deg, var(--violet-light), var(--violet)); border-radius: 50%; }
+.dom-step b { color: var(--fg); font-weight: 700; }
+.dom-step a { display: inline-flex; align-items: center; gap: 3px; color: var(--violet-light); font-weight: 600; text-decoration: none; }
+.dom-step a:hover { text-decoration: underline; }
+.dom-step code { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 11.5px; color: var(--fg); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+.dom-step-todo { opacity: .75; }
+.dom-copy { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: var(--violet-light); background: none; border: 1px solid color-mix(in srgb, var(--violet) 40%, transparent); border-radius: 999px; padding: 3px 9px; cursor: pointer; font-family: inherit; }
+.dom-copy:hover { background: color-mix(in srgb, var(--violet) 14%, transparent); }
+.dom-err { display: block; margin-top: 6px; color: var(--danger); font-size: 11.5px; font-weight: 600; }

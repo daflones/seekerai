@@ -39,6 +39,25 @@ export async function checkDomainAvailable(host: string): Promise<{
   return { host, available: null, expiresAt: null };
 }
 
+// Nameservers delegados do domínio (RDAP) — usado pra detectar quando o
+// admin apontou o domínio pros NS da zona do Cloudflare.
+export async function lookupNameservers(host: string): Promise<string[]> {
+  for (const url of rdapUrls(host)) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: UA });
+      if (!res.ok) continue;
+      const data = (await res.json().catch(() => ({}))) as {
+        nameservers?: { ldhName?: string }[];
+      };
+      const ns = (data.nameservers ?? [])
+        .map((n) => n.ldhName?.toLowerCase().replace(/\.$/, ""))
+        .filter((n): n is string => Boolean(n));
+      if (ns.length > 0) return ns;
+    } catch { /* timeout/rede — tenta o próximo */ }
+  }
+  return [];
+}
+
 const STOP = new Set(["de", "da", "do", "das", "dos", "e", "em", "no", "na", "a", "o", "the"]);
 
 // Gera candidatos de domínio a partir do nome do estabelecimento:

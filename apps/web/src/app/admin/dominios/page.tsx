@@ -3,6 +3,7 @@ import { Globe } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AdminDomains } from "@/components/admin-domains";
+import { domainAutomationReady } from "@/lib/domains/provision";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Domínios", robots: { index: false } };
@@ -13,7 +14,7 @@ export default async function AdminDominiosPage() {
 
   const [domainsRes, priceRes, authUsers] = await Promise.all([
     admin.from("domains")
-      .select("id,user_id,site_slug,desired_host,host,status,price_cents,payment_id,activated_at,expires_at,created_at,sites:site_slug(nome)")
+      .select("id,user_id,site_slug,desired_host,host,status,price_cents,payment_id,activated_at,expires_at,created_at,cf_zone_id,cf_nameservers,setup_error,sites:site_slug(nome)")
       .order("created_at", { ascending: false }).limit(300),
     admin.from("app_settings").select("value").eq("key", "domain_price_cents").maybeSingle(),
     admin.auth.admin.listUsers({ perPage: 1000 }),
@@ -41,6 +42,9 @@ export default async function AdminDominiosPage() {
     activatedAt: d.activated_at,
     createdAt: d.created_at,
     payment: d.payment_id ? paymentById.get(d.payment_id) ?? null : null,
+    cfZoneId: d.cf_zone_id,
+    cfNameservers: d.cf_nameservers,
+    setupError: d.setup_error,
   }));
 
   const priceCents = Math.min(1_000_000, Math.max(500, Number(priceRes.data?.value ?? 6999) || 6999));
@@ -54,7 +58,7 @@ export default async function AdminDominiosPage() {
       {rows.length} pedidos · {ativos} ativos · {pendentes} aguardando configuração manual
       {pendentes > 0 && " — SLA de 48h"}.
     </p>
-    <AdminDomains rows={rows} priceCents={priceCents} />
+    <AdminDomains rows={rows} priceCents={priceCents} automation={domainAutomationReady()} />
     <p className="private-disclaimer">
       <Globe size={13} /> Ative com o host definitivo — o usuário é notificado no app e o
       domínio passa a servir o site imediatamente.

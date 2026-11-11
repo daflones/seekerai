@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, CheckCircle2, CircleDollarSign, Hourglass, RefreshCw, Save, Trash2, XCircle } from "lucide-react";
+import { BadgeCheck, CheckCircle2, CircleDollarSign, Clipboard, ExternalLink, Hourglass, RefreshCw, Save, Trash2, XCircle } from "lucide-react";
 
 interface PaymentInfo { id: string; provider: string; method: string; amount_cents: number; status: string; created_at: string }
 export interface DomainAdminRow {
@@ -10,6 +10,7 @@ export interface DomainAdminRow {
   desiredHost: string; host: string | null; status: string; priceCents: number;
   expiresAt: string | null; activatedAt: string | null; createdAt: string;
   payment: PaymentInfo | null;
+  cfZoneId: string | null; cfNameservers: string[] | null; setupError: string | null;
 }
 
 const money = (cents: number) =>
@@ -31,7 +32,23 @@ function daysLeft(iso: string | null): number | null {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
 
-export function AdminDomains({ rows, priceCents }: { rows: DomainAdminRow[]; priceCents: number }) {
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return <button type="button" className="dom-copy" title="Copiar"
+    onClick={() => {
+      void navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    }}>
+    {copied ? <CheckCircle2 size={13} /> : <Clipboard size={13} />}
+    {copied ? "Copiado" : "Copiar"}
+  </button>;
+}
+
+export function AdminDomains({ rows, priceCents, automation }: {
+  rows: DomainAdminRow[]; priceCents: number; automation: boolean;
+}) {
   const router = useRouter();
   const [price, setPrice] = useState((priceCents / 100).toFixed(2).replace(".", ","));
   const [hosts, setHosts] = useState<Record<string, string>>({});
@@ -71,7 +88,7 @@ export function AdminDomains({ rows, priceCents }: { rows: DomainAdminRow[]; pri
 
   return <div className="plan-editor">
     {error && <p role="alert" className="auth-error">{error}</p>}
-    {saved && <p role="status" className="editor-saved"><CheckCircle2 size={16} />{saved}</p>}
+    {saved && <p role="status" className="notice-ok"><CheckCircle2 size={16} />{saved}</p>}
 
     <fieldset disabled={busy !== null} className="editor-form">
       <legend><CircleDollarSign size={15} /> Preço anual do domínio</legend>
@@ -103,9 +120,10 @@ export function AdminDomains({ rows, priceCents }: { rows: DomainAdminRow[]; pri
         <div className="editor-features">
           {items.map((r) => {
             const days = daysLeft(r.expiresAt);
+            const host = r.host ?? r.desiredHost;
             return <div className="editor-feature" key={r.id}>
               <div>
-                <strong>{r.host ?? r.desiredHost}</strong>
+                <strong>{host}</strong>
                 <small>{r.siteNome} · /site/{r.siteSlug}</small>
                 <small>{r.userEmail} · pedido {fmtDate(r.createdAt)}</small>
                 <small suppressHydrationWarning>
@@ -113,6 +131,22 @@ export function AdminDomains({ rows, priceCents }: { rows: DomainAdminRow[]; pri
                   {r.payment && ` · ${r.payment.provider === "stripe" ? "cartão" : "PIX"} ${money(r.payment.amount_cents)} (${r.payment.status})`}
                   {r.status === "active" && days !== null && ` · ${days >= 0 ? `${days}d restantes` : "expirado"} · até ${fmtDate(r.expiresAt)}`}
                 </small>
+                {r.setupError && <small className="dom-err">{r.setupError}</small>}
+
+                {automation && r.status === "pending_setup" && <div className="dom-steps">
+                  <p className="dom-step"><span>1</span> Registre <b>{host}</b> no
+                    <a href="https://registro.br" target="_blank" rel="noreferrer">registro.br <ExternalLink size={11} /></a>
+                    <CopyBtn text={host} /></p>
+                  {r.cfNameservers && r.cfNameservers.length > 0
+                    ? <p className="dom-step"><span>2</span> Delegue para os nameservers:
+                        {r.cfNameservers.map((ns) => (
+                          <code key={ns}>{ns} <CopyBtn text={ns} /></code>
+                        ))}</p>
+                    : <p className="dom-step dom-step-todo"><span>2</span> Clique em
+                        <b>Preparar DNS</b> pra gerar os nameservers do Cloudflare</p>}
+                  <p className="dom-step"><span>3</span> Ative aqui — ou a ativação
+                    acontece sozinha quando a delegação propagar (~15min)</p>
+                </div>}
               </div>
               {r.status === "pending_setup" && <>
                 <input
@@ -121,9 +155,15 @@ export function AdminDomains({ rows, priceCents }: { rows: DomainAdminRow[]; pri
                   value={hosts[r.id] ?? ""}
                   onChange={(e) => setHosts((h) => ({ ...h, [r.id]: e.target.value }))}
                 />
+                {automation && !r.cfZoneId && (
+                  <button type="button" className="button button-glass" disabled={busy !== null}
+                    onClick={() => void send({ acao: "provision", domainId: r.id, host: (hosts[r.id] || r.desiredHost).trim() }, `prov-${r.id}`)}>
+                    <RefreshCw size={15} />{busy === `prov-${r.id}` ? "Preparando..." : "Preparar DNS"}
+                  </button>
+                )}
                 <button type="button" className="button button-primary" disabled={busy !== null}
                   onClick={() => void send({ acao: "activate", domainId: r.id, host: (hosts[r.id] || r.desiredHost).trim() }, `act-${r.id}`)}>
-                  <BadgeCheck size={15} />{busy === `act-${r.id}` ? "Ativando..." : "Ativar"}
+                  <BadgeCheck size={15} />{busy === `act-${r.id}` ? "Ativando..." : automation ? "Verificar e ativar" : "Ativar"}
                 </button>
                 <button type="button" className="editor-remove" disabled={busy !== null}
                   onClick={() => void send({ acao: "reject", domainId: r.id }, `rej-${r.id}`)}>
