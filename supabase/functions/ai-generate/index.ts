@@ -1818,13 +1818,16 @@ interface SerperDetails {
 
 async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): Promise<SerperDetails> {
   const empty: SerperDetails = { reviews: [], horariosLabel: [] };
-  // Principal + reservas (_2.._4): se uma chave falhar (cota/rate
+  // Principal + reservas (_2.._7): se uma chave falhar (cota/rate
   // limit) a próxima responde a mesma requisição.
   const keys = [
     await getSecret("SERPER_API_KEY"),
     await getSecret("SERPER_API_KEY_2"),
     await getSecret("SERPER_API_KEY_3"),
     await getSecret("SERPER_API_KEY_4"),
+    await getSecret("SERPER_API_KEY_5"),
+    await getSecret("SERPER_API_KEY_6"),
+    await getSecret("SERPER_API_KEY_7"),
   ].filter((k): k is string => Boolean(k));
   if (!keys.length) return empty;
   const gl = (leadPais(lead) ?? "BR").toLowerCase();
