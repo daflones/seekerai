@@ -6,7 +6,9 @@ import { getLocale, formatMoney } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { AnimatedNumber } from "@/components/animated-number";
 import { DashNotifications } from "@/components/dash-notifications";
+import { CheckoutSuccess } from "@/components/checkout-success";
 import { PayFailBanner } from "@/components/pay-fail-banner";
+import { publicPlanCards } from "@/lib/plans/server";
 import { lastDeclineDetail } from "@/lib/payments/decline";
 
 export default async function AppPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
@@ -61,10 +63,17 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   // Motivo da recusa do cartão (webhook grava status_detail no metadata).
   const decline = params.checkout === "cancelado"
     ? await lastDeclineDetail(supabase, user.id) : null;
+  // Retorno do checkout de cartão: benefícios por plano pro painel de
+  // sucesso que faz polling até o webhook confirmar a assinatura.
+  const planFeatures = params.checkout === "sucesso"
+    ? Object.fromEntries((await publicPlanCards()).plans.map((p) => [p.slug,
+        (p.content.features ?? []).filter((f) => f.visible).slice(0, 6).map((f) => f.text)]))
+    : {};
 
   return <>
     {params.checkout === "sucesso" && (
-      <p className="shell-notice" role="status">{t.success}</p>
+      <CheckoutSuccess features={planFeatures} fallback={t.success}
+        t={getMessages(loc.lang).common} />
     )}
     {params.checkout === "cancelado" && (
       <PayFailBanner detail={decline} t={t} />

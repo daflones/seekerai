@@ -356,6 +356,24 @@ a.lead-action { text-decoration: none; }
 .pay-banner-warn .pay-banner-icon, .pay-banner-warn .pay-banner-text strong { color: #f5b35e; }
 @media (max-width: 640px) { .pay-banner { flex-wrap: wrap; } .pay-banner-text { flex-basis: calc(100% - 40px); } }
 
+/* ── Pagamento confirmado (dashboard + modal PIX) ── */
+.paid-panel { display: flex; flex-direction: column; gap: 12px; background: #6be3cc10; border: 1px solid #6be3cc3d; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; }
+.paid-head { display: flex; align-items: flex-start; gap: 12px; }
+.paid-check, .pix-paid-check { color: var(--ok); flex-shrink: 0; }
+.paid-head strong { display: block; color: var(--white); font-size: 15px; }
+.paid-head span { display: block; color: var(--fg2); font-size: 12.5px; margin-top: 3px; }
+.paid-credits { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 12px; font-weight: 700; color: var(--cyan); background: #6be3cc14; border: 1px solid #6be3cc33; border-radius: 999px; padding: 5px 12px; }
+.paid-benefits { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; }
+.paid-benefits li { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg2); }
+.paid-benefits svg { color: var(--ok); flex-shrink: 0; }
+.paid-panel .button { align-self: flex-start; }
+.pix-paid { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 6px 4px 4px; }
+.pix-paid h2 { margin: 0; }
+.pix-paid-plan { color: var(--fg2); font-size: 14px; font-weight: 600; margin: 0; }
+.pix-paid .paid-benefits { justify-content: center; text-align: left; }
+.pix-paid .button { margin-top: 6px; }
+.pix-waiting { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: 11px; margin-top: 14px; }
+
 /* ── Dashboard stats ── */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 26px 0; }
 .stat-card { background: var(--panel-raised); border: 1px solid #a879d11e; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 6px; }

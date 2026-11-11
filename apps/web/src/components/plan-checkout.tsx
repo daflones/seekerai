@@ -1,13 +1,16 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { CalendarClock, CheckCircle2, ChevronDown, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { CalendarClock, CheckCircle2, ChevronDown, Copy, CreditCard, Loader2, QrCode, Zap } from "lucide-react";
+import type { BillingStatus } from "./checkout-success";
 import { callAction } from "@/lib/app-client";
 import { metaCookies, trackMeta } from "@/lib/meta";
 import { CREDIT_PACKS, formatMoney, INTL_PRICES, type CreditPack, type Locale } from "@/lib/i18n/shared";
 import { BILLING_PERIODS, periodDef, periodMonthlyCents, periodTotalCents, type BillingPeriod } from "@/lib/plans/periods";
-import type { Messages } from "@/lib/i18n/messages";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
 
 interface PlanItem {
   slug: string;
@@ -26,6 +29,7 @@ interface PlanItem {
 
 interface PixResult {
   provider?: string;
+  reference?: string;
   qrCode?: string | null;
   qrCodeImage?: string | null;
   expiresAt?: string | null;
@@ -47,11 +51,45 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
   planCredits?: Record<string, number>;
   packs?: CreditPack[];
 }) {
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pix, setPix] = useState<{ plan: string; pack?: CreditPack } & PixResult | null>(null);
+  const [paid, setPaid] = useState<BillingStatus | null>(null);
   const [copied, setCopied] = useState(false);
   const [period, setPeriod] = useState<BillingPeriod>("mensal");
+
+  // Polling da confirmação: o webhook do provedor marca o pagamento como
+  // 'paid' e o modal vira tela de sucesso com plano/benefícios/saldo na hora.
+  useEffect(() => {
+    const ref = pix?.reference;
+    if (!ref || paid) return;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const res = await fetch(`/api/billing-status?ref=${encodeURIComponent(ref!)}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as BillingStatus;
+          if (data.status === "paid" || data.active) {
+            setPaid(data);
+            router.refresh();
+            trackMeta("Purchase", { content_name: pix!.pack ? `credit-pack-${pix!.pack.id}` : `plan-${pix!.plan}` });
+            return;
+          }
+          if (data.status === "failed" || data.status === "expired") {
+            setPix(null);
+            setError(tc.paidFail);
+            return;
+          }
+        }
+      } catch { /* tenta de novo */ }
+      if (!stop) timer = setTimeout(() => void poll(), 4000);
+    }
+    void poll();
+    return () => { stop = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pix?.reference, paid]);
 
   // Benefícios do card: no mobile começam recolhidos (accordion no próprio card).
   const moreRefs = useRef<(HTMLDetailsElement | null)[]>([]);
@@ -61,6 +99,7 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
   }, []);
 
   const isIntl = !locale.isBrazil;
+  const tc = getMessages(locale.lang).common;
   const money = (cents: number) => formatMoney(cents, locale.currency, locale.lang);
   const def = periodDef(period);
   // Gringo: preços em USD/EUR ($5/$15/$25). Brasil: preço em BRL vindo do banco.
@@ -237,29 +276,49 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
     {error && <p role="alert" className="auth-error">{error}</p>}
 
     {pix && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label="PIX"
-      onClick={() => setPix(null)}>
+      onClick={() => { setPix(null); setPaid(null); }}>
       <section className="pix-panel pix-modal" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="pix-close" aria-label="×" onClick={() => setPix(null)}>×</button>
-        <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : lookup.find((p) => p.slug === pix.plan)?.name}</h2>
-        <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : disc(priceFor(lookup.find((p) => p.slug === pix.plan)!)))}{!pix.pack && <small>{t.perMonth}</small>}</p>
-        {!pix.pack && def.months > 1 && (
-          <p className="plan-billed-caption">
-            {money(disc(totalFor(lookup.find((p) => p.slug === pix.plan)!)))}
-            {" "}{period === "trimestral" ? t.billedTri : t.billedYear}
+        <button type="button" className="pix-close" aria-label="×" onClick={() => { setPix(null); setPaid(null); }}>×</button>
+        {paid ? (() => {
+          const paidPlan = lookup.find((p) => p.slug === (paid.planSlug ?? pix.plan));
+          const feats = paidPlan?.content.features?.filter((f) => f.visible).slice(0, 6) ?? [];
+          return <div className="pix-paid" role="status">
+            <CheckCircle2 size={42} className="pix-paid-check" />
+            <h2>{tc.paidT}</h2>
+            <p className="pix-paid-plan">
+              {pix.pack ? `+${pix.pack.credits} ${t.packCredits}` : paidPlan?.name}
+            </p>
+            {(paid.credits ?? 0) > 0 && (
+              <span className="paid-credits"><Zap size={13} />+{paid.credits} {tc.paidCredits}</span>
+            )}
+            {feats.length > 0 && <ul className="paid-benefits">
+              {feats.map((f) => <li key={f.id}><CheckCircle2 size={12} />{f.text}</li>)}
+            </ul>}
+            <Link href="/app/buscar" className="button button-primary button-small">{tc.paidCta}</Link>
+          </div>;
+        })() : <>
+          <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : lookup.find((p) => p.slug === pix.plan)?.name}</h2>
+          <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : disc(priceFor(lookup.find((p) => p.slug === pix.plan)!)))}{!pix.pack && <small>{t.perMonth}</small>}</p>
+          {!pix.pack && def.months > 1 && (
+            <p className="plan-billed-caption">
+              {money(disc(totalFor(lookup.find((p) => p.slug === pix.plan)!)))}
+              {" "}{period === "trimestral" ? t.billedTri : t.billedYear}
+            </p>
+          )}
+          {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code PIX" width={210} height={210} unoptimized />}
+          {pix.qrCode && <div className="pix-code">
+            <code>{pix.qrCode}</code>
+            <button type="button" className="button button-glass button-small" onClick={() => void copyPix(pix.qrCode!)}>
+              <Copy size={14} />{copied ? t.pixCopied : t.pixCopy}
+            </button>
+          </div>}
+          <p className="seek-meta">
+            {t.pixHint}
+            {pix.expiresAt && ` ${t.pixValid} ${new Date(pix.expiresAt).toLocaleString()}.`}
+            {" "}{t.pixAuto}
           </p>
-        )}
-        {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code PIX" width={210} height={210} unoptimized />}
-        {pix.qrCode && <div className="pix-code">
-          <code>{pix.qrCode}</code>
-          <button type="button" className="button button-glass button-small" onClick={() => void copyPix(pix.qrCode!)}>
-            <Copy size={14} />{copied ? t.pixCopied : t.pixCopy}
-          </button>
-        </div>}
-        <p className="seek-meta">
-          {t.pixHint}
-          {pix.expiresAt && ` ${t.pixValid} ${new Date(pix.expiresAt).toLocaleString()}.`}
-          {" "}{t.pixAuto}
-        </p>
+          <p className="pix-waiting"><Loader2 size={13} className="spin" /> {tc.paidChecking}</p>
+        </>}
       </section>
     </div>}
   </>;
