@@ -51,7 +51,7 @@ export function WelcomeQuiz({ name, t }: { name: string; t?: Messages["welcome"]
         setBusy(false);
         return;
       }
-      router.replace("/app");
+      router.replace("/app/buscar?primeira=1");
     } catch {
       setError(tt.errNet);
       setBusy(false);

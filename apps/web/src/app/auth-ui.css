@@ -68,6 +68,13 @@
 
 /* ── Busca (radar) ── */
 .seek-console { margin-top: 38px; }
+.seek-first { display: flex; gap: 15px; align-items: center; padding: 16px 18px; margin-bottom: 18px; border-radius: 14px; border: 1px solid #ab7bcd55; background: linear-gradient(135deg, #a879d11f, #a879d108); position: relative; overflow: hidden; }
+.seek-first::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, #a879d118 50%, transparent 62%); animation: seek-first-shine 2.6s ease-in-out infinite; pointer-events: none; }
+.seek-first-ic { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex: none; border-radius: 12px; color: var(--violet-light); background: #a879d120; border: 1px solid #ab7bcd45; }
+.seek-first strong { display: block; color: var(--white); font-size: 15px; }
+.seek-first p { color: var(--fg2); font-size: 12.5px; margin-top: 3px; }
+@keyframes seek-first-shine { 0% { transform: translateX(-100%); } 60%, 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .seek-first::after { animation: none; } }
 .seek-form { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; padding: 20px; border: 1px solid #ab7bcd2c; border-radius: 15px; background: linear-gradient(135deg, #a879d10d, #a879d103); }
 .seek-field { display: flex; flex-direction: column; gap: 7px; min-width: 190px; }
 .seek-field-grow { flex: 1; min-width: 240px; }

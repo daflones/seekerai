@@ -9,15 +9,16 @@ import { getServicesCatalog } from "@/lib/catalog-cache";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Buscar oportunidades", robots: { index: false } };
 
-export default async function BuscarPage() {
-  const [{ supabase, user, profile }, loc] = await Promise.all([
-    requireSession("/app/buscar"), getLocale(),
+export default async function BuscarPage({ searchParams }: {
+  searchParams: Promise<{ primeira?: string }>;
+}) {
+  const [{ supabase, user, profile }, loc, params] = await Promise.all([
+    requireSession("/app/buscar"), getLocale(), searchParams,
   ]);
   const t = getMessages(loc.lang).seek;
-  // Renova a cota diária antes de calcular saldo/buscas restantes —
-  // 'ativo' diz se a janela de 7 dias ainda está aberta.
-  const { data: daily } = await supabase.rpc("daily_credit_state");
-  const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
+  // Créditos diários gratuitos foram descontinuados — sem recarga diária,
+  // quem bloqueia vê direto a mensagem de assinatura (não "volta amanhã").
+  const dailyActive = false;
   const [catalog, { data: subs }, { data: wallet }] = await Promise.all([
     getServicesCatalog(),
     supabase.from("subscriptions").select("status").eq("user_id", user.id)
@@ -42,7 +43,7 @@ export default async function BuscarPage() {
       services={((services ?? []) as { slug: string; nome: string; categoria: string }[])
         .map((s) => ({ slug: s.slug, nome: serviceName(s.slug, s.nome, loc.lang), categoria: serviceCategory(s.categoria, loc.lang) }))}
       canSearch={canSearch} subscribed={subscribed} freeSearchesLeft={freeSearchesLeft}
-      dailyActive={dailyActive}
+      dailyActive={dailyActive} firstSearch={params.primeira === "1"}
       loc={loc} t={t} />
   </>;
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BookmarkPlus, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
-  AlarmClock, Globe, Heart, Instagram, Loader2, Lock, MapPin, MessageCircle, Phone,
+  AlarmClock, Globe, Heart, Instagram, Loader2, MapPin, MessageCircle, Phone,
   Search, SlidersHorizontal, Sparkles, Star, Users, XCircle,
 } from "lucide-react";
 import { fmtCompact, igHandle, igUrl, placeImageSrc, type PlaceResult } from "@/lib/app-client";
@@ -67,6 +67,7 @@ export function SearchConsole({
   subscribed = true,
   freeSearchesLeft = null,
   dailyActive = true,
+  firstSearch = false,
   t = getMessages("pt").seek,
   loc,
 }: {
@@ -75,6 +76,7 @@ export function SearchConsole({
   subscribed?: boolean;
   freeSearchesLeft?: number | null;
   dailyActive?: boolean;
+  firstSearch?: boolean;
   t?: Messages["seek"];
   loc?: Locale;
 }) {
@@ -376,6 +378,13 @@ export function SearchConsole({
   })();
 
   return <div className="seek-console">
+    {firstSearch && <div className="seek-first" role="note">
+      <span className="seek-first-ic"><Sparkles size={20} /></span>
+      <div>
+        <strong>{t.firstT}</strong>
+        <p>{t.firstP}</p>
+      </div>
+    </div>}
     <form className="seek-form" onSubmit={(e) => { e.preventDefault(); void search(); }}>
       <label className="seek-field">
         <span>{t.fService}</span>
@@ -432,13 +441,6 @@ export function SearchConsole({
       onClick={() => setUpgradeOpen(false)}>
       <section className="pix-panel pix-modal seek-upgrade" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="pix-close" aria-label={t.tutClose} onClick={() => setUpgradeOpen(false)}>×</button>
-        <div className="seek-locked" role="note">
-          <Lock size={18} />
-          <div>
-            <strong>{dailyActive ? t.lockedT : t.lockedExpT}</strong>
-            <p>{dailyActive ? t.lockedP : t.lockedExpP}</p>
-          </div>
-        </div>
         <div className="seek-tut">
           <p className="seek-tut-title">{t.tutT}</p>
           <ol>

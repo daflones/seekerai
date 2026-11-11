@@ -14,12 +14,11 @@ export const metadata: Metadata = { title: "Meus leads", robots: { index: false 
 export default async function LeadsPage() {
   const [{ supabase, user }, loc] = await Promise.all([requireSession("/app/leads"), getLocale()]);
   const t = getMessages(loc.lang).leadsPage;
-  const [{ data: leads }, services, rules, { data: outputs }, { data: daily }, { data: subs }] = await Promise.all([
+  const [{ data: leads }, services, rules, { data: outputs }, { data: subs }] = await Promise.all([
     supabase.from("leads").select("*").order("created_at", { ascending: false }).limit(500),
     getServicesCatalog(),
     getCreditActionRules(),
     supabase.from("lead_outputs").select("lead_id,tipo").limit(2000),
-    supabase.rpc("daily_credit_state"),
     supabase.from("subscriptions").select("status").eq("user_id", user.id).in("status", ["active"]).limit(1),
   ]);
   type Service = { slug: string; nome: string; enabled_actions: string[] | null };
@@ -39,6 +38,6 @@ export default async function LeadsPage() {
     {(leads ?? []).length === 0
       ? <p className="private-intro">{t.empty} <Link className="text-link" href="/app/buscar">{t.emptyLink}</Link></p>
       : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} doneByLead={doneByLead} lang={loc.lang} t={t}
-          trial={!subs?.length} dailyActive={(daily as { ativo?: boolean } | null)?.ativo !== false} />}
+          trial={!subs?.length} dailyActive={false} />}
   </>;
 }

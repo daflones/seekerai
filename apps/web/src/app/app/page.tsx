@@ -20,10 +20,9 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  // Cota diária de quem não tem plano: completa até 13 dentro da
-  // janela de 7 dias. 'ativo' diz se a renovação ainda está valendo.
-  const { data: daily } = await supabase.rpc("daily_credit_state");
-  const dailyActive = (daily as { ativo?: boolean } | null)?.ativo !== false;
+  // Créditos diários gratuitos descontinuados — sem renovação diária,
+  // o dashboard mostra o estado "sem assinatura" direto.
+  const dailyActive = false;
   const [{ data: wallet }, { count: leadsTotal }, { count: leadsNovos }, { data: subs }, { data: ops }, { data: wonLeads }, { data: allWon }, { data: notifs }] = await Promise.all([
     supabase.from("credit_wallets").select("saldo").eq("user_id", user.id).maybeSingle(),
     supabase.from("leads").select("id", { count: "exact", head: true }),

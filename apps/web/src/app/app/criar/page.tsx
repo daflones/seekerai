@@ -12,10 +12,9 @@ export const metadata: Metadata = { title: "Estúdio", robots: { index: false } 
 
 export default async function CriarPage() {
   const [{ supabase, user, profile }, loc] = await Promise.all([requireSession("/app/criar"), getLocale()]);
-  const [{ data: subs }, { data: daily }, planSlug] = await Promise.all([
+  const [{ data: subs }, planSlug] = await Promise.all([
     supabase.from("subscriptions").select("status")
       .eq("user_id", user.id).eq("status", "active").limit(1),
-    supabase.rpc("daily_credit_state"),
     userPlanSlug(supabase, user.id),
   ]);
   const t = getMessages(loc.lang).studio;
@@ -26,7 +25,7 @@ export default async function CriarPage() {
     <p className="private-intro">{t.intro}</p>
     {profile.role === "admin" || planAllowsPaidFeatures(planSlug)
       ? <StudioStudio t={t} lang={loc.lang} trial={!(subs ?? []).length}
-          dailyActive={(daily as { ativo?: boolean } | null)?.ativo !== false} />
+          dailyActive={false} />
       : <div className="site-soon">
           <span className="site-soon-badge"><Lock size={13} />{t.lockBadge}</span>
           <h1>{t.lockT}</h1>
