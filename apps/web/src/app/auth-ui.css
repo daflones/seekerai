@@ -632,6 +632,17 @@ a.lead-action { text-decoration: none; }
 .adm-job-error .adm-job-etapa { color: var(--danger); }
 .adm-job-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid #a879d114; display: flex; flex-direction: column; gap: 7px; }
 .adm-job-resumo { font-size: 12px; color: var(--white); }
+
+/* Admin → Criações */
+.adm-create-search { margin-left: auto; padding: 7px 13px; border-radius: 999px; border: 1px solid #b387d133; background: var(--panel); color: var(--white); font-size: 12px; min-width: 240px; }
+.adm-create-search::placeholder { color: var(--muted); }
+.adm-creation-date { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.adm-creation-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-creation-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.adm-creation-code { margin: 0; padding: 10px 12px; border-radius: 10px; background: #0c0812; border: 1px solid #a879d118; color: var(--fg2); font-size: 11px; line-height: 1.55; max-height: 380px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.adm-creation-preview summary { cursor: pointer; font-size: 11.5px; color: var(--violet-light); margin-bottom: 6px; }
+.adm-creation-frame { width: 100%; height: 420px; border: 1px solid #a879d124; border-radius: 10px; background: #fff; margin-bottom: 6px; }
+.light .adm-creation-code { background: #f6f1fb; color: var(--fg); }
 .adm-job-itens { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .adm-job-itens li { font-size: 11.5px; color: var(--muted); padding: 5px 9px; background: #a879d108; border-radius: 7px; }
 .status-btn.status-resolvido.active { border-color: var(--cyan); color: var(--cyan); background: #6be3cc14; }
