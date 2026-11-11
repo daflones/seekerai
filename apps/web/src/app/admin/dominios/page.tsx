@@ -55,13 +55,12 @@ export default async function AdminDominiosPage() {
     <span className="eyebrow">DOMÍNIOS CUSTOMIZADOS</span>
     <h1>Domínios próprios<span className="gradient-text">.</span></h1>
     <p className="private-intro">
-      {rows.length} pedidos · {ativos} ativos · {pendentes} aguardando configuração manual
-      {pendentes > 0 && " — SLA de 48h"}.
+      {rows.length} pedidos · {ativos} ativos · {pendentes} aguardando configuração.
     </p>
     <AdminDomains rows={rows} priceCents={priceCents} automation={domainAutomationReady()} />
     <p className="private-disclaimer">
-      <Globe size={13} /> Ative com o host definitivo — o usuário é notificado no app e o
-      domínio passa a servir o site imediatamente.
+      <Globe size={13} /> Registre no registro.br e delegue os nameservers — a ativação
+      acontece sozinha quando a delegação propagar.
     </p>
   </>;
 }
