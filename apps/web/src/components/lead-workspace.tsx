@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   AlertTriangle, Check, Copy, Download, ExternalLink, Eye, Heart, ImagePlus, Instagram, Loader2,
-  Lock, MapPin, MessageSquareText, Pencil, Phone, Plus, RotateCcw, Sparkles, Star, Trash2, Globe, Users,
+  Lock, MapPin, MessageSquareText, NotebookPen, Pencil, Phone, Plus, RotateCcw, Sparkles, Star, Trash2, Globe, Users,
   MessageCircle, FileText, MonitorSmartphone, Power,
 } from "lucide-react";
 import { callAction, fmtCompact, igHandle, igUrl, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
@@ -455,6 +455,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
               {t.wonBadge} {formatMoney(Math.round(lead.valor_fechado * 100), currency)}
             </button>
           )}
+          <button type="button" className="lead-head-del" disabled={isBusy("delete")}
+            onClick={() => void removeLead()} title={t.delete} aria-label={t.delete}>
+            <Trash2 size={15} />
+          </button>
         </div>
         {lead.categoria && <span className="seek-category">{lead.categoria} · {serviceName}</span>}
         {lead.endereco && <p className="seek-line"><MapPin size={12} />{[lead.endereco, lead.cidade, lead.uf].filter(Boolean).join(" · ")}</p>}
@@ -476,35 +480,28 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         </div>
         {ig && igUrl(lead.instagram) && <a className="seek-ig" href={igUrl(lead.instagram)!}
           target="_blank" rel="noopener noreferrer" title={ig.bio ?? ""}>
-          {ig.foto
-            // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
-            ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
-            : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
-          <span className="seek-ig-handle">@{igHandle(lead.instagram)}</span>
-          {ig.seguidores != null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
-          {ig.posts != null && <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} posts</span>}
-          {ig.curtidas != null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)}/post</span>}
-          {ig.bio && <span className="lead-ig-bio">{ig.bio}</span>}
+          <span className="seek-ig-head">
+            {ig.foto
+              // eslint-disable-next-line @next/next/no-img-element -- CDN do Instagram
+              ? <img className="seek-ig-pic" src={ig.foto} alt="" loading="lazy" />
+              : <span className="seek-ig-pic seek-ig-pic-empty"><Instagram size={12} /></span>}
+            <span className="seek-ig-handle">@{igHandle(lead.instagram)}</span>
+            <ExternalLink className="seek-ig-ext" size={11} />
+          </span>
+          {(ig.seguidores != null || ig.posts != null || ig.curtidas != null) && <span className="seek-ig-stats">
+            {ig.seguidores != null && <span className="seek-ig-stat"><Users size={11} />{fmtCompact(ig.seguidores, lang)}</span>}
+            {ig.posts != null && <span className="seek-ig-stat">{fmtCompact(ig.posts, lang)} posts</span>}
+            {ig.curtidas != null && <span className="seek-ig-stat"><Heart size={11} />{fmtCompact(ig.curtidas, lang)}/post</span>}
+          </span>}
         </a>}
+        {ig?.bio && <p className="lead-ig-bio">{ig.bio}</p>}
       </div>
     </header>
-
-    <section className="lead-actions">
-      {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={isBusy("deep_strategy")}
-        onClick={() => void generate("deep_strategy")}>
-        {isBusy("deep_strategy") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
-        {isBusy("deep_strategy") ? t.actStrategyBusy : t.actStrategy}
-      </button>}
-      <button type="button" className="button button-glass button-small lead-delete" disabled={isBusy("delete")}
-        onClick={() => void removeLead()}>
-        <Trash2 size={14} />{t.delete}
-      </button>
-    </section>
 
     {error && (isCreditsError(error)
       ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
       : <p role="alert" className="auth-error">{error}</p>)}
-    {notice && <p role="status" className="editor-saved"><Sparkles size={14} />{notice}</p>}
+    {notice && <p role="status" className="notice-ok"><Sparkles size={14} />{notice}</p>}
 
     <section className="lead-journey">
       <h2><Sparkles size={17} /> {t.journey}</h2>
@@ -699,7 +696,14 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     </section>
 
     <section className="lead-outputs">
-      <h2>{t.outTitle}</h2>
+      <div className="lead-outputs-head">
+        <h2>{t.outTitle}</h2>
+        {!hasStrategy && <button type="button" className="button button-glass button-small" disabled={isBusy("deep_strategy")}
+          onClick={() => void generate("deep_strategy")}>
+          {isBusy("deep_strategy") ? <Loader2 size={14} className="spin" /> : <FileText size={14} />}
+          {isBusy("deep_strategy") ? t.actStrategyBusy : t.actStrategy}
+        </button>}
+      </div>
       {outputs.length === 0 && <p className="seek-empty">{t.outEmpty}</p>}
       {outputs.map((o) => <article key={o.id} className="lead-output">
         <button type="button" className="lead-output-head" onClick={() => setOpen((s) => ({ ...s, [o.id]: !s[o.id] }))}>
@@ -743,19 +747,21 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       </article>)}
     </section>
 
-    <section className="lead-notes">
-      <h2>{t.notes}</h2>
+    <section className="dash-panel lead-notes">
+      <div className="dash-panel-heading"><h2><NotebookPen size={15} /> {t.notes}</h2></div>
       <textarea
         value={notas}
         maxLength={2000}
         placeholder={t.notesPh}
         onChange={(e) => setNotas(e.target.value)}
       />
-      <button type="button" className="button button-glass button-small"
-        disabled={notas === (lead.notas ?? "")}
-        onClick={() => { void patch({ notas }); setLead((l) => ({ ...l, notas })); setNotice(t.notesSaved); }}>
-        {t.notesSave}
-      </button>
+      <div className="lead-notes-foot">
+        <button type="button" className="button button-glass button-small"
+          disabled={notas === (lead.notas ?? "")}
+          onClick={() => { void patch({ notas }); setLead((l) => ({ ...l, notas })); setNotice(t.notesSaved); }}>
+          {t.notesSave}
+        </button>
+      </div>
     </section>
 
     <LeadAssistant lead={lead} serviceName={serviceName} lang={lang} statusLabel={statusLabels[lead.status] ?? lead.status} t={t.copilot} />

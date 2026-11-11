@@ -189,7 +189,7 @@ export function TicketChat({
             {enhancing ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
           </button>
         )}
-        <button type="button" onClick={() => void send()} disabled={busy || enhancing || !text.trim()}>
+        <button type="button" className="button button-primary chat-send" onClick={() => void send()} disabled={busy || enhancing || !text.trim()}>
           {busy ? <Loader2 size={16} className="spin" /> : <Send size={16} />} {tt.sendBtn}
         </button>
       </div>

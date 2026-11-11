@@ -38,7 +38,7 @@ export default async function PlanAdminPage() {
     {error ? <p role="alert" className="auth-error">Não foi possível carregar os planos.</p> : plans.length ? <PlanEditor initialPlans={plans} /> : <p className="auth-notice">Nenhum plano inicial foi provisionado. Execute o seed antes de editar.</p>}
     <AdminPacks initial={packs} />
     <AdminCheckoutVisibility
-      plans={plans.map((p) => ({ slug: p.slug, name: p.name }))}
+      plans={plans.filter((p) => p.slug !== "gratis").map((p) => ({ slug: p.slug, name: p.name }))}
       packs={packs} hiddenPlans={hiddenPlans} hiddenPacks={hiddenPacks} />
   </>;
 }

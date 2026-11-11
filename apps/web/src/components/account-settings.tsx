@@ -73,7 +73,7 @@ export function AccountSettings({ nome, email, telefone, t }: {
           {saving ? t.nameSaving : t.nameSave}
         </button>
       </div>
-      {saved && <p role="status" className="editor-saved"><CheckCircle2 size={14} />{saved}</p>}
+      {saved && <p role="status" className="notice-ok"><CheckCircle2 size={14} />{saved}</p>}
       {error && <p role="alert" className="auth-error">{error}</p>}
 
       <div className="acct-row">

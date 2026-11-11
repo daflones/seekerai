@@ -66,7 +66,7 @@
 .editor-feature button { display: flex; padding: 5px; background: transparent; color: #b08cca; border: 1px solid #ac76c323; border-radius: 5px; }
 .editor-feature button:disabled { opacity: .25; cursor: not-allowed; }
 .editor-add { display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px; margin-top: 15px; color: #c19ade; background: #9f6bbe0c; border: 1px solid #a371c62c; border-radius: 7px; font-size: 11px; }
-.editor-saved { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: #94d6b9; margin-block: 20px; line-height: 1.8; }
+.notice-ok { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #94d6b9; margin-block: 14px; line-height: 1.6; }
 .editor-preview { position: sticky; top: 25px; }
 .editor-preview > span { display: flex; align-items: center; gap: 7px; margin-bottom: 16px; font-size: 8px; letter-spacing: .12em; color: #a586b9; }
 .editor-preview > p { margin-top: 15px; text-align: center; font-size: 9px; color: #8b6d9e; }
@@ -106,19 +106,18 @@
 }
 
 /* Domínios próprios — /app/dominios e /admin/dominios */
-.domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 21px; margin-top: 28px; }
-.domain-card h3 { display: flex; align-items: center; gap: 9px; }
-.domain-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11px; color: #b9a0cc; margin-top: 12px; padding: 9px 11px; border-radius: 8px; background: #a573ca10; border: 1px solid #a573ca22; }
+.domain-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 12px; padding: 9px 11px; border-radius: 8px; background: #a573ca10; border: 1px solid var(--border); }
 .domain-status-active { color: #8be2a7; border-color: #8be2a733; background: #8be2a70c; }
-.domain-status-pending_setup { color: #f4cf7a; border-color: #f4cf7a33; background: #f4cf7a0c; }
-.domain-status-pending_payment { color: #b9a0cc; }
-.domain-check { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #90729f; margin-top: 10px; }
+.domain-status-pending_setup { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); background: color-mix(in srgb, var(--warn) 8%, transparent); }
+.domain-status-pending_payment { color: var(--muted); }
+.domain-status-expired, .domain-status-rejected, .domain-status-removed { color: var(--danger); border-color: #ef94a338; background: #e87b8e0d; }
+.domain-check { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); margin-top: 10px; }
 .domain-check.is-free { color: #8be2a7; }
 .domain-check.is-taken { color: #ef9f9f; }
 .domain-suggest { margin-top: 12px; }
-.domain-suggest-label { font-size: 10.5px; color: #90729f; display: block; margin-bottom: 7px; }
+.domain-suggest-label { font-size: 10.5px; color: var(--muted); display: block; margin-bottom: 7px; }
 .domain-suggest-row { display: flex; flex-wrap: wrap; gap: 7px; }
-.domain-chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; font-size: 11.5px; border: 1px solid #ab7bcd33; background: #a879d10a; color: #cbb3dd; cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+.domain-chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; font-size: 11.5px; border: 1px solid var(--border); background: #a879d10a; color: var(--muted); cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
 .domain-chip.is-free { border-color: #8be2a755; color: #a8ecc0; }
 .domain-chip.is-free:hover { background: #8be2a71c; border-color: #8be2a7aa; }
 .domain-chip.is-taken { opacity: .45; cursor: not-allowed; text-decoration: line-through; }
@@ -128,22 +127,19 @@
 /* Compra de domínio — painel único com seletor */
 .domain-buy { max-width: 640px; margin-top: 28px; }
 .domain-buy h3 { display: flex; align-items: center; gap: 9px; }
-.domain-buy-pitch { margin: 2px 0 0; font-size: 12.5px; line-height: 1.6; color: #b9a0cc; }
-.domain-buy-pitch strong { color: #f2e8fa; }
+.domain-buy-pitch { margin: 2px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.domain-buy-pitch strong { color: var(--white); }
 .domain-site-link { margin-top: 6px; }
-.domain-buy .editor-block-label select { width: 100%; background: var(--panel); border: 1px solid #ab7bcd33; border-radius: 10px; padding: 11px 12px; color: var(--white); font-size: 13px; }
-.domain-buy .editor-block-label select:focus { outline: none; border-color: var(--violet); }
+.domain-buy .editor-block-label select { width: 100%; }
 .domain-host-row { display: flex; gap: 10px; }
-.domain-host-row input { flex: 1; min-width: 0; padding: 10px 12px; color: #efe7f5; background: var(--panel); border: 1px solid #ab7bcd33; border-radius: 10px; font-size: 13px; }
-.domain-host-row input:focus { outline: none; border-color: var(--violet); }
 .domain-host-row .button { flex-shrink: 0; align-self: stretch; }
 .domain-pay { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .domain-mine { margin-top: 30px; }
-.domain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.domain-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 13px; background: #a879d10a; border: 1px solid #a879d114; border-radius: 9px; font-size: 12px; }
-.domain-list-host { display: inline-flex; align-items: center; gap: 6px; color: #f3ecfa; font-weight: 600; word-break: break-all; }
+.domain-list { list-style: none; }
+.domain-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; }
+.domain-list-host { display: inline-flex; align-items: center; gap: 6px; color: var(--white); font-weight: 600; word-break: break-all; }
 .domain-list-host svg { color: var(--muted); flex-shrink: 0; }
-.domain-list-site { color: #9d86ad; font-size: 11px; }
+.domain-list-site { color: var(--muted); font-size: 11px; }
 .domain-list .domain-status { margin: 0 0 0 auto; padding: 4px 9px; font-size: 10px; }
 @media (max-width: 560px) {
   .domain-host-row { flex-direction: column; }
@@ -229,13 +225,6 @@ a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
 .seek-tut li { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #cdbfda; line-height: 1.5; }
 .seek-tut-num { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #a573ca30; color: #e9d5ff; font-size: 10px; font-weight: 800; }
 .seek-tut .button { margin-top: 14px; display: inline-flex; }
-
-/* Recarga de créditos — /app/planos#creditos */
-.pack-section { margin-top: 30px; }
-.pack-section-title { font-size: 15px; font-weight: 700; color: #f2e8fa; margin: 0 0 4px; }
-.pack-section-sub { font-size: 12px; color: #9d86ad; margin: 0 0 16px; }
-.pack-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-.pack-grid .credit-pack h3 { font-size: 22px; font-weight: 800; color: #e9d5ff; margin: 0; }
 
 /* Aviso "créditos acabaram" */
 .no-credits { display: flex; align-items: flex-start; gap: 13px; margin-top: 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid #f2b87944; background: #f2b87910; color: #f2b879; }

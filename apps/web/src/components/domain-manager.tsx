@@ -136,7 +136,7 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
 
   return <div className="plan-editor">
     {unread.length > 0 && <section className="dash-panel domain-notifs">
-      <h2><BellRing size={16} /> Novidades dos seus domínios</h2>
+      <div className="dash-panel-heading"><h2><BellRing size={15} /> Novidades dos seus domínios</h2></div>
       <ul className="dash-usage">
         {unread.map((n) => <li key={n.id}>
           <span><strong>{n.titulo}</strong>{n.corpo ? ` — ${n.corpo}` : ""}</span>
@@ -151,10 +151,15 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
 
     {error && <p role="alert" className="auth-error">{error}</p>}
 
-    {sites.length === 0 && <p className="private-intro">
-      Você ainda não tem sites publicados. Gere um site no radar ou no estúdio e volte aqui
-      para apontar um domínio próprio.
-    </p>}
+    {sites.length === 0 && <section className="dash-panel">
+      <div className="dash-panel-heading"><h2><Globe size={15} /> Domínio personalizado</h2></div>
+      <div className="dash-empty">
+        <Globe size={26} />
+        <p>Você ainda não tem sites publicados. Gere um site no radar ou no estúdio e volte aqui para apontar um domínio próprio.</p>
+        <a className="text-link" href="/app/buscar">Buscar clientes no radar</a>
+        <a className="text-link" href="/app/criar">Criar site no estúdio</a>
+      </div>
+    </section>}
 
     {sites.length > 0 && <section className="plan-card-checkout domain-buy">
       <h3><Globe size={15} /> Domínio personalizado</h3>
@@ -179,6 +184,7 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
       {live && <p className={`domain-status domain-status-${live.status}`}>
         {live.status === "active" && <BadgeCheck size={14} />}
         {(live.status === "pending_setup" || live.status === "pending_payment") && <Hourglass size={14} />}
+        {(live.status === "expired" || live.status === "rejected" || live.status === "removed") && <XCircle size={14} />}
         <strong>{STATUS_LABEL[live.status] ?? live.status}</strong>
         {" · "}{live.host ?? live.desired_host}
         {live.status === "active" && live.expires_at && ` · até ${fmtDate(live.expires_at)}`}
@@ -241,8 +247,8 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
     </section>}
 
     {domains.length > 0 && <section className="dash-panel domain-mine">
-      <h2><Globe size={16} /> Meus domínios</h2>
-      <ul className="domain-list">
+      <div className="dash-panel-heading"><h2><Globe size={15} /> Meus domínios</h2></div>
+      <ul className="dash-usage domain-list">
         {domains.map((d) => <li key={d.id}>
           <span className="domain-list-host">
             <Globe size={13} />{d.host ?? d.desired_host}
@@ -251,6 +257,7 @@ export function DomainManager({ sites, domains, notifications, priceCents, initi
           <span className={`domain-status domain-status-${d.status}`}>
             {d.status === "active" && <BadgeCheck size={13} />}
             {(d.status === "pending_setup" || d.status === "pending_payment") && <Hourglass size={13} />}
+            {(d.status === "expired" || d.status === "rejected" || d.status === "removed") && <XCircle size={13} />}
             {STATUS_LABEL[d.status] ?? d.status}
             {d.status === "active" && d.expires_at && ` · até ${fmtDate(d.expires_at)}`}
           </span>

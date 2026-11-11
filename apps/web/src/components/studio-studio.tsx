@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Clapperboard, Copy, Check, Download, FilePlus2, Image as ImageIcon,
+  Clapperboard, Copy, Check, Download, FilePlus2, History, Image as ImageIcon,
   Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, Trophy, X,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
@@ -304,7 +304,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
       {running && <p className="st-note"><Loader2 size={13} className="spin" /> {t.runningStatus}</p>}
       {error && (isCreditsError(error)
         ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
-        : <p className="st-err" role="alert">{error}</p>)}
+        : <p className="auth-error" role="alert">{error}</p>)}
     </div>
 
     {/* Resultado: toolbar + moldura de dispositivo */}
@@ -381,7 +381,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
             <span>{wonBusy ? t.wonSaving : t.wonSave}</span>
           </button>
         </div>
-        {wonError && <p className="st-err" role="alert">{wonError}</p>}
+        {wonError && <p className="auth-error" role="alert" style={{ margin: 0 }}>{wonError}</p>}
       </div>}
       <div className={`st-stage st-stage-${viewTarget}`}>
         {viewTarget === "mobile"
@@ -400,8 +400,8 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
     </div>}
 
     {/* Histórico */}
-    {history.length > 0 && <section className="st-history">
-      <h4>{t.historyTitle}</h4>
+    {history.length > 0 && <section className="dash-panel st-history">
+      <div className="dash-panel-heading"><h2><History size={15} /> {t.historyTitle}</h2></div>
       <ul>
         {history.map(p => <li key={p.id}>
           <button type="button" onClick={async () => {

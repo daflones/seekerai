@@ -39,7 +39,7 @@ export function SupportCenter({ tickets: initial, admin = false, t, lang = "pt" 
 
   return <>
     <ul className="ticket-list">
-      {tickets.length === 0 && <li className="dash-empty">{tt.empty}</li>}
+      {tickets.length === 0 && <li className="dash-empty"><MessageCircle size={18} />{tt.empty}</li>}
       {pageItems.map((t) => (
         <li key={t.id}>
           <button type="button" className={`ticket-open ${openId === t.id ? "active" : ""}`} onClick={() => setOpenId(openId === t.id ? null : t.id)}>

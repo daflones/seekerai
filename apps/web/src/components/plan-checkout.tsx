@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { CalendarClock, CheckCircle2, ChevronDown, Copy, CreditCard, Loader2, QrCode } from "lucide-react";
 import { callAction } from "@/lib/app-client";
@@ -52,14 +52,6 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
   const [pix, setPix] = useState<{ plan: string; pack?: CreditPack } & PixResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [period, setPeriod] = useState<BillingPeriod>("mensal");
-  const [canceled, setCanceled] = useState(false);
-
-  // Retorno do Stripe com checkout cancelado — aviso leve acima dos planos.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("checkout") === "cancelado") {
-      setCanceled(true);
-    }
-  }, []);
 
   // Benefícios do card: no mobile começam recolhidos (accordion no próprio card).
   const moreRefs = useRef<(HTMLDetailsElement | null)[]>([]);
@@ -171,8 +163,6 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
   }
 
   return <>
-    {canceled && <p className="seek-meta" role="status">{t.cancelNote}</p>}
-
     {hasSubscription && current && <section className="plan-now">
       <div className="plan-now-info">
         <small>{t.yourPlan}</small>
