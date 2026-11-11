@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ChevronDown, CircleDollarSign, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, UserRound, Users, Zap } from "lucide-react";
+import { Activity, ChevronDown, CircleDollarSign, ClipboardList, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, UserRound, Users, Zap } from "lucide-react";
 import { Brand } from "./brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
@@ -28,6 +28,7 @@ const DEFAULT_T: Messages["shell"] = {
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
+  { href: "/admin/onboarding", label: "Onboarding", icon: ClipboardList },
   { href: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign },
   { href: "/admin/chamados", label: "Chamados", icon: MessageCircle },
   { href: "/admin/jobs", label: "Jobs", icon: Activity },
