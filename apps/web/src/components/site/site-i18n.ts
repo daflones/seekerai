@@ -50,6 +50,10 @@ export interface SiteStrings {
   agendarAgora: string; direitos: string; waBarberFloat: (n: string) => string;
   reserveBarberA: string; reserveBarberB: string; stepProfBarber: string;
   primeiroDisp: string; barbeiro: string;
+  /* elementos premium (faixa de agendamento rápido, reviews marquee,
+     banner CTA) — compartilhados pelos dois temas */
+  quickTitle: string; reviewsEyebrow: (cidade: string) => string;
+  bannerTitle: (em: string) => string;
   /* gate de site pausado (página pública) */
   gateTitle: string; gateA: string; gateB: string; gateCta: string;
 }
@@ -114,6 +118,9 @@ const PT: SiteStrings = {
   reserveBarberA: "Reserve em", reserveBarberB: "30 segundos",
   stepProfBarber: "2. Escolha o profissional", primeiroDisp: "Primeiro disponível",
   barbeiro: "Barbeiro",
+  quickTitle: "Agende em dois toques",
+  reviewsEyebrow: (c) => `O que ${c} diz`,
+  bannerTitle: (em) => `Pronto para ${em}?`,
   gateTitle: "Site em pausa",
   gateA: "O site de",
   gateB: "está temporariamente indisponível. Se você é o proprietário, assine um plano na sua conta SeekerAi e ele volta ao ar imediatamente.",
@@ -180,6 +187,9 @@ const EN: SiteStrings = {
   reserveBarberA: "Book in", reserveBarberB: "30 seconds",
   stepProfBarber: "2. Choose your barber", primeiroDisp: "First available",
   barbeiro: "Barber",
+  quickTitle: "Book in two taps",
+  reviewsEyebrow: (c) => `What ${c} says`,
+  bannerTitle: (em) => `Ready to ${em}?`,
   gateTitle: "Site paused",
   gateA: "The website of",
   gateB: "is temporarily unavailable. If you're the owner, subscribe to a plan on your SeekerAi account and it goes back online immediately.",
@@ -246,6 +256,9 @@ const ES: SiteStrings = {
   reserveBarberA: "Reserva en", reserveBarberB: "30 segundos",
   stepProfBarber: "2. Elige el profesional", primeiroDisp: "Primero disponible",
   barbeiro: "Barbero",
+  quickTitle: "Reserva en dos toques",
+  reviewsEyebrow: (c) => `Lo que ${c} dice`,
+  bannerTitle: (em) => `¿Listo para ${em}?`,
   gateTitle: "Sitio en pausa",
   gateA: "El sitio de",
   gateB: "no está disponible temporalmente. Si eres el propietario, suscríbete a un plan en tu cuenta SeekerAi y vuelve al aire de inmediato.",

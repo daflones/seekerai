@@ -2140,23 +2140,50 @@ function baseSiteConfig(lead: Record<string, unknown>, tipo: string): Record<str
   };
 }
 
-/** Sanitiza o patch de IA — aceita só campos conhecidos, com tetos. */
-function sanitizeConfigPatch(raw: unknown): Record<string, unknown> {
+/** Sanitiza o patch de IA — aceita só campos conhecidos, com tetos.
+    `sourceText` = material real (legendas/bio) — preço só sobrevive se o
+    número constar lá; sem isso o modelo inventaria valores no site. */
+function sanitizeConfigPatch(raw: unknown, sourceText = ""): Record<string, unknown> {
   if (!isRecord(raw)) return {};
   const patch: Record<string, unknown> = {};
   const str = (v: unknown, max = 200) => asString(v, max) ?? undefined;
+  // "45", "R$ 45", "45,00", "45 reais" — o inteiro tem que aparecer no material.
+  const precoCitado = (v: unknown) =>
+    typeof v === "number" && v > 0 && v < 100_000
+    && new RegExp(`\\b${Math.trunc(v)}\\b`).test(sourceText)
+      ? Math.round(v * 100) / 100 : null;
 
   patch.tagline = str(raw.tagline, 120);
   if (Array.isArray(raw.servicos)) {
-    patch.servicos = raw.servicos.filter(isRecord).slice(0, 12).map((s) => ({
-      nome: str(s.nome, 80) ?? "Serviço",
-      duracaoMin: typeof s.duracaoMin === "number" && s.duracaoMin >= 10 && s.duracaoMin <= 480
-        ? Math.round(s.duracaoMin) : null,
-      preco: null, // nunca inventa preço
-      categoria: str(s.categoria, 60),
-      descricao: str(s.descricao, 200),
-    })).filter((s) => s.nome !== "Serviço");
+    patch.servicos = raw.servicos.filter(isRecord).slice(0, 12).map((s) => {
+      const preco = precoCitado(s.preco);
+      const precoDe = precoCitado(s.precoDe);
+      return {
+        nome: str(s.nome, 80) ?? "Serviço",
+        duracaoMin: typeof s.duracaoMin === "number" && s.duracaoMin >= 10 && s.duracaoMin <= 480
+          ? Math.round(s.duracaoMin) : null,
+        preco,
+        // "de R$80 por R$68" — preço cheio só se citado e maior que o atual.
+        precoDe: preco !== null && precoDe !== null && precoDe > preco ? precoDe : null,
+        categoria: str(s.categoria, 60),
+        descricao: str(s.descricao, 200),
+        badge: str(s.badge, 26) ?? null,
+        // Índice da foto real descrita pela visão — resolvido pra URL
+        // depois que as fotos terminam de subir.
+        foto: typeof s.foto === "number" && Number.isInteger(s.foto) && s.foto >= 0 ? s.foto : null,
+      };
+    }).filter((s) => s.nome !== "Serviço");
     if (!(patch.servicos as unknown[]).length) delete patch.servicos;
+  }
+  // Equipe real: nomes/cargos que a IA extraiu da bio e legendas —
+  // monograma + selo de cargo no site; nunca inventada (regra no prompt).
+  if (Array.isArray(raw.profissionais)) {
+    const p = raw.profissionais.filter(isRecord).slice(0, 8).map((x) => ({
+      nome: str(x.nome, 80) ?? "",
+      cargo: str(x.cargo, 40),
+      especialidade: str(x.especialidade, 80),
+    })).filter((x) => x.nome);
+    if (p.length) patch.profissionais = p;
   }
   if (isRecord(raw.historia)) {
     const paragrafos = Array.isArray(raw.historia.paragrafos)
@@ -2212,7 +2239,9 @@ function configPatchSystem(lang: string): string {
   return [
     "Você é um diretor de arte e copywriter sênior montando o SiteConfig JSON de um site premium.",
     "Responda APENAS com JSON válido (sem markdown, sem comentários) neste formato exato:",
-    '{ "tagline": "frase curta de marca", "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null}],',
+    '{ "tagline": "frase curta de marca",',
+    '  "servicos": [{"nome":"…","categoria":"…","descricao":"…","duracaoMin":null,"preco":null,"precoDe":null,"badge":null,"foto":null}],',
+    '  "profissionais": [{"nome":"…","cargo":"…","especialidade":"…"}],',
     '  "historia": {"titulo":"…","paragrafos":["…","…"]}, "diferenciais":["…"],',
     '  "ofertas": [{"titulo":"…","texto":"…","tag":"OFERTA"}],',
     '  "faq":[{"q":"…","a":"…"}], "seo":{"description":"…"}',
@@ -2221,6 +2250,10 @@ function configPatchSystem(lang: string): string {
     "- Use SOMENTE os fatos dados (nome, categoria, cidade, avaliações, serviços citados, legendas do Instagram). Não invente preços, profissionais, prêmios ou números.",
     "- Siga o GUIA DO NICHO enviado junto com os fatos — ele define o que 'servicos' representa nesse negócio (cardápio, setores, tratamentos…) e se duracaoMin deve ser null.",
     "- Se os serviços reais não estiverem claros, proponha 4-8 itens típicos da categoria, respeitando o guia do nicho, e preco SEMPRE null.",
+    "- preco/precoDe: número SOMENTE se o valor estiver literalmente escrito no material (legenda, bio, panfleto — 'de R$80 por R$68'). Sem citação explícita → null. precoDe é o preço cheio riscado (maior que preco).",
+    "- foto: quando a lista FOTOS REAIS vier nos fatos, aponte o ÍNDICE da foto que melhor representa o serviço (ex.: foto de um corte → serviço 'Corte'). Só quando o casamento for claro — senão null. No máximo 4 serviços com foto, os mais vendáveis.",
+    "- badge: selo curto em MAIÚSCULAS (máx 2 serviços) tipo 'MAIS PEDIDO' ou 'MELHOR CUSTO' — só quando o material sustentar (serviço mais citado nos posts/reviews, combo com desconto real). Sem evidência → null.",
+    "- profissionais: SÓ quando nomes reais aparecerem na bio ou legendas ('@joao barbeiro', 'equipe: Maria e Ana', 'dono @x'). cargo = papel em MAIÚSCULAS ('DONO','BARBEIRO','TATUADORA'). especialidade = nicho curto ('fades','coloração'). Sem nomes reais → omita o campo.",
     "- ofertas: SÓ preencha quando o material real (legendas/fotos do Instagram) mostrar promoções, panfletos, combos, pacotes ou campanhas — ex.: panfleto de mercado, happy hour, combo de banho+tosa. tag é um selo curto ('OFERTA DA SEMANA', 'COMBO'). Sem material promocional, omita o campo. Nunca invente preço ou validade; pode mencionar valores apenas se estiverem escritos nas legendas.",
     "- tagline: elegante, max 8 palavras, no tom do negócio.",
     "- historia: 2 parágrafos acolhedores sobre a proposta do lugar — sem inventar datas/fatos; pode falar de proposta e experiência, não de biografia.",
@@ -2315,6 +2348,7 @@ async function configPatchFromAi(
     return {
       patch: sanitizeConfigPatch(
         JSON.parse(content.replace(/^```[a-z]*\n?/i, "").replace(/```\s*$/, "").trim()),
+        extraFacts ?? "",
       ),
       modelo,
     };
@@ -2438,6 +2472,11 @@ async function publishPremiumSite(
     return handle ? fetchInstagramMedia(handle) : null;
   })();
 
+  // Descrições de visão das fotos reais — começam cedo pra entrar no
+  // prompt do redator (o campo servicos[].foto aponta o índice dessas
+  // fotos) e alimentar o accent + referência visual do gap-fill.
+  let descsPromise: Promise<{ i: number; d: string | null }[]> | null = null;
+
   // Patch de config roda EM PARALELO com as imagens — são independentes.
   // Espera o Instagram até 35s só pra capturar as legendas como contexto.
   const patchPromise = (async () => {
@@ -2454,11 +2493,18 @@ async function publishPremiumSite(
     const nicho = await Promise.race([nichoPromise, sleep(50_000).then(() => null)]);
     const vocab = nicho?.vocab
       ?? nicheVocab(nicho?.paleta ?? paleta, asString(lead.categoria, 150));
+    // Fotos reais descritas pela visão — o redator casa cada serviço à
+    // foto certa pelo índice (card de destaque com foto, estilo Porem).
+    const fotos = descsPromise
+      ? (await Promise.race([descsPromise, sleep(50_000).then(() => [])]))
+        .filter((x) => x.d)
+      : [];
     const extra = [
       `GUIA DO NICHO (${vocab.rotulo}): ${vocab.guia}`,
       siteLang === "pt" ? "" : `VOCAB BASE (traduza/adapte cada campo pro idioma do site no campo "vocab" da resposta): ${JSON.stringify({ rotulo: vocab.rotulo, em: vocab.em, desc: vocab.desc, prep: vocab.prep, marquee: vocab.marquee, ctaEm: vocab.ctaEm, ctaLabel: vocab.ctaLabel, servicosLabel: vocab.servicosLabel, servicosTitle: vocab.servicosTitle, servicosEm: vocab.servicosEm, servicosHint: vocab.servicosHint, ofertasTitle: vocab.ofertasTitle })}`,
       facts.length ? `Dados reais do Instagram:\n${facts.join("\n")}` : "",
       captions ? `Legendas reais do Instagram do estabelecimento (use pra inferir serviços, ofertas, diferenciais e o tom da marca — nunca cite nomes de clientes):\n${captions}` : "",
+      fotos.length ? `FOTOS REAIS do estabelecimento (índice: descrição da visão) — use o índice no campo "foto" do serviço que a foto representa:\n${fotos.map((x) => `FOTO[${x.i}]: ${x.d}`).join("\n")}` : "",
       ig?.videos?.length ? `O perfil tem ${ig.videos.length} reels/vídeos recentes — se as legendas indicarem bastidores/produção, a seção de história pode mencionar esse processo.` : "",
     ].filter(Boolean).join("\n\n");
     return configPatchFromAi(apiKey, lead, extra ? `\n${extra}` : "", siteLang);
@@ -2481,25 +2527,30 @@ async function publishPremiumSite(
   if (igFoto && sources.length < MAX_SITE_IMAGES && !sources.includes(igFoto)) {
     sources.push(igFoto);
   }
-  const publicUrls: { url: string; real: boolean }[] = [];
+  // Descreve até 6 fotos reais em paralelo com os downloads — o redator
+  // usa a lista "FOTO[i]" pra casar serviço↔foto (i = índice em sources).
+  descsPromise = Promise.all(
+    sources.slice(0, 6).map((u, i) =>
+      describeReferenceImage(apiKey, u).then((d) => ({ i, d })),
+    ),
+  );
+  // src = índice em sources — o "foto" do patch aponta pro índice de
+  // source e precisa sobreviver a downloads que falham (sem shift).
+  const publicUrls: { url: string; real: boolean; src: number }[] = [];
   {
     const downloads = await Promise.all(sources.map(fetchImageBytes));
-    let i = 0;
+    let i = 0, src = -1;
     for (const dl of downloads) {
+      src++;
       if (!dl) continue;
       const ext = dl.contentType.includes("png") ? "png" : dl.contentType.includes("webp") ? "webp" : "jpg";
       const url = await uploadSiteAsset(db, slug, `real-${++i}.${ext}`, dl.bytes, dl.contentType);
-      if (url) publicUrls.push({ url, real: true });
+      if (url) publicUrls.push({ url, real: true, src });
     }
   }
 
-  // Descreve até 2 fotos reais (Maps/Instagram) — serve pra (a) dar
-  // referência visual ao gap-fill e (b) extrair as cores dominantes do
-  // lugar de verdade, que viram o accent do site.
-  const refs = await Promise.all(
-    publicUrls.slice(0, 2).map((x) => describeReferenceImage(apiKey, x.url)),
-  );
-  const descs = refs.filter((d): d is string => Boolean(d));
+  const descPairs = (await descsPromise) ?? [];
+  const descs = descPairs.filter((x): x is { i: number; d: string } => Boolean(x.d)).map((x) => x.d);
   const cores = accentFromDescriptions(descs);
 
   // Nicho não mapeado (paleta "generico") → IA decide a partir das fotos,
@@ -2605,6 +2656,15 @@ async function publishPremiumSite(
     hero: realPhotos[0] ?? genPhotos[0],
     galeria: [...realPhotos.slice(1), ...placeImgs, ...genPhotos],
   };
+  // servicos[].foto vem do patch como índice na lista FOTOS REAIS
+  // (sources) — resolve pra URL re-hospedada; índice inválido vira null
+  // e o serviço cai no card de texto normal.
+  if (Array.isArray(config.servicos)) {
+    const bySrc = new Map(publicUrls.map((x) => [x.src, x.url]));
+    for (const s of config.servicos as Record<string, unknown>[]) {
+      s.foto = typeof s.foto === "number" ? bySrc.get(s.foto) ?? null : null;
+    }
+  }
   // Tema: paleta do nicho + variante de layout (3 composições — sites
   // não ficam clones) + cores extraídas das fotos reais do lugar.
   // variantSeed rota a variante: a "nova versão" (regeneração) sai com

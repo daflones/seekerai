@@ -11,6 +11,15 @@ export interface SiteServico {
   preco: number | null;
   categoria?: string;
   descricao?: string;
+  /** Foto real do estabelecimento casada ao serviço pela visão —
+      vira card de destaque estilo "treatment" (foto + selo). */
+  foto?: string | null;
+  /** Selo curto do card ("MAIS PEDIDO", "MELHOR CUSTO") — só quando o
+      material real sustenta (serviço mais citado, combo com desconto). */
+  badge?: string | null;
+  /** Preço "de" riscado — só preenchido quando a fonte real citar os
+      dois valores (ex.: "de R$80 por R$68" numa legenda). */
+  precoDe?: number | null;
 }
 
 export interface SiteConfig {
@@ -78,7 +87,7 @@ export interface SiteConfig {
   horarios?: Record<string, [string, string][] | null>;
   horariosLabel?: [string, string][];
   servicos: SiteServico[];
-  profissionais?: { nome: string; especialidade?: string; foto?: string }[];
+  profissionais?: { nome: string; especialidade?: string; foto?: string; cargo?: string }[];
   fotos: { hero?: string; galeria: string[] };
   videos?: { src: string; titulo: string; descricao?: string; destaque?: boolean }[];
   historia?: { titulo: string; paragrafos: string[] };

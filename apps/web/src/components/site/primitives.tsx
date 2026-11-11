@@ -223,9 +223,14 @@ export function useBooking(cfg: SiteConfig) {
   const finalStep = hasPros ? 4 : 3;
 
   const openBook = useCallback((servico?: SiteServico) => {
-    if (servico) setBk((b) => ({ ...b, servico }));
-    setStep(0); setErro(""); setBookOpen(true);
-  }, []);
+    // Serviço pré-selecionado (faixa "dois toques"/card) → o wizard já
+    // abre no passo seguinte: toque no serviço + toque no horário.
+    if (servico) {
+      setBk((b) => ({ ...b, servico }));
+      setStep(hasPros ? 1 : dataStep);
+    } else setStep(0);
+    setErro(""); setBookOpen(true);
+  }, [hasPros, dataStep]);
 
   const dataLabel = bk.data ? `${dows[bk.data.getDay()]}, ${fmtDia.format(bk.data)}` : "—";
   const waMsg = () => [

@@ -19,6 +19,7 @@ import {
   CountUp, EASE, FadeUp, Magnetic, RevealText, Spotlight,
   useBooking, useOverlayLock, VideoCard,
 } from "./primitives";
+import { QuickBook, ReviewMarquee, SvcPhotoCard } from "./premium";
 import { siteLocale, siteMoney, siteStrings } from "./site-i18n";
 import { siteRuntimeJson } from "./runtime-payload";
 import "./site.css";
@@ -46,6 +47,14 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
 
   const marca = cfg.marca || cfg.nome;
   const galeria = cfg.fotos.galeria;
+  // "Dois toques": serviços com selo primeiro, até 3 — cada pick abre o
+  // wizard já no passo seguinte (serviço pré-selecionado).
+  const quickPicks = (cfg.servicos ?? [])
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => Number(Boolean(b.s.badge)) - Number(Boolean(a.s.badge)))
+    .slice(0, 3);
+  const svcFoto = (cfg.servicos ?? []).filter((s) => s.foto);
+  const svcTexto = (cfg.servicos ?? []).filter((s) => !s.foto);
   const videosAll = cfg.videos ?? [];
   const destaqueVideo = videosAll.find((v) => v.destaque) ?? videosAll[0] ?? null;
   const outrosVideos = videosAll.filter((v) => v !== destaqueVideo);
@@ -242,6 +251,16 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </motion.div>
       </header>
 
+      {/* ---------- AGENDE EM DOIS TOQUES (widget estilo Porem) ---------- */}
+      {bookingEnabled && quickPicks.length > 0 && (
+        <div className="bshop-wrap">
+          <FadeUp>
+            <QuickBook ns="bshop" title={S.quickTitle} picks={quickPicks} money={money}
+              onPick={(s) => openBook(s)} />
+          </FadeUp>
+        </div>
+      )}
+
       {/* ---------- MARQUEE ---------- */}
       <div className="bshop-marquee" aria-hidden>
         <div className="bshop-marquee-track">
@@ -353,8 +372,23 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               <RevealText text={S.oQueFazemosA} /> <em><RevealText text={S.deMelhorB} delay={0.25} /></em>
             </h2>
           </div>
+          {/* Destaques com foto real + selo — "treatments" do Porem */}
+          {svcFoto.length > 0 && (
+            <div className="bshop-svc-cards">
+              {svcFoto.map((s, i) => (
+                <motion.div key={s.nome}
+                  initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
+                  whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  viewport={{ once: true, margin: "-8% 0px" }}
+                  transition={{ duration: 0.6, delay: i * 0.08, ease: EASE }}>
+                  <SvcPhotoCard s={s} ns="bshop" money={money} index={cfg.servicos.indexOf(s)}
+                    onPick={bookingEnabled ? (sv) => openBook(sv) : undefined} />
+                </motion.div>
+              ))}
+            </div>
+          )}
           <div className="bshop-services">
-            {(cfg.servicos ?? []).map((s, i) => (
+            {svcTexto.map((s, i) => (
               <motion.article key={s.nome} className="bshop-service-wrap"
                 initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
                 whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -399,10 +433,42 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
         </section>
       )}
 
-      {/* ---------- AVALIAÇÕES ---------- */}
+      {/* ---------- EQUIPE (nomes reais extraídos do IG) ---------- */}
+      {hasPros && (
+        <section className="bshop-section" style={{ paddingTop: 0 }}>
+          <div className="bshop-wrap">
+            <div className="bshop-section-head">
+              <FadeUp y={16}><span className="bshop-eyebrow">{S.equipeEyebrow}</span></FadeUp>
+              <h2 className="bshop-h2"><RevealText text={S.equipeA} /> <em><RevealText text={S.equipeB} delay={0.25} /></em></h2>
+            </div>
+            <div className="bshop-team">
+              {pros.map((p, i) => (
+                <motion.div key={p.nome} className="bshop-member"
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.55, delay: i * 0.08, ease: EASE }}>
+                  {p.foto
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    ? <img className="bshop-member-foto" src={p.foto} alt={p.nome} loading="lazy" />
+                    : <span className="bshop-member-mono">{p.nome[0]}</span>}
+                  {p.cargo && <span className="bshop-member-role">{p.cargo}</span>}
+                  <strong>{p.nome}</strong>
+                  <small>{p.especialidade ?? S.barbeiro}</small>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ---------- AVALIAÇÕES (reviews reais em marquee estilo Google) ---------- */}
       {cfg.avaliacoes && (
         <section className="bshop-section">
           <div className="bshop-wrap">
+            <FadeUp y={14}><span className="bshop-eyebrow bshop-eyebrow-solo">
+              {S.reviewsEyebrow(cfg.cidade?.split("·")[0]?.trim() || cfg.nome)}
+            </span></FadeUp>
             <FadeUp>
               <div className="bshop-rating-hero">
                 <div className="big"><CountUp to={cfg.avaliacoes.nota} /></div>
@@ -411,19 +477,7 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
               </div>
             </FadeUp>
             {(cfg.avaliacoes.itens?.length ?? 0) > 0 && (
-              <div className="bshop-reviews">
-                {(cfg.avaliacoes.itens ?? []).map((r, i) => (
-                  <motion.article key={i} className="bshop-review"
-                    initial={{ opacity: 0, y: 24 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-8% 0px" }}
-                    transition={{ duration: 0.6, delay: (i % 4) * 0.08, ease: EASE }}>
-                    <span className="stars">{"★".repeat(r.nota ?? 5)}</span>
-                    <p>“{r.texto}”</p>
-                    <footer><span>{r.autor}</span>{r.quando && <span>{r.quando}</span>}</footer>
-                  </motion.article>
-                ))}
-              </div>
+              <FadeUp><ReviewMarquee itens={cfg.avaliacoes.itens!} ns="bshop" /></FadeUp>
             )}
           </div>
         </section>
@@ -496,6 +550,24 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
                   </div>
                 ))}
               </div>
+            </FadeUp>
+          </div>
+        </section>
+      )}
+
+      {/* ---------- BANNER CTA (foto de fundo — "ready for your best cut?") ---------- */}
+      {(galeria[0] || cfg.fotos.hero) && (
+        <section className="bshop-banner" aria-label={S.agendarAgora}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="bshop-banner-bg" src={galeria[0] ?? cfg.fotos.hero} alt="" aria-hidden />
+          <div className="bshop-banner-body">
+            <FadeUp>
+              <h2>{S.bannerTitle(cfg.vocab?.ctaEm ?? S.ctaEmFb)}</h2>
+            </FadeUp>
+            <FadeUp delay={0.1}>
+              {bookingEnabled
+                ? <button className="bshop-pill primary" onClick={() => openBook()}><Scissors size={15} /> {S.agendarAgora}</button>
+                : waNumber && <a className="bshop-pill primary" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a>}
             </FadeUp>
           </div>
         </section>

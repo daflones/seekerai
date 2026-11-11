@@ -373,10 +373,13 @@
       if (step === finalStep) return sendWa();
       step++; renderStep();
     };
-    var openBook = function () {
+    var openBook = function (preIdx) {
       if (!C || !C.book) { waOpen(); return; }
       bk = { servico: null, prof: null, data: null, hora: null, nome: "", tel: "" };
       step = 0;
+      /* "dois toques": serviço pré-selecionado pula direto pro próximo passo
+         (voltar ainda mostra a lista com o serviço marcado). */
+      if (preIdx != null && C.sv && C.sv[preIdx]) { bk.servico = C.sv[preIdx]; step = 1; }
       modal = paintOverlay(el("div", ns + "-book-modal-bg"));
       var card = paintOverlay(el("div", ns + "-booking-card " + ns + "-book-modal"));
       var x = el("button", ns + "-modal-close", "&times;");
@@ -451,11 +454,18 @@
 
     /* ---------- CTAs: botões que a página viva liga via React ---------- */
     document.addEventListener("click", function (e) {
+      var kind = C ? C.cta : "link";
+      /* quick-pick / card de serviço: abre o wizard já no serviço escolhido */
+      var bkEl = e.target.closest ? e.target.closest("[data-bk-open]") : null;
+      if (bkEl && !bkEl.closest("." + ns + "-book-modal-bg")
+        && kind === "agendar" && C && C.book) {
+        openBook(parseInt(bkEl.getAttribute("data-bk-open"), 10));
+        return;
+      }
       var b = e.target.closest ? e.target.closest(
         "button." + ns + "-nav-cta, button." + ns + "-mobile-cta, button." + ns + "-pill"
       ) : null;
       if (!b || b.closest("." + ns + "-book-modal-bg") || b.classList.contains(ns + "-footer-top")) return;
-      var kind = C ? C.cta : "link";
       if (kind === "agendar" && C.book) openBook();
       else if (kind === "mapa") openVisit();
       else if (kind === "scroll") {

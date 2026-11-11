@@ -20,6 +20,7 @@ import {
   useBooking, useOverlayLock, VideoCard,
 } from "./primitives";
 import { conjLugar, conjNoLugar, siteLocale, siteMoney, siteStrings } from "./site-i18n";
+import { QuickBook, ReviewMarquee, SvcPhotoCard } from "./premium";
 import { siteRuntimeJson } from "./runtime-payload";
 import "./beauty.css";
 
@@ -57,8 +58,18 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
   const outrosVideos = videosAll.filter((v) => v !== destaqueVideo);
   const giant = marca.split(" ")[0].toUpperCase();
 
-  // Serviços agrupados por categoria (menu editorial)
-  const servicosPorCat = (cfg.servicos ?? []).reduce<Record<string, SiteServico[]>>((acc, s) => {
+  // "Dois toques": serviços com selo primeiro, até 3 — cada pick abre o
+  // wizard já no passo seguinte (serviço pré-selecionado).
+  const quickPicks = (cfg.servicos ?? [])
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => Number(Boolean(b.s.badge)) - Number(Boolean(a.s.badge)))
+    .slice(0, 3);
+  const svcFoto = (cfg.servicos ?? []).filter((s) => s.foto);
+  const svcTexto = (cfg.servicos ?? []).filter((s) => !s.foto);
+
+  // Serviços agrupados por categoria (menu editorial) — os que têm foto
+  // saem da lista e viram card de destaque, sem duplicar.
+  const servicosPorCat = svcTexto.reduce<Record<string, SiteServico[]>>((acc, s) => {
     const cat = s.categoria ?? siteStrings(cfg.lang).catFallback;
     (acc[cat] ??= []).push(s);
     return acc;
@@ -297,6 +308,16 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         </motion.div>
       </header>
 
+      {/* ---------- AGENDE EM DOIS TOQUES (widget estilo Porem) ---------- */}
+      {ctaKind === "agendar" && bookingEnabled && quickPicks.length > 0 && (
+        <div className="bbeauty-wrap">
+          <FadeUp>
+            <QuickBook ns="bbeauty" title={S.quickTitle} picks={quickPicks} money={money}
+              onPick={(s) => openBook(s)} />
+          </FadeUp>
+        </div>
+      )}
+
       {/* ---------- MARQUEE ---------- */}
       <div className="bbeauty-marquee" aria-hidden>
         <div className="bbeauty-marquee-track">
@@ -359,6 +380,26 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             <FadeUp y={16}><span className="bbeauty-eyebrow">{servicosLabel}</span></FadeUp>
             <h2 className="bbeauty-h2"><RevealText text={vocab?.servicosTitle ?? S.servicosTitleFb} /> <em><RevealText text={vocab?.servicosEm ?? S.momentoFb} delay={0.25} /></em></h2>
           </div>
+          {/* Destaques com foto real + selo — "treatments" do Porem */}
+          {svcFoto.length > 0 && (
+            <div className="bbeauty-svc-cards">
+              {svcFoto.map((s, i) => (
+                <motion.div key={s.nome}
+                  initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
+                  whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  viewport={{ once: true, margin: "-8% 0px" }}
+                  transition={{ duration: 0.6, delay: i * 0.08, ease: EASE }}>
+                  {ctaKind === "agendar" && bookingEnabled
+                    ? <SvcPhotoCard s={s} ns="bbeauty" money={money} index={cfg.servicos.indexOf(s)} onPick={(sv) => openBook(sv)} />
+                    : ctaKind === "zap" && waServico(s.nome)
+                      ? <a className="bbeauty-svc-link" href={waServico(s.nome)!} target="_blank" rel="noopener noreferrer">
+                          <SvcPhotoCard s={s} ns="bbeauty" money={money} />
+                        </a>
+                      : <SvcPhotoCard s={s} ns="bbeauty" money={money} />}
+                </motion.div>
+              ))}
+            </div>
+          )}
           <div className="bbeauty-services">
             {Object.entries(servicosPorCat).map(([cat, itens], ci) => (
               <FadeUp key={cat} delay={ci * 0.08}>
@@ -511,7 +552,11 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.55, delay: i * 0.08, ease: EASE }}>
-                  <span className="m-mono">{p.nome[0]}</span>
+                  {p.foto
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    ? <img className="bbeauty-member-foto" src={p.foto} alt={p.nome} loading="lazy" />
+                    : <span className="m-mono">{p.nome[0]}</span>}
+                  {p.cargo && <span className="bbeauty-member-role">{p.cargo}</span>}
                   <strong>{p.nome}</strong>
                   <small>{p.especialidade ?? S.profissional}</small>
                 </motion.div>
@@ -521,10 +566,13 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
         </section>
       )}
 
-      {/* ---------- AVALIAÇÕES ---------- */}
+      {/* ---------- AVALIAÇÕES (reviews reais em marquee estilo Google) ---------- */}
       {cfg.avaliacoes && (
         <section className="bbeauty-section">
           <div className="bbeauty-wrap">
+            <FadeUp y={14}><span className="bbeauty-eyebrow bbeauty-eyebrow-solo">
+              {S.reviewsEyebrow(cfg.cidade?.split("·")[0]?.trim() || cfg.nome)}
+            </span></FadeUp>
             <FadeUp>
               <div className="bbeauty-rating-hero">
                 <div className="big"><CountUp to={cfg.avaliacoes.nota} /></div>
@@ -532,37 +580,17 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
                 <small>{S.reviewsReal(cfg.avaliacoes.total, cfg.avaliacoes.fonte)}</small>
               </div>
             </FadeUp>
+            {cfg.avaliacoes.print && (
+              <FadeUp>
+                <div className="bbeauty-review-print">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={cfg.avaliacoes.print} alt={S.recadoAlt} loading="lazy" />
+                  <small>{S.recadoCliente}</small>
+                </div>
+              </FadeUp>
+            )}
             {(cfg.avaliacoes.itens?.length ?? 0) > 0 && (
-              <div className="bbeauty-reviews">
-                {cfg.avaliacoes.print && (
-                  <motion.div className="bbeauty-review-print"
-                    initial={{ opacity: 0, y: 24 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, ease: EASE }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={cfg.avaliacoes.print} alt={S.recadoAlt} loading="lazy" />
-                    <small>{S.recadoCliente}</small>
-                  </motion.div>
-                )}
-                {(cfg.avaliacoes.itens ?? []).map((r, i) => (
-                  <motion.article key={i} className="bbeauty-review"
-                    initial={{ opacity: 0, y: 24 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-8% 0px" }}
-                    transition={{ duration: 0.6, delay: (i % 4) * 0.08, ease: EASE }}>
-                    <span className="stars">{"★".repeat(r.nota ?? 5)}</span>
-                    <p>“{r.texto}”</p>
-                    <footer>
-                      {r.foto && (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img className="bbeauty-review-avatar" src={r.foto} alt="" loading="lazy" />
-                      )}
-                      <span>{r.autor}</span>{r.quando && <span>{r.quando}</span>}
-                    </footer>
-                  </motion.article>
-                ))}
-              </div>
+              <FadeUp><ReviewMarquee itens={cfg.avaliacoes.itens!} ns="bbeauty" /></FadeUp>
             )}
           </div>
         </section>
@@ -650,6 +678,22 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
               </div>
             </FadeUp>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* ---------- BANNER CTA (foto de fundo — "ready for your best…?") ---------- */}
+      {(galeria[0] || cfg.fotos.hero) && (
+        <section className="bbeauty-banner" aria-label={ctaLabel}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="bbeauty-banner-bg" src={galeria[0] ?? cfg.fotos.hero} alt="" aria-hidden />
+          <div className="bbeauty-banner-body">
+            <FadeUp>
+              <h2>{S.bannerTitle(vocab?.ctaEm ?? S.ctaEmFb)}</h2>
+            </FadeUp>
+            <FadeUp delay={0.1}>
+              <CtaButton className="bbeauty-pill primary"><Sparkles size={15} /> {ctaLabel}</CtaButton>
+            </FadeUp>
           </div>
         </section>
       )}

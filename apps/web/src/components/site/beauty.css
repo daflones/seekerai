@@ -960,3 +960,92 @@ a.bbeauty-nav-cta, a.bbeauty-mobile-cta { text-decoration: none; display: inline
   .bbeauty-marquee-track, .bbeauty-footer-marquee .bbeauty-marquee-track { animation: none; transform: none; }
   .bbeauty-shader-text { -webkit-text-fill-color: var(--bb-muted); color: var(--bb-muted); }
 }
+
+
+
+.bbeauty-quick { background: rgba(255,251,247,.85); border-color: rgba(60,40,30,.1); box-shadow: 0 24px 60px -28px rgba(90,60,40,.28); }
+.bbeauty-quick-head h3 { font-size: 1rem; color: #4b3428; }
+.bbeauty-quick-label { background: rgba(176,112,63,.14); color: #a05e33; }
+.bbeauty-quick-pick { color: #5c4434; border-color: rgba(90,60,40,.22); }
+.bbeauty-quick-pick:hover { transform: translateY(-2px); border-color: #b0703f; background: rgba(176,112,63,.1); }
+.bbeauty-quick-badge { background: #f3d9c2; color: #6b3a1d; }
+.bbeauty-svc-card { background: rgba(255,255,255,.8); border-color: rgba(90,60,40,.1); }
+.bbeauty-svc-badge { background: rgba(243,217,194,.95); color: #6b3a1d; }
+.bbeauty-svc-meta strong { color: #a05e33; font-weight: 700; }
+a.bbeauty-svc-link { display: block; text-decoration: none; color: inherit; }
+.bbeauty-member-role { background: rgba(176,112,63,.14); color: #a05e33; }
+@keyframes skr-revm { to { transform: translateX(-50%); } }
+.bbeauty-revm-card { background: rgba(255,255,255,.75); border: 1px solid rgba(90,60,40,.1); }
+.bbeauty-revm-avatar { background: rgba(176,112,63,.16); color: #a05e33; }
+.bbeauty-banner-body h2 { font-size: clamp(2rem, 5.5vw, 3.6rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 0; }/* ---------- Quick book ("dois toques" — estilo Porem) ---------- */
+.bbeauty-quick {
+  position: relative; z-index: 2; margin: -20px auto 56px; max-width: 1080px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px;
+  padding: 18px 22px; border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -24px rgba(0,0,0,.6);
+}.bbeauty-quick-head { display: flex; align-items: center; gap: 10px; }.bbeauty-quick-head h3 { margin: 0; font-weight: 700; letter-spacing: .04em; }.bbeauty-quick-label {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+}.bbeauty-quick-picks { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }.bbeauty-quick-pick {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 10px 16px; border-radius: 14px; cursor: pointer; text-align: left;
+  border: 1px solid rgba(255,255,255,.16); background: transparent;
+  font-family: inherit; color: inherit;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}.bbeauty-quick-pick strong { font-size: .88rem; font-weight: 700; }.bbeauty-quick-pick small { font-size: .72rem; font-weight: 500; opacity: .72; display: flex; align-items: center; }.bbeauty-quick-badge {
+  position: absolute; top: -8px; right: 10px; padding: 2px 8px; border-radius: 999px;
+  font-size: .58rem; font-weight: 800; font-style: normal; letter-spacing: .12em; text-transform: uppercase;
+}
+
+/* ---------- Cards de serviço com foto (treatments — estilo Porem) ---------- */
+.bbeauty-svc-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px; margin-bottom: 40px;
+}.bbeauty-svc-card {
+  position: relative; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 16px; padding: 0; text-align: left; font-family: inherit;
+  border: 1px solid rgba(255,255,255,.08); cursor: default;
+  transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s;
+}button.bbeauty-svc-card { cursor: pointer; background: none; color: inherit; }.bbeauty-svc-card:hover { transform: translateY(-6px); box-shadow: 0 30px 60px -20px rgba(0,0,0,.55); }.bbeauty-svc-photo { position: relative; aspect-ratio: 4 / 3; overflow: hidden; }.bbeauty-svc-photo img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .8s cubic-bezier(.22,1,.36,1);
+}.bbeauty-svc-card:hover .bbeauty-svc-photo img { transform: scale(1.06); }.bbeauty-svc-badge {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  padding: 5px 11px; border-radius: 999px; font-size: .62rem; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase;
+}.bbeauty-svc-info { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 16px; }.bbeauty-svc-info h3 { margin: 0; font-size: 1rem; font-weight: 700; line-height: 1.25; }.bbeauty-svc-meta { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: .82rem; }.bbeauty-svc-meta s { opacity: .55; }.bbeauty-svc-meta span { opacity: .7; }.bbeauty-svc-desc { margin: 0; font-size: .8rem; line-height: 1.5; opacity: .75; }.bbeauty-member-foto { width: 108px; height: 108px; border-radius: 50%; object-fit: cover; }.bbeauty-member-role {
+  padding: 3px 10px; border-radius: 999px; font-size: .62rem; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+
+/* ---------- Marquee de reviews estilo Google (2 fileiras contrárias) ---------- */
+.bbeauty-revm { display: flex; flex-direction: column; gap: 14px; overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent); }.bbeauty-revm-row { overflow: hidden; }.bbeauty-revm-track { display: flex; gap: 14px; width: max-content; animation: skr-revm 46s linear infinite; }.bbeauty-revm-row.rev .bbeauty-revm-track { animation-direction: reverse; animation-duration: 54s; }.bbeauty-revm:hover .bbeauty-revm-track { animation-play-state: paused; }.bbeauty-revm-set { display: flex; gap: 14px; }.bbeauty-revm-card {
+  width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 16px; border-radius: 14px;
+}.bbeauty-revm-card header { display: flex; align-items: center; gap: 10px; }.bbeauty-revm-card header svg { margin-left: auto; flex-shrink: 0; }.bbeauty-revm-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+  display: grid; place-items: center; font-size: .82rem; font-weight: 800;
+}.bbeauty-revm-who { min-width: 0; }.bbeauty-revm-who strong { display: block; font-size: .82rem; line-height: 1.2; }.bbeauty-revm-who small { font-size: .68rem; opacity: .55; }.bbeauty-revm-card p { font-size: .82rem; line-height: 1.5; opacity: .85; margin: 0; }
+
+/* ---------- Banner CTA mid-page ---------- */
+.bbeauty-banner {
+  position: relative; min-height: 380px; display: grid; place-items: center;
+  overflow: hidden; text-align: center;
+}.bbeauty-banner-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}.bbeauty-banner::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(rgba(12,7,3,.78), rgba(12,7,3,.68));
+}.bbeauty-banner-body {
+  position: relative; z-index: 2; display: flex; flex-direction: column;
+  align-items: center; gap: 22px; padding: 64px 24px; color: #fff;
+}@media (max-width: 720px) {
+  .bbeauty-quick { margin: -12px 16px 40px; flex-direction: column; align-items: stretch; }
+  .bbeauty-quick-picks { flex-direction: column; }
+  .bbeauty-quick-pick { width: 100%; }
+  .bbeauty-revm-card { width: 240px; }
+  .bbeauty-banner { min-height: 300px; }
+}
