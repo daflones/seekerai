@@ -39,4 +39,14 @@ describe("validação de autenticação", () => {
     expect(allowedOrigin(null)).toBe(false);
     expect(callbackOrigin("https://evil.example")).toBe("https://seekerai.digital");
   });
+  it("aceita os domínios-espelho de produção e mantém a sessão no host acessado", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://seekerai.digital");
+    expect(allowedOrigin("https://seekerai.com.br")).toBe(true);
+    expect(allowedOrigin("https://www.seekerai.com.br")).toBe(true);
+    expect(allowedOrigin("https://seekerai.com.br.evil.example")).toBe(false);
+    expect(callbackOrigin("https://seekerai.com.br")).toBe("https://seekerai.com.br");
+    vi.stubEnv("APP_EXTRA_ORIGINS", "https://seekerai.net");
+    expect(allowedOrigin("https://seekerai.net")).toBe(true);
+  });
 });

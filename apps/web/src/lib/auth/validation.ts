@@ -30,20 +30,35 @@ export function safeNext(value: string | null | undefined): string {
   } catch { return "/app"; }
 }
 
+// O app responde por mais de um domínio (seekerai.digital pra gringa,
+// seekerai.com.br pro Brasil). A canônica continua NEXT_PUBLIC_APP_URL;
+// os espelhos aceitos vivem em APP_EXTRA_ORIGINS + o domínio BR fixo.
+function extraOrigins(): Set<string> {
+  const list = (process.env.APP_EXTRA_ORIGINS ?? "https://seekerai.com.br,https://www.seekerai.com.br")
+    .split(",").map((o) => o.trim()).filter(Boolean);
+  const out = new Set<string>();
+  for (const o of list) {
+    try { if (new URL(o).protocol === "https:") out.add(new URL(o).origin); } catch { /* ignora */ }
+  }
+  return out;
+}
+
 export function allowedOrigin(origin: string | null): boolean {
   if (!origin) return false;
   try {
     const candidate = new URL(origin);
     const canonical = process.env.NEXT_PUBLIC_APP_URL;
     if (canonical && candidate.origin === new URL(canonical).origin) return true;
-    if (process.env.NODE_ENV === "production") return false;
+    if (process.env.NODE_ENV === "production") return extraOrigins().has(candidate.origin);
     // Fora de produção: qualquer porta de loopback (dev server, previews/proxies locais).
     return candidate.protocol === "http:" && ["localhost", "127.0.0.1"].includes(candidate.hostname);
   } catch { return false; }
 }
 
 export function callbackOrigin(requestOrigin: string): string {
-  if (process.env.NODE_ENV !== "production" && allowedOrigin(requestOrigin)) return new URL(requestOrigin).origin;
+  // Sessão por domínio: quem entra pelo .com.br volta pro .com.br —
+  // cookie e redirect ficam no host que o usuário acessou.
+  if (allowedOrigin(requestOrigin)) return new URL(requestOrigin).origin;
   const canonical = process.env.NEXT_PUBLIC_APP_URL;
   if (!canonical || new URL(canonical).protocol !== "https:") throw new Error("URL pública HTTPS não configurada.");
   return new URL(canonical).origin;

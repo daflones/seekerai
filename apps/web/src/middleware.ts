@@ -77,10 +77,15 @@ function sessionCookieParts(baseName: string, session: unknown) {
 }
 
 function appHosts(): Set<string> {
-  const hosts = new Set<string>(["localhost", "127.0.0.1"]);
+  // Domínios da própria plataforma — inclui os espelhos de país
+  // (.com.br) senão caíam no lookup de domínio customizado por request.
+  const hosts = new Set<string>(["localhost", "127.0.0.1", "seekerai.com.br", "www.seekerai.com.br"]);
   const url = process.env.NEXT_PUBLIC_APP_URL;
   if (url) {
     try { hosts.add(new URL(url).hostname.toLowerCase()); } catch { /* ignora */ }
+  }
+  for (const o of (process.env.APP_EXTRA_ORIGINS ?? "").split(",")) {
+    try { if (o.trim()) hosts.add(new URL(o.trim()).hostname.toLowerCase()); } catch { /* ignora */ }
   }
   return hosts;
 }
