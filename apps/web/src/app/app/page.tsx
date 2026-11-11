@@ -33,7 +33,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
     supabase.from("credit_operations").select("action,cost,status,created_at")
       .eq("status", "completed").order("created_at", { ascending: false }).limit(30),
     supabase.from("leads").select("id,nome,valor_fechado,updated_at")
-      .eq("status", "ganho").order("updated_at", { ascending: false }).limit(20),
+      .eq("status", "ganho").order("updated_at", { ascending: false }).limit(10),
     // Soma total de TODOS os ganhos — a lista acima mostra só os 20 últimos.
     supabase.from("leads").select("valor_fechado").eq("status", "ganho"),
     supabase.from("notifications").select("id,tipo,titulo,corpo,lida")
@@ -90,8 +90,13 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
       <div className="dash-insight-stack">
         <Link href="/app/buscar" className="dash-insight">
           <span className="dash-insight-top"><Radar size={16} />{t.n1t}<ArrowUpRight size={18} /></span>
-          <strong>{t.n1s}</strong>
-          <span className="dash-insight-bottom">{getMessages(loc.lang).shell.seek}<span><ArrowUpRight size={18} /></span></span>
+          <div className="dash-insight-mid">
+            <strong>{t.n1s}</strong>
+            <span className="seek-radar dash-radar" aria-hidden="true">
+              <span /><span /><span /><i /><b /><b /><b />
+            </span>
+          </div>
+          <span className="dash-insight-cta">{getMessages(loc.lang).shell.seek}<ArrowUpRight size={15} /></span>
         </Link>
       </div>
     </div>
@@ -138,14 +143,20 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
       <h3 className="dash-list-title">{t.wonTitle}</h3>
       {ganhos.length === 0
         ? <div className="dash-empty"><Users size={23} /><p>{t.wonEmpty}</p><Link className="text-link" href="/app/leads">{t.n2t}<ArrowUpRight size={14} /></Link></div>
-        : <ul className="dash-usage">
-            {ganhos.map((l) => (
-              <li key={l.id}>
-                <span><Link className="text-link" href={`/app/leads/${l.id}`}>{l.nome}</Link></span>
-                <strong>{l.valor_fechado != null ? formatMoney(Math.round(l.valor_fechado * 100), loc.currency, loc.lang) : "—"}</strong>
-              </li>
-            ))}
-          </ul>}
+        : <>
+            <ul className="dash-usage dash-won-list">
+              {ganhos.map((l) => (
+                <li key={l.id}>
+                  <span className="dash-won-name">
+                    <Link className="text-link" href={`/app/leads/${l.id}`}>{l.nome}</Link>
+                    <small>{new Date(l.updated_at).toLocaleDateString(dateLocale, { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })}</small>
+                  </span>
+                  <strong>{l.valor_fechado != null ? formatMoney(Math.round(l.valor_fechado * 100), loc.currency, loc.lang) : "—"}</strong>
+                </li>
+              ))}
+            </ul>
+            <Link className="dash-foot-link" href="/app/leads">{t.wonAll}<ArrowUpRight size={13} /></Link>
+          </>}
     </section>
 
       <section className="dash-panel dash-activity">
@@ -164,6 +175,7 @@ export default async function AppPage({ searchParams }: { searchParams: Promise<
                   </li>
                 ))}
               </ul>
+              <h3 className="dash-list-title">{t.opsRecent}</h3>
               <ul className="dash-ops">
                 {operacoes.slice(0, 6).map((o, i) => (
                   <li key={`${o.created_at}-${i}`}>
