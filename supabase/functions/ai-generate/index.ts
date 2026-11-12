@@ -67,6 +67,12 @@ const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versati
 // Modelo ":free" do próprio OpenRouter — não consome crédito pago e
 // responde rápido (~10s). Rede de segurança quando a NVIDIA está fora.
 const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
+// Modelos ":free" tentados em ordem na geração de app/site quando o
+// modelo pago falha (402, rede, 5xx) — preferência a modelos bons de
+// código. Override por secret, separados por vírgula.
+const OR_FREE_APP_MODELS = (optionalEnv("OR_FREE_APP_MODELS")
+  ?? "nvidia/nemotron-3-ultra-550b-a55b:free,qwen/qwen3-coder:free,meta-llama/llama-3.3-70b-instruct:free")
+  .split(",").map((s) => s.trim()).filter(Boolean);
 // Patch de config do site (copy + serviços + FAQ + SEO) — JSON estruturado
 // de ~2.5k tokens; 4o-mini resolve pela metade do custo do 4.1-mini.
 const PATCH_MODEL = optionalEnv("AI_PATCH_MODEL") ?? "openai/gpt-4o-mini";
@@ -159,6 +165,7 @@ async function orFreeChat(
   userContent: string,
   maxTokens?: number,
   timeoutMs?: number,
+  model?: string,
 ): Promise<Record<string, unknown> | null> {
   const key = await getSecret("OPENROUTER_API_KEY");
   if (!key) return null;
@@ -170,7 +177,7 @@ async function orFreeChat(
       "X-Title": "SeekerAi",
     },
     body: JSON.stringify({
-      model: OR_FREE_TEXT_MODEL,
+      model: model ?? OR_FREE_TEXT_MODEL,
       stream: false,
       ...(maxTokens ? { max_tokens: maxTokens } : {}),
       messages: [
@@ -2941,14 +2948,27 @@ async function generateAppHtml(
     }
   }
   // Fallbacks gratuitos — em qualquer falha do OpenRouter (rede,
-  // 402 sem crédito, 5xx): modelo ":free" do OR, depois a NVIDIA.
+  // 402 sem crédito, 5xx): modelos ":free" do OR em sequência, depois
+  // Groq e por último a NVIDIA. Fallback exige documento COMPLETO
+  // (</html> presente) — resposta truncada cai pro próximo provedor.
   if (!html) {
-    const f = await orFreeChat(APP_SYSTEM, user, 24000, 60_000);
-    const fch = f && Array.isArray(f.choices) ? f.choices : [];
-    const fContent = isRecord(fch[0]) && isRecord(fch[0].message) ? fch[0].message.content : null;
-    if (typeof fContent === "string") {
-      html = extractHtml(fContent);
-      if (html) modelo = OR_FREE_TEXT_MODEL;
+    for (const fm of OR_FREE_APP_MODELS) {
+      const f = await orFreeChat(APP_SYSTEM, user, 24000, 75_000, fm);
+      const fch = f && Array.isArray(f.choices) ? f.choices : [];
+      const fContent = isRecord(fch[0]) && isRecord(fch[0].message) ? fch[0].message.content : null;
+      if (typeof fContent === "string") {
+        const h = extractHtml(fContent);
+        if (h && /<\/html>/i.test(h)) { html = h; modelo = fm; break; }
+      }
+    }
+  }
+  if (!html) {
+    const g = await groqChat(APP_SYSTEM, user, 16384, 75_000);
+    const gch = g && Array.isArray(g.choices) ? g.choices : [];
+    const gContent = isRecord(gch[0]) && isRecord(gch[0].message) ? gch[0].message.content : null;
+    if (typeof gContent === "string") {
+      const h = extractHtml(gContent);
+      if (h && /<\/html>/i.test(h)) { html = h; modelo = GROQ_TEXT_MODEL; }
     }
   }
   if (!html) {

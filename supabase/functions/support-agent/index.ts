@@ -456,6 +456,15 @@ Deno.serve(async (req) => {
       decision = raw ? parseDecision(raw) : null;
     }
     if (!decision) {
+      // Provedor fora/resposta inválida: NÃO posta mensagem nem escala.
+      // A última mensagem continua sendo do cliente → o support-sweep
+      // (~5min) dispara de novo. Só escala se já passou tempo demais
+      // tentando (cadeia de modelos realmente fora do ar).
+      const waitedMs = Date.now() - new Date(last.created_at).getTime();
+      if (waitedMs < 15 * 60_000) {
+        console.error("[support-agent] llm sem decisão — aguardando sweep");
+        return json({ action: "retry_later", waited_s: Math.round(waitedMs / 1000) });
+      }
       return await escalate(
         "Vou chamar o nosso time humano pra te ajudar melhor com isso — eles assumem por aqui mesmo.",
       );
