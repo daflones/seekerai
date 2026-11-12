@@ -73,6 +73,9 @@ const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron
 const OR_FREE_APP_MODELS = (optionalEnv("OR_FREE_APP_MODELS")
   ?? "nvidia/nemotron-3-ultra-550b-a55b:free,qwen/qwen3-coder:free,meta-llama/llama-3.3-70b-instruct:free")
   .split(",").map((s) => s.trim()).filter(Boolean);
+// Modelo ":free" com visão — usado quando a ação recebe imagens de
+// verdade (editor_assist com fotos anexadas). Override por secret.
+const OR_FREE_VISION_MODEL = optionalEnv("OR_FREE_VISION_MODEL") ?? "google/gemma-4-26b-a4b-it:free";
 // Patch de config do site (copy + serviços + FAQ + SEO) — JSON estruturado
 // de ~2.5k tokens; 4o-mini resolve pela metade do custo do 4.1-mini.
 const PATCH_MODEL = optionalEnv("AI_PATCH_MODEL") ?? "openai/gpt-4o-mini";
@@ -166,9 +169,19 @@ async function orFreeChat(
   maxTokens?: number,
   timeoutMs?: number,
   model?: string,
+  images?: string[],
 ): Promise<Record<string, unknown> | null> {
   const key = await getSecret("OPENROUTER_API_KEY");
   if (!key) return null;
+  const userMsg = images?.length
+    ? {
+        role: "user",
+        content: [
+          { type: "text", text: userContent },
+          ...images.map((url) => ({ type: "image_url", image_url: { url } })),
+        ],
+      }
+    : { role: "user", content: userContent };
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -182,7 +195,7 @@ async function orFreeChat(
       ...(maxTokens ? { max_tokens: maxTokens } : {}),
       messages: [
         { role: "system", content: system },
-        { role: "user", content: userContent },
+        userMsg,
       ],
     }),
     signal: AbortSignal.timeout(timeoutMs ?? 40_000),
@@ -3188,6 +3201,15 @@ Deno.serve(async (req) => {
           ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
           : prompt;
 
+      // editor_assist com anexos: as URLs vão como texto (fallbacks
+      // sem visão ainda conseguem inserir como <img src>) E como
+      // image_url nas chamadas de modelos com visão de verdade.
+      const editorImgs = action === "editor_assist" && Array.isArray(context.imagens)
+        ? (context.imagens as unknown[])
+            .map((u) => asString(u, 1200)).filter((u): u is string => Boolean(u))
+            .slice(0, 5)
+        : [];
+
       // Cadeia de provedores: OpenRouter primeiro; NVIDIA como fallback
       // gratuito quando o principal falha (rede, 402, 5xx) ou não devolve imagem.
       const t0 = Date.now();
@@ -3244,7 +3266,15 @@ Deno.serve(async (req) => {
             : undefined,
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
+            {
+              role: "user",
+              content: editorImgs.length
+                ? [
+                    { type: "text", text: userContent },
+                    ...editorImgs.map((url) => ({ type: "image_url", image_url: { url } })),
+                  ]
+                : userContent,
+            },
           ],
         }),
         // Sem timeout o OpenRouter pode segurar a conexão até o gateway cortar.
@@ -3287,7 +3317,16 @@ Deno.serve(async (req) => {
         const valid = (d: Record<string, unknown> | null) =>
           chatContent(d) ? d : null;
         const g = freeFirst ? null : valid(await groqChat(systemPrompt, userContent, 8192, 20_000));
-        const f = g ?? (freeFirst ? null : valid(await orFreeChat(systemPrompt, userContent, 8192, 15_000)));
+        // Com imagens anexadas o free de visão (gemma) entra antes do
+        // texto puro — modelo de texto não "vê" a foto, só a URL.
+        const f = g ?? (freeFirst ? null : valid(await orFreeChat(
+          systemPrompt,
+          userContent,
+          8192,
+          20_000,
+          editorImgs.length ? OR_FREE_VISION_MODEL : undefined,
+          editorImgs.length ? editorImgs : undefined,
+        )));
         const elapsed = Date.now() - t0;
         const nv = f ?? (elapsed < 80_000
           ? valid(await nvidiaChat(

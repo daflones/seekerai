@@ -39,6 +39,9 @@ const VOID_TAGS = new Set([
   "img", "input", "br", "hr", "source", "track", "wbr",
   "area", "base", "col", "embed", "video", "audio", "iframe", "canvas",
 ]);
+// Mídia redimensiona mantendo a proporção — sem isso o GrapesJS grava
+// width+height em px e a imagem sai espremida/distida no site salvo.
+const MEDIA_TAGS = new Set(["img", "video", "svg", "canvas", "iframe", "picture", "figure"]);
 
 // Edição livre: todo elemento vira arrastável (posicionamento livre,
 // segue o mouse), redimensionável pelas 8 alças, copiável e removível.
@@ -58,7 +61,11 @@ function unlockTree(root: Component) {
   UNLOCKED.add(root);
   const tag = (root.get("tagName") ?? "").toLowerCase();
   if (!SKIP_TAGS.has(tag)) {
-    root.set({ ...FREE_PROPS, droppable: !VOID_TAGS.has(tag) });
+    root.set({
+      ...FREE_PROPS,
+      resizable: MEDIA_TAGS.has(tag) ? { ratioDefault: true } : true,
+      droppable: !VOID_TAGS.has(tag),
+    });
     // O GrapesJS monta a toolbar padrão na criação do componente
     // (initToolbar); anexo o 📷 aqui — roda antes de qualquer seleção.
     const tb = root.get("toolbar");

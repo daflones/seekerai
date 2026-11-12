@@ -27,6 +27,9 @@ const GROQ_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
 // Modelo ":free" do OpenRouter — não gasta crédito, segura a cadeia
 // quando a NVIDIA free está fora (comum: modelos somem da conta).
 const OR_FREE_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
+// Modelo ":free" com visão — usado quando o cliente anexa imagens no
+// chamado (prints de erro etc.). Sem ele a IA só via "[anexou: x.png]".
+const OR_FREE_VISION_MODEL = optionalEnv("OR_FREE_VISION_MODEL") ?? "google/gemma-4-26b-a4b-it:free";
 
 const SYSTEM = `Você é a IA oficial de suporte do SeekerAi (seekerai.digital), plataforma que ajuda freelancers, agências, designers, social media e prestadores de serviço a encontrar e fechar clientes locais. Você é consultivo: além de responder, guia o cliente pro próximo passo prático quando fizer sentido.
 
@@ -164,7 +167,51 @@ function extractContent(data: unknown): string | null {
   return typeof content === "string" && content.trim() ? content : null;
 }
 
-async function llm(system: string, convo: { role: string; content: string }[]): Promise<string | null> {
+async function llm(
+  system: string,
+  convo: { role: string; content: string }[],
+  images?: string[],
+): Promise<string | null> {
+  // Com imagens anexadas, só modelos com visão enxergam de verdade —
+  // primeiro o ":free" do OpenRouter (gemma), depois o pago (gpt-4o-mini).
+  // Se nenhum responder, cai na cadeia de texto normal (o anexo continua
+  // marcado como nota e a IA responde o que der).
+  if (images?.length) {
+    const orKey = await getSecret("OPENROUTER_API_KEY");
+    if (orKey) {
+      const msgs = [
+        { role: "system", content: system },
+        ...convo.map((m, i, arr) => i === arr.length - 1 && m.role === "user"
+          ? {
+              role: "user",
+              content: [
+                { type: "text", text: m.content },
+                ...images.map((url) => ({ type: "image_url", image_url: { url } })),
+              ],
+            }
+          : m),
+      ];
+      for (const model of [OR_FREE_VISION_MODEL, OR_MODEL]) {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${orKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": optionalEnv("APP_URL") ?? "https://seekerai.digital",
+            "X-Title": "SeekerAi Support",
+          },
+          body: JSON.stringify({
+            model, stream: false, max_tokens: 700, messages: msgs,
+          }),
+          signal: AbortSignal.timeout(40_000),
+        }).catch(() => null);
+        if (res?.ok) {
+          const content = extractContent(await res.json().catch(() => null));
+          if (content) return content;
+        }
+      }
+    }
+  }
   // Groq primeiro: gratuito e rápido. OpenRouter (pago) só quando os dois
   // gratuitos falham — suporte não pode queimar crédito por resposta.
   const groqKey = await getSecret("GROQ_API_KEY");
@@ -447,12 +494,30 @@ Deno.serve(async (req) => {
       { role: "user", content: context },
       ...convo.slice(-29),
     ];
-    let raw = await llm(SYSTEM, messages);
+    // Imagens anexadas viram URLs assinadas e vão pro modelo de visão —
+    // a IA passa a "ver" prints de erro/telas que o cliente manda.
+    const imgPaths = list.slice(-12)
+      .flatMap((m) => Array.isArray(m.anexos) ? m.anexos : [])
+      .filter((a): a is Record<string, unknown> =>
+        isRecord(a) && asString(a.tipo, 80)?.startsWith("image/") === true
+          && typeof a.path === "string")
+      .map((a) => a.path as string)
+      .slice(0, 3);
+    let images: string[] = [];
+    if (imgPaths.length) {
+      const { data: signed } = await db.storage
+        .from("support-files").createSignedUrls(imgPaths, 3600)
+        .catch(() => ({ data: null }));
+      images = (signed ?? [])
+        .map((s) => (isRecord(s) ? asString(s.signedUrl, 2000) : null))
+        .filter((u): u is string => Boolean(u));
+    }
+    let raw = await llm(SYSTEM, messages, images);
     let decision = raw ? parseDecision(raw) : null;
     // Segunda chance antes de escalar: resposta truncada/malformada não
     // deve mandar o chamado pro humano sem a IA ter respondido de fato.
     if (!decision) {
-      raw = await llm(SYSTEM, messages);
+      raw = await llm(SYSTEM, messages, images);
       decision = raw ? parseDecision(raw) : null;
     }
     if (!decision) {
