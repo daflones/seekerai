@@ -115,6 +115,7 @@ export function SearchConsole({
   // confirmados aparecendo em tempo real via SSE.
   const [liveEvents, setLiveEvents] = useState<GenEvent[]>([]);
   const [livePlaces, setLivePlaces] = useState<PlaceResult[]>([]);
+  const [jobStart, setJobStart] = useState<number | null>(null);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   const deadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sseRef = useRef<EventSource | null>(null);
@@ -134,6 +135,16 @@ export function SearchConsole({
   function clearLive() {
     setLiveEvents([]);
     setLivePlaces([]);
+    setJobStart(null);
+  }
+
+  // SSE e polling entregam o MESMO evento (o `at` difere: ISO do Node vs
+  // timestamp do Postgres) — dedup por p+etapa, senão tudo aparece 2x.
+  const eventKey = (e: GenEvent) => `${e.p ?? ""}|${e.etapa ?? ""}`;
+  function mergeEvents(cur: GenEvent[], add: GenEvent[]): GenEvent[] {
+    const seen = new Set(cur.map(eventKey));
+    const fresh = add.filter((e) => e.etapa && !seen.has(eventKey(e)));
+    return fresh.length ? [...cur, ...fresh].slice(-60) : cur;
   }
 
   // SSE do gen-service: etapas da busca + estabelecimentos confirmados.
@@ -154,7 +165,7 @@ export function SearchConsole({
               return add.length ? [...cur, ...add].slice(-60) : cur;
             });
           }
-          if (e.etapa) setLiveEvents((cur) => [...cur, e].slice(-60));
+          if (e.etapa) setLiveEvents((cur) => mergeEvents(cur, [e]));
         } catch { /* evento malformado — ignora */ }
       };
       es.onerror = () => { es.close(); if (sseRef.current === es) sseRef.current = null; };
@@ -202,6 +213,7 @@ export function SearchConsole({
     setBusy(true);
     setTimedOut(false);
     clearLive();
+    setJobStart(Date.now());
     openStream(jobId);
     // Backstop: se nenhum tick responder, corta mesmo assim.
     deadTimer.current = setTimeout(() => cancelSearch(true), DEAD_MS);
@@ -214,12 +226,7 @@ export function SearchConsole({
           const job = data.job;
           // Fallback sem SSE: eventos persistidos no banco alimentam o chat.
           if (Array.isArray(job.eventos) && job.eventos.length) {
-            setLiveEvents((cur) => {
-              const key = (e: GenEvent) => `${e.at ?? ""}|${e.etapa ?? ""}`;
-              const seen = new Set(cur.map(key));
-              const add = job.eventos!.filter((e) => !seen.has(key(e)));
-              return add.length ? [...cur, ...add].slice(-60) : cur;
-            });
+            setLiveEvents((cur) => mergeEvents(cur, job.eventos!));
           }
           // Idade real do job — restaurado de outra aba já conta o tempo certo.
           const elapsed = Date.now() - new Date(job.created_at).getTime();
@@ -491,15 +498,31 @@ export function SearchConsole({
     </p>}
 
     {busy && <div className="seek-live">
-      <GenActivity events={liveEvents} running={busy} lang={lang} />
+      <div className="seek-live-head">
+        <div className="seek-radar seek-radar-sm" aria-hidden="true"><span /><span /><span /><i /><b /><b /><b /></div>
+        <div className="seek-live-head-txt">
+          <strong>{t.liveWorking}</strong>
+          <p>{liveEvents[liveEvents.length - 1]?.etapa ?? t.liveThinking}</p>
+          <span>
+            {livePlaces.length > 0 && <>{livePlaces.length} {t.liveFound} · </>}
+            {jobStart && `${Math.floor((Date.now() - jobStart) / 1000)}s`}
+          </span>
+        </div>
+      </div>
+      <GenActivity events={liveEvents} running={busy} lang={lang} title={t.liveLog} />
       {livePlaces.length > 0 && <>
         <p className="seek-live-title"><Radar size={13} /> {t.liveTitle} · {livePlaces.length}</p>
         <div className="seek-live-grid">
           {[...livePlaces].reverse().slice(0, 12).map((p) => (
             <div key={p.id ?? `${p.nome}|${p.imagem}`} className="seek-live-card">
-              {p.imagem
-                ? <div className="seek-live-img" style={{ backgroundImage: `url(${placeImageSrc(p.imagem)})` }} role="img" aria-label={p.nome ?? ""} />
-                : <div className="seek-live-img seek-live-img-empty" aria-hidden><MapPin size={16} /></div>}
+              <div className="seek-live-img">
+                <MapPin size={15} className="seek-live-img-fb" />
+                {p.imagem && <>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail externo do Maps */}
+                  <img src={placeImageSrc(p.imagem) ?? ""} alt="" loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                </>}
+              </div>
               <div className="seek-live-body">
                 <strong>{p.nome ?? "—"}</strong>
                 <span>{[p.cidade, p.uf].filter(Boolean).join(" · ")}</span>
@@ -507,11 +530,12 @@ export function SearchConsole({
                   {p.prioridade === "alta" && <em className="seek-live-hot">{t.prioAlta}</em>}
                   {p.prioridade === "media" && <em>{t.prioMedia}</em>}
                   {p.instagram && <em><Instagram size={10} /> @{igHandle(p.instagram)}</em>}
-                  {!p.site
+                  {/* "Instagram sem site" já resume os dois fatos — não repete "Sem site". */}
+                  {p.prioridade !== "alta" && (!p.site
                     ? <em className="seek-live-gap"><Globe size={10} /> {t.noSite}</em>
                     : p.siteCheck?.estado === "fora" || p.siteCheck?.estado === "desatualizado"
                     ? <em><Globe size={10} /> {p.siteCheck.estado === "fora" ? t.siteOut : t.siteOld}</em>
-                    : <em><Globe size={10} /> {t.hasSite}</em>}
+                    : <em><Globe size={10} /> {t.hasSite}</em>)}
                 </span>
               </div>
             </div>
@@ -643,11 +667,12 @@ export function SearchConsole({
             <div className="seek-badges">
               {p.prioridade === "alta" && <span className="seek-badge seek-badge-hot"><Sparkles size={11} />{t.prioAlta}</span>}
               {p.prioridade === "media" && <span className="seek-badge">{t.prioMedia}</span>}
-              {p.site && check
+              {/* prioridade "alta" = Instagram sem site — o selo já diz tudo. */}
+              {p.prioridade !== "alta" && (p.site && check
                 ? <a className={`seek-badge ${check.cls}`} href={p.site} target="_blank" rel="noopener noreferrer" title={check.sinais}><Globe size={11} />{check.label}</a>
                 : p.site
                 ? <a className="seek-badge seek-badge-ok" href={p.site} target="_blank" rel="noopener noreferrer"><Globe size={11} />{t.hasSite}</a>
-                : <span className="seek-badge seek-badge-gap">{t.noSite}</span>}
+                : <span className="seek-badge seek-badge-gap">{t.noSite}</span>)}
               {check && check.sinais && p.siteCheck!.estado !== "bom" &&
                 <span className="seek-badge seek-site-note" title={check.sinais}>{check.sinais.split(" · ")[0]}</span>}
               {p.whatsapp === true && <span className="seek-badge seek-badge-ok"><MessageCircle size={11} />{t.waOk}</span>}

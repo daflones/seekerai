@@ -213,18 +213,29 @@ a.lead-action { text-decoration: none; }
 /* Busca inteligente: feed ao vivo (chat de etapas + estabelecimentos). */
 .seek-live { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
 .seek-live .gen-act { max-width: 720px; }
+.seek-live-head { display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  border: 1px solid #ab7bcd26; border-radius: 14px; background: var(--bg-2, #181021); }
+.seek-radar-sm { width: 62px; height: 62px; flex-shrink: 0; }
+.seek-live-head-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.seek-live-head-txt strong { font-size: 13px; color: var(--text); }
+.seek-live-head-txt p { margin: 0; font-size: 12px; color: var(--violet-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seek-live-head-txt span { font-size: 11px; color: var(--muted); }
 .seek-live-title { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--violet-light); }
 .seek-live-title svg { flex-shrink: 0; }
 .seek-live-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
 .seek-live-card { display: flex; gap: 10px; padding: 10px; border-radius: 12px; border: 1px solid #ab7bcd26; background: var(--bg-2, #181021); min-width: 0; animation: seekLiveIn .35s ease both; }
 @keyframes seekLiveIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.seek-live-img { width: 52px; height: 52px; border-radius: 10px; background-size: cover; background-position: center; flex-shrink: 0; }
-.seek-live-img-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); background: #ab7bcd14; }
+.seek-live-img { position: relative; width: 56px; height: 56px; border-radius: 10px; overflow: hidden;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: #ab7bcd14; color: var(--muted); }
+.seek-live-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.seek-live-img-fb { opacity: .8; }
 .seek-live-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .seek-live-body strong { font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .seek-live-body > span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .seek-live-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-.seek-live-tags em { display: inline-flex; align-items: center; gap: 3px; font-style: normal; font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid #ab7bcd30; border-radius: 999px; padding: 2px 7px; }
+.seek-live-tags em { display: inline-flex; align-items: center; gap: 3px; font-style: normal; font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid #ab7bcd30; border-radius: 999px; padding: 2px 7px; white-space: nowrap; }
 .seek-live-hot { color: #ffd166 !important; border-color: #ffd16655 !important; background: #ffd16612; }
 .seek-live-gap { color: var(--warn) !important; border-color: #c89b4e40 !important; }
 .seek-badge-hot { color: #ffd166 !important; border-color: #ffd16655 !important; background: #ffd16612; }

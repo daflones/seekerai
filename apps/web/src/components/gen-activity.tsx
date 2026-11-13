@@ -20,11 +20,13 @@ function fmtTime(at: string | null | undefined, lang: Lang): string {
 
 // Janela de "chat" mostrando o que a IA está fazendo durante a geração:
 // cada etapa reportada pela edge vira uma bolha, com spinner na última.
-export function GenActivity({ events, running, lang = "pt", max = 30 }: {
+export function GenActivity({ events, running, lang = "pt", max = 30, title }: {
   events: GenEvent[];
   running: boolean;
   lang?: Lang;
   max?: number;
+  /** Título do cabeçalho — default "A IA está trabalhando". */
+  title?: string;
 }) {
   const list = events.slice(-max);
   const bottom = useRef<HTMLDivElement>(null);
@@ -37,7 +39,7 @@ export function GenActivity({ events, running, lang = "pt", max = 30 }: {
   return <div className="gen-act" role="log" aria-live="polite" aria-label={c.aiWorking}>
     <div className="gen-act-head">
       {running ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
-      <b>{running ? c.aiWorking : c.aiDone}</b>
+      <b>{title ?? (running ? c.aiWorking : c.aiDone)}</b>
     </div>
     <div className="gen-act-list">
       {list.length === 0 && running &&

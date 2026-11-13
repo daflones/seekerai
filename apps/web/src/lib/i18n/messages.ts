@@ -273,6 +273,7 @@ const pt = {
     errNet: "Sem conexão. Tente novamente.",
     errSave: "Não foi possível salvar os leads.",
     liveTitle: "Encontrados ao vivo", prioAlta: "Instagram sem site", prioMedia: "Instagram + site fraco",
+    liveWorking: "Radar varrendo a região", liveLog: "O que o radar está fazendo", liveFound: "encontrados", liveThinking: "Procurando estabelecimentos…",
   },
   leadsPage: {
     eyebrow: "PIPELINE", title: "Seus leads",
@@ -908,6 +909,7 @@ export const messages: Record<Lang, Messages> = {
       timeoutP: "The radar timed out. Try another city or niche.",
       errSave: "Couldn't save the leads.",
       liveTitle: "Found live", prioAlta: "Instagram, no site", prioMedia: "Instagram + weak site",
+      liveWorking: "Radar scanning the area", liveLog: "What the radar is doing", liveFound: "found", liveThinking: "Looking for establishments…",
     },
     leadsPage: {
       eyebrow: "PIPELINE", title: "Your leads",
@@ -1538,6 +1540,7 @@ export const messages: Record<Lang, Messages> = {
       timeoutP: "El radar superó el tiempo límite. Prueba otra ciudad u otro nicho.",
       errSave: "No se pudieron guardar los leads.",
       liveTitle: "Encontrados en vivo", prioAlta: "Instagram sin sitio", prioMedia: "Instagram + sitio débil",
+      liveWorking: "Radar barriendo la zona", liveLog: "Qué está haciendo el radar", liveFound: "encontrados", liveThinking: "Buscando establecimientos…",
     },
     leadsPage: {
       eyebrow: "PIPELINE", title: "Tus leads",
@@ -2168,6 +2171,7 @@ export const messages: Record<Lang, Messages> = {
       timeoutP: "Le radar a dépassé le temps imparti. Essayez une autre ville ou un autre créneau.",
       errSave: "Impossible d'enregistrer les leads.",
       liveTitle: "Trouvés en direct", prioAlta: "Instagram sans site", prioMedia: "Instagram + site faible",
+      liveWorking: "Radar en train de balayer la zone", liveLog: "Ce que fait le radar", liveFound: "trouvés", liveThinking: "Recherche d'établissements…",
     },
     leadsPage: {
       eyebrow: "PIPELINE", title: "Vos leads",
@@ -2797,6 +2801,7 @@ export const messages: Record<Lang, Messages> = {
       timeoutP: "Das Radar hat das Zeitlimit überschritten. Probiere eine andere Stadt oder Nische.",
       errSave: "Leads konnten nicht gespeichert werden.",
       liveTitle: "Live gefunden", prioAlta: "Instagram ohne Website", prioMedia: "Instagram + schwache Website",
+      liveWorking: "Radar scannt die Gegend", liveLog: "Was der Radar tut", liveFound: "gefunden", liveThinking: "Suche nach Betrieben…",
     },
     leadsPage: {
       eyebrow: "PIPELINE", title: "Deine Leads",
@@ -3426,6 +3431,7 @@ export const messages: Record<Lang, Messages> = {
       timeoutP: "Il radar ha superato il tempo limite. Prova un'altra città o nicchia.",
       errSave: "Impossibile salvare i lead.",
       liveTitle: "Trovati in diretta", prioAlta: "Instagram senza sito", prioMedia: "Instagram + sito debole",
+      liveWorking: "Radar che scandisce la zona", liveLog: "Cosa sta facendo il radar", liveFound: "trovati", liveThinking: "Ricerca di attività…",
     },
     leadsPage: {
       eyebrow: "PIPELINE", title: "I tuoi lead",

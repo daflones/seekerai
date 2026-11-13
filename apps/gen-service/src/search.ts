@@ -450,8 +450,11 @@ function leadScore(p: NormalizedPlace): number {
       : p.siteCheck?.estado === "desatualizado" ? 2 : 0);
 }
 
+// Badge segue o tier real: "media" = Instagram + site fraco (tier 1).
+// Tier 2 (sem IG + sem site) não ganha selo próprio — os badges de site
+// e Instagram do card já contam a história, sem redundância.
 function prioridadeOf(tier: number): "alta" | "media" | "baixa" {
-  return tier === 0 ? "alta" : tier <= 2 ? "media" : "baixa";
+  return tier === 0 ? "alta" : tier === 1 ? "media" : "baixa";
 }
 
 /** Versão enxuta pro feed ao vivo — o card se forma enquanto busca. */
