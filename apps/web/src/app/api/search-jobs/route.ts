@@ -24,17 +24,28 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
   // wall-clock da edge (expansão de região pode levar vários minutos).
   const genBase = genServiceUrl();
   const upstreamUrl = genBase ? `${genBase}/places-search` : `${config!.url}/functions/v1/places-search`;
+  const callUpstream = (url: string, timeoutMs: number) => fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: config!.key,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ...payload, jobId }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   try {
-    const upstream = await fetch(upstreamUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: config!.key,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ...payload, jobId }),
-      signal: AbortSignal.timeout(genBase ? 900_000 : 240_000),
-    });
+    let upstream: Response;
+    try {
+      upstream = await callUpstream(upstreamUrl, genBase ? 900_000 : 240_000);
+    } catch (err) {
+      // Gen-service fora do ar (DNS/conexão): cai na edge como rede de segurança.
+      // Timeout não faz fallback — o gen pode seguir processando e cobrar;
+      // reserveAction por requestRef é idempotente, mas o provedor cobraria 2x.
+      const isTimeout = err instanceof Error && err.name === "TimeoutError";
+      if (!genBase || isTimeout) throw err;
+      upstream = await callUpstream(`${config!.url}/functions/v1/places-search`, 240_000);
+    }
     const data = (await upstream.json().catch(() => ({}))) as Record<string, unknown>;
     if (!upstream.ok) {
       const erro = typeof data.erro === "string" ? data.erro
