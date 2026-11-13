@@ -9,7 +9,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
   const { id } = await params;
   const { data, error } = await session.supabase.from("ai_jobs")
-    .select("id,status,lead_id,result,erro,created_at")
+    .select("id,status,lead_id,result,erro,progresso,etapa,eventos,created_at")
     .eq("id", id).maybeSingle();
   if (error || !data) return NextResponse.json({ error: "Geração não encontrada." }, { status: 404 });
   if (data.status === "running" && Date.now() - new Date(data.created_at).getTime() > STALE_MS) {

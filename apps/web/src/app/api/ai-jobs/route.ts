@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
   const leadId = request.nextUrl.searchParams.get("leadId");
   if (!leadId) return NextResponse.json({ error: "Parâmetro inválido." }, { status: 400 });
   const { data } = await session.supabase.from("ai_jobs")
-    .select("id,status,lead_id,result,erro,created_at,request_ref")
+    .select("id,status,lead_id,result,erro,progresso,etapa,eventos,created_at,request_ref")
     .eq("lead_id", leadId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (data?.status === "running" && Date.now() - new Date(data.created_at).getTime() > STALE_MS) {
     const admin = createSupabaseAdminClient();

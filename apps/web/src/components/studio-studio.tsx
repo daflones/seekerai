@@ -6,6 +6,8 @@ import {
   Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, Trophy, X,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
+import type { Lang } from "@/lib/i18n/shared";
+import { GenActivity, type GenEvent } from "./gen-activity";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
 
 type T = Messages["studio"];
@@ -18,7 +20,10 @@ interface Project {
   target: Target; site_slug: string | null; created_at: string;
   lead_id?: string | null; ganho_em?: string | null;
   leads?: { nome?: string } | null;
+  progresso?: number; etapa?: string | null; eventos?: GenEvent[];
+  prompt?: string; refs?: Ref[];
 }
+interface LiveState { progresso: number; etapa: string | null; eventos: GenEvent[]; }
 
 const MAX_IMG = 6;
 const MAX_VID = 2;
@@ -39,13 +44,14 @@ function guessName(prompt: string): string {
   return clean.length > 60 ? `${clean.slice(0, 57)}…` : clean;
 }
 
-export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true }: { t: T; lang?: string; trial?: boolean; dailyActive?: boolean }) {
+export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true }: { t: T; lang?: Lang; trial?: boolean; dailyActive?: boolean }) {
   const [target, setTarget] = useState<Target>("web");
   const [prompt, setPrompt] = useState("");
   const [refs, setRefs] = useState<Ref[]>([]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [running, setRunning] = useState(false);
+  const [live, setLive] = useState<LiveState | null>(null);
   const [error, setError] = useState("");
   const [project, setProject] = useState<Project | null>(null);
   const [history, setHistory] = useState<Project[]>([]);
@@ -109,9 +115,13 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
       try {
         const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${id}`);
         if (!p) return;
-        if (p.status === "running") return;
+        if (p.status === "running") {
+          setLive({ progresso: p.progresso ?? 0, etapa: p.etapa ?? null, eventos: p.eventos ?? [] });
+          return;
+        }
         stopPoll();
         setRunning(false);
+        setLive(null);
         setProject(p);
         if (p.status === "error") setError(p.erro ?? t.failed);
         else setPreview(p.target);
@@ -152,6 +162,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
     setError("");
     setRunning(true);
     setProject(null);
+    setLive({ progresso: 0, etapa: null, eventos: [] });
     try {
       const { projectId } = await api<{ projectId: string }>("/api/studio/generate", {
         nome: guessName(prompt),
@@ -229,10 +240,42 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
     } catch { /* clipboard indisponível */ }
   }
 
+  // Reenvia o mesmo pedido como projeto novo — pra quem clicou em
+  // "Tentar novamente" num projeto que falhou.
+  async function retry(p: Project) {
+    if (running) return;
+    let full = p;
+    if (!full.prompt) {
+      try {
+        const { project } = await api<{ project: Project | null }>(`/api/studio/generate?id=${p.id}`);
+        if (!project?.prompt) { setError(t.failed); return; }
+        full = project;
+      } catch { setError(t.failed); return; }
+    }
+    setError("");
+    setRunning(true);
+    setProject(null);
+    setLive({ progresso: 0, etapa: null, eventos: [] });
+    try {
+      const { projectId } = await api<{ projectId: string }>("/api/studio/generate", {
+        nome: full.nome || guessName(full.prompt ?? full.nome),
+        prompt: full.prompt,
+        target: full.target,
+        refs: full.refs ?? [],
+      });
+      startPoll(projectId);
+      void refreshHistory();
+    } catch (e) {
+      setRunning(false);
+      setLive(null);
+      setError(e instanceof Error ? e.message : t.failed);
+    }
+  }
+
   function reset() {
     stopPoll();
     setProject(null); setPrompt(""); setRefs([]);
-    setError(""); setRunning(false); setPreview(null);
+    setError(""); setRunning(false); setPreview(null); setLive(null);
   }
 
   const viewTarget = preview ?? project?.target ?? "web";
@@ -301,7 +344,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
         </button>
       </div>
       {uploading && <p className="st-note"><Loader2 size={13} className="spin" /> {t.uploading}</p>}
-      {running && <p className="st-note"><Loader2 size={13} className="spin" /> {t.runningStatus}</p>}
+      {running && <GenActivity events={live?.eventos ?? []} running lang={lang} />}
       {error && (isCreditsError(error)
         ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
         : <p className="auth-error" role="alert">{error}</p>)}
@@ -399,12 +442,24 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
       </div>
     </div>}
 
+    {/* Projeto que falhou: erro + tentar de novo com o mesmo pedido */}
+    {project?.status === "error" && <div className="st-result st-result-error">
+      <div className="st-error-card">
+        <p className="auth-error" role="alert">{project.erro ?? t.failed}</p>
+        <button type="button" className="st-btn st-btn-primary" disabled={running}
+          onClick={() => void retry(project)}>
+          {running ? <Loader2 size={14} className="spin" /> : <RotateCcw size={14} />}
+          <span>{t.retry}</span>
+        </button>
+      </div>
+    </div>}
+
     {/* Histórico */}
     {history.length > 0 && <section className="dash-panel st-history">
       <div className="dash-panel-heading"><h2><History size={15} /> {t.historyTitle}</h2></div>
       <ul>
-        {history.map(p => <li key={p.id}>
-          <button type="button" onClick={async () => {
+        {history.map(p => <li key={p.id} className="st-h-item">
+          <button type="button" className="st-h-open" onClick={async () => {
             const { project: full } = await api<{ project: Project | null }>(`/api/studio/generate?id=${p.id}`);
             if (full) {
               setProject(full); setPreview(full.target); setWonClient(""); setWonOpen(false);
@@ -416,6 +471,11 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
             <span className={`st-h-status st-h-${p.status}`}>{p.status}</span>
             {p.site_slug && <Globe size={13} />}
           </button>
+          {p.status === "error" && <button type="button" className="st-h-retry"
+            disabled={running} title={t.retry} aria-label={t.retry}
+            onClick={() => void retry(p)}>
+            {running ? <Loader2 size={13} className="spin" /> : <RotateCcw size={13} />}
+          </button>}
         </li>)}
       </ul>
     </section>}

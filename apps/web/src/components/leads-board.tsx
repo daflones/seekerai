@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { callAction, fmtCompact, igHandle, igUrl, LEAD_STATUS, placeImageSrc, type LeadRow } from "@/lib/app-client";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
+import { GenActivity, type GenEvent } from "./gen-activity";
 import { promptFor } from "@/lib/ai-prompts";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
@@ -54,6 +55,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
   const [notices, setNotices] = useState<Record<string, string>>({});
   const [wonLead, setWonLead] = useState<LeadRow | null>(null);
   const [wonValue, setWonValue] = useState("");
+  const [siteJobs, setSiteJobs] = useState<Record<string, { progresso: number; etapa: string | null; eventos: GenEvent[] }>>({});
 
   function markDone(leadId: string, kind: string) {
     setDone((d) => ({ ...d, [leadId]: new Set([...(d[leadId] ?? []), kind]) }));
@@ -152,18 +154,22 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       return;
     }
     notice(lead.id, `${t.actSite}…`);
+    const setJob = (j: { progresso?: number; etapa?: string | null; eventos?: GenEvent[] }) =>
+      setSiteJobs((m) => ({ ...m, [lead.id]: {
+        progresso: j.progresso ?? 0, etapa: j.etapa ?? null, eventos: j.eventos ?? [],
+      } }));
     const poller = setInterval(async () => {
       const r = await fetch(`/api/ai-jobs/${data.jobId}`, { cache: "no-store" }).catch(() => null);
-      const j = r ? (await r.json().catch(() => null)) as { job?: { status: string; erro?: string | null } } | null : null;
+      const j = r ? (await r.json().catch(() => null)) as { job?: { status: string; erro?: string | null; progresso?: number; etapa?: string | null; eventos?: GenEvent[] } } | null : null;
       if (!j?.job) return;
+      if (j.job.status === "running") { setJob(j.job); return; }
+      clearInterval(poller);
+      setSiteJobs((m) => { const n = { ...m }; delete n[lead.id]; return n; });
+      setBusy(null);
       if (j.job.status === "done") {
-        clearInterval(poller);
-        setBusy(null);
         markDone(lead.id, "generate_site");
         notice(lead.id, `${t.actSite} — ${t.generated}`);
       } else if (j.job.status === "error") {
-        clearInterval(poller);
-        setBusy(null);
         setError(j.job.erro ?? "Erro");
       }
     }, 4000);
@@ -310,6 +316,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               })}
               <Link className="lead-open" href={`/app/leads/${lead.id}`}>{t.open} <ArrowUpRight size={13} /></Link>
             </div>
+            {siteJobs[lead.id] && <GenActivity events={siteJobs[lead.id].eventos} running lang={lang} />}
             {notices[lead.id] && <p className="lead-notice"><CheckCircle2 size={12} />{notices[lead.id]}</p>}
           </div>
         </article>;

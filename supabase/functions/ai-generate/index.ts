@@ -2629,6 +2629,9 @@ async function publishPremiumSite(
   const descPairs = (await descsPromise) ?? [];
   const descs = descPairs.filter((x): x is { i: number; d: string } => Boolean(x.d)).map((x) => x.d);
   const cores = accentFromDescriptions(descs);
+  onStep?.(50, publicUrls.length
+    ? `Reunindo ${publicUrls.length} imagens reais do negócio`
+    : "Nenhuma foto real encontrada — a IA vai criar as imagens");
 
   // Nicho não mapeado (paleta "generico") → IA decide a partir das fotos,
   // bio e legendas — pode votar numa paleta conhecida ou criar vocab novo.
@@ -2661,7 +2664,7 @@ async function publishPremiumSite(
       { nome, categoria: asString(lead.categoria, 150), cidade: asString(lead.cidade, 80) },
       tipo === "barbearia" ? "barbearia" : paleta, visualRef, leadPais(lead),
     ).slice(0, faltando);
-    onStep?.(55, "Escrevendo copy e gerando imagens");
+    onStep?.(55, `Escrevendo textos e gerando ${prompts.length} ${prompts.length === 1 ? "imagem" : "imagens"} com IA`);
     const generated = await Promise.all(prompts.map((p) => generateSiteImage(apiKey, p, imgErrors)));
     // Uma segunda chance pras que falharem — provedores falham intermitente.
     await Promise.all(generated.map(async (img, i) => {
@@ -2700,6 +2703,7 @@ async function publishPremiumSite(
     }
     return out;
   })();
+  onStep?.(75, "Organizando avaliações, vídeos e mapas");
   const [videos, place] = await Promise.all([
     igVideoPromise,
     Promise.race([placePromise, sleep(45_000).then(() => ({ reviews: [], imageUrls: [] } as PlaceDetails))]),
@@ -2917,6 +2921,7 @@ async function generateAppHtml(
   apiKey: string | null,
   prompt: string,
   context: Record<string, unknown>,
+  onStep?: (pct: number, etapa: string) => void,
 ): Promise<{ html: string; modelo: string }> {
   const target = asString(context.target, 10) === "mobile" ? "mobile" : "web";
   const refs = Array.isArray(context.refs) ? context.refs.filter(isRecord) : [];
@@ -2931,10 +2936,21 @@ async function generateAppHtml(
     mediaLines ? `\nMídias de referência do usuário (incorpore estas URLs):\n${mediaLines}` : "",
   ].join("");
 
+  // Orçamento total da cadeia de provedores — a edge tem wall-clock
+  // limitado; estourar aqui derruba a function (HTTP 546 do gateway)
+  // em vez de devolver o erro amigável.
+  const t0 = Date.now();
+  const BUDGET_MS = 270_000;
+  const overBudget = () => Date.now() - t0 > BUDGET_MS;
+  onStep?.(18, refs.length
+    ? `Analisando o pedido e ${refs.length} ${refs.length === 1 ? "mídia de referência" : "mídias de referência"}`
+    : "Analisando o pedido");
+
   let html: string | null = null;
   let modelo = SITE_MODEL;
   let orStatus = 0;
-  if (apiKey) {
+  if (apiKey && !overBudget()) {
+    onStep?.(30, "Escrevendo o app com IA");
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -2948,7 +2964,7 @@ async function generateAppHtml(
           { role: "user", content: user },
         ],
       }),
-      signal: AbortSignal.timeout(210_000),
+      signal: AbortSignal.timeout(150_000),
     }).catch(() => null);
     orStatus = res?.status ?? 0;
     if (res?.ok) {
@@ -2965,8 +2981,10 @@ async function generateAppHtml(
   // Groq e por último a NVIDIA. Fallback exige documento COMPLETO
   // (</html> presente) — resposta truncada cai pro próximo provedor.
   if (!html) {
-    for (const fm of OR_FREE_APP_MODELS) {
-      const f = await orFreeChat(APP_SYSTEM, user, 24000, 75_000, fm);
+    for (const [i, fm] of OR_FREE_APP_MODELS.entries()) {
+      if (overBudget()) break;
+      onStep?.(35 + i * 6, `Tentando provedor alternativo ${i + 1}`);
+      const f = await orFreeChat(APP_SYSTEM, user, 24000, 60_000, fm);
       const fch = f && Array.isArray(f.choices) ? f.choices : [];
       const fContent = isRecord(fch[0]) && isRecord(fch[0].message) ? fch[0].message.content : null;
       if (typeof fContent === "string") {
@@ -2975,8 +2993,9 @@ async function generateAppHtml(
       }
     }
   }
-  if (!html) {
-    const g = await groqChat(APP_SYSTEM, user, 16384, 75_000);
+  if (!html && !overBudget()) {
+    onStep?.(55, "Tentando provedor alternativo");
+    const g = await groqChat(APP_SYSTEM, user, 16384, 60_000);
     const gch = g && Array.isArray(g.choices) ? g.choices : [];
     const gContent = isRecord(gch[0]) && isRecord(gch[0].message) ? gch[0].message.content : null;
     if (typeof gContent === "string") {
@@ -2984,9 +3003,10 @@ async function generateAppHtml(
       if (h && /<\/html>/i.test(h)) { html = h; modelo = GROQ_TEXT_MODEL; }
     }
   }
-  if (!html) {
+  if (!html && !overBudget()) {
     modelo = NVIDIA_TEXT_MODEL;
-    const nv = await nvidiaChat(APP_SYSTEM, user, 24000, 90_000);
+    onStep?.(62, "Último provedor de reserva");
+    const nv = await nvidiaChat(APP_SYSTEM, user, 24000, 60_000);
     const ch = nv && Array.isArray(nv.choices) ? nv.choices : [];
     const content = isRecord(ch[0]) && isRecord(ch[0].message) ? ch[0].message.content : null;
     if (typeof content === "string") html = extractHtml(content);
@@ -3036,10 +3056,11 @@ Deno.serve(async (req) => {
     const jobTable = asString(body.jobTable, 30);
     const reportJob = async (p: number, etapa: string) => {
       if (!jobId || (jobTable !== "ai_jobs" && jobTable !== "studio_projects")) return;
-      await db.from(jobTable)
-        .update({ progresso: p, etapa, updated_at: new Date().toISOString() })
-        .eq("id", jobId).eq("status", "running")
-        .then(() => {}, () => {});
+      // RPC atômico: atualiza progresso/etapa e faz append do evento no
+      // feed `eventos` (o que a UI mostra como "chat de progresso").
+      await db.rpc("report_job_event", {
+        p_table: jobTable, p_id: jobId, p_pct: p, p_etapa: etapa,
+      }).then(() => {}, () => {});
     };
     // Copy dirigida ao estabelecimento (abordagem de vendas) sai no idioma
     // do LEAD — derivado do país — não no idioma da interface do usuário.
@@ -3116,8 +3137,9 @@ Deno.serve(async (req) => {
       // businessRef carrega "studio:<projectId>" pra idempotência.
       if (action === "generate_app") {
         try {
-          await reportJob(30, "Escrevendo o app com IA");
-          const app = await generateAppHtml(apiKey, prompt, context);
+          await reportJob(25, "Recebendo o pedido");
+          const app = await generateAppHtml(apiKey, prompt, context,
+            (p, e) => { void reportJob(p, e); });
           await reportJob(85, "Montando o HTML");
           await settleAction(db, user.id, requestRef, "completed");
           return json({

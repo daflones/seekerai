@@ -14,6 +14,7 @@ import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import { callingCodeFor, toE164 } from "@/lib/phone";
 import { LeadAssistant } from "./lead-assistant";
+import { GenActivity, type GenEvent } from "./gen-activity";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
 
 interface OutputRow {
@@ -107,6 +108,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const siteAbsoluteUrl = () =>
     siteSlug ? `${window.location.origin}/site/${siteSlug}` : "";
   const sitePoller = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [siteActivity, setSiteActivity] = useState<{ progresso: number; etapa: string | null; eventos: GenEvent[] } | null>(null);
 
   // Site completo leva minutos quando o provedor principal falha e o
   // fallback gratuito assume — roda como job no servidor, com polling.
@@ -115,18 +117,24 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
     sitePoller.current = setInterval(() => {
       void (async () => {
         const res = await fetch(`/api/ai-jobs/${jobId}`, { cache: "no-store" }).catch(() => null);
-        const data = res ? (await res.json().catch(() => null)) as { job?: { status: string; erro?: string | null } } | null : null;
+        const data = res ? (await res.json().catch(() => null)) as { job?: { status: string; erro?: string | null; progresso?: number; etapa?: string | null; eventos?: GenEvent[] } } | null : null;
         if (!data?.job) return;
+        if (data.job.status === "running") {
+          setSiteActivity({
+            progresso: data.job.progresso ?? 0,
+            etapa: data.job.etapa ?? null,
+            eventos: data.job.eventos ?? [],
+          });
+          return;
+        }
+        setSiteActivity(null);
+        if (sitePoller.current) clearInterval(sitePoller.current);
+        sitePoller.current = null;
+        setBusyKey("generate_site", false);
         if (data.job.status === "done") {
-          if (sitePoller.current) clearInterval(sitePoller.current);
-          sitePoller.current = null;
-          setBusyKey("generate_site", false);
           setNotice(t.siteDone);
           router.refresh();
-        } else if (data.job.status === "error") {
-          if (sitePoller.current) clearInterval(sitePoller.current);
-          sitePoller.current = null;
-          setBusyKey("generate_site", false);
+        } else {
           setError(data.job.erro ?? t.errNoContent);
         }
       })();
@@ -137,9 +145,10 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   useEffect(() => {
     void (async () => {
       const res = await fetch(`/api/ai-jobs?leadId=${lead.id}`, { cache: "no-store" }).catch(() => null);
-      const data = res ? (await res.json().catch(() => null)) as { job?: { id: string; status: string } | null } | null : null;
+      const data = res ? (await res.json().catch(() => null)) as { job?: { id: string; status: string; progresso?: number; etapa?: string | null; eventos?: GenEvent[] } | null } | null : null;
       if (data?.job?.status === "running") {
         setBusyKey("generate_site", true);
+        setSiteActivity({ progresso: data.job.progresso ?? 0, etapa: data.job.etapa ?? null, eventos: data.job.eventos ?? [] });
         pollSiteJob(data.job.id);
       }
     })();
@@ -229,6 +238,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       return;
     }
     setRegenOpen(false);
+    setSiteActivity({ progresso: 0, etapa: null, eventos: [] });
     pollSiteJob(data.jobId);
   }
 
@@ -508,6 +518,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
       ? <OutOfCredits lang={lang} trial={trial} expired={trial && !dailyActive} />
       : <p role="alert" className="auth-error">{error}</p>)}
     {notice && <p role="status" className="notice-ok"><Sparkles size={14} />{notice}</p>}
+    {siteActivity && <GenActivity events={siteActivity.eventos} running lang={lang} />}
 
     <section className="lead-journey">
       <h2><Sparkles size={17} /> {t.journey}</h2>
