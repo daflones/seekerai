@@ -116,6 +116,17 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
   // Desconto de primeira compra — mesmo arredondamento da edge.
   const disc = (cents: number) =>
     discountPct > 0 ? Math.max(100, Math.round(cents * (100 - discountPct) / 100)) : cents;
+  // % efetivo cobrado pela edge: assinante só tem desconto de UPGRADE
+  // (transição "de:para"); sem assinatura vale a primeira compra.
+  const effPctFor = (slug: string) => {
+    const p = lookup.find((x) => x.slug === slug);
+    if (!p || !hasSubscription || !current) return discountPct;
+    return p.order > (current?.order ?? 0)
+      ? (upgradeDisc[`${currentPlanSlug}:${slug}`] ?? 0)
+      : 0;
+  };
+  const effOff = (cents: number, pct: number) =>
+    pct > 0 ? Math.max(100, Math.round(cents * (100 - pct) / 100)) : cents;
   const periodLabel: Record<BillingPeriod, string> = {
     mensal: t.pMonthly, trimestral: t.pQuarterly, anual: t.pYearly,
   };
@@ -128,7 +139,9 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
     const payload = pack
       ? { creditPack: true, packId: pack.id, method, currency: locale.currency, ...metaCookies() }
       : { planSlug, method, currency: locale.currency, period, ...metaCookies() };
-    const valueCents = pack ? packCents(pack) : disc(totalFor(lookup.find((p) => p.slug === planSlug)!));
+    const pixPlan = lookup.find((p) => p.slug === planSlug);
+    const valueCents = pack ? packCents(pack)
+      : effOff(totalFor(pixPlan!), effPctFor(planSlug));
     trackMeta("InitiateCheckout", {
       value: valueCents / 100,
       currency: locale.currency.toUpperCase(),
@@ -310,13 +323,23 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
           </div>;
         })() : <>
           <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : lookup.find((p) => p.slug === pix.plan)?.name}</h2>
-          <p className="plan-price pix-price">{money(pix.pack ? packCents(pix.pack) : disc(priceFor(lookup.find((p) => p.slug === pix.plan)!)))}{!pix.pack && <small>{t.perMonth}</small>}</p>
-          {!pix.pack && def.months > 1 && (
-            <p className="plan-billed-caption">
-              {money(disc(totalFor(lookup.find((p) => p.slug === pix.plan)!)))}
-              {" "}{period === "trimestral" ? t.billedTri : t.billedYear}
-            </p>
-          )}
+          {(() => {
+            const pp = lookup.find((p) => p.slug === pix.plan);
+            const pct = pix.pack ? 0 : effPctFor(pix.plan);
+            return <>
+              <p className="plan-price pix-price">
+                {money(pix.pack ? packCents(pix.pack) : effOff(priceFor(pp!), pct))}
+                {!pix.pack && <small>{t.perMonth}</small>}
+              </p>
+              {!pix.pack && pct > 0 && <span className="plan-off-tag">{pct}% {t.upgradeOff}</span>}
+              {!pix.pack && def.months > 1 && (
+                <p className="plan-billed-caption">
+                  {money(effOff(totalFor(pp!), pct))}
+                  {" "}{period === "trimestral" ? t.billedTri : t.billedYear}
+                </p>
+              )}
+            </>;
+          })()}
           {pix.qrCodeImage && <Image className="pix-qr" src={pix.qrCodeImage} alt="QR Code PIX" width={210} height={210} unoptimized />}
           {pix.qrCode && <div className="pix-code">
             <code>{pix.qrCode}</code>
