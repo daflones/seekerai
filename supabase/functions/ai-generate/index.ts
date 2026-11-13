@@ -3,7 +3,7 @@
 // como fallback gratuito — texto via chat/completions e imagem via genai.
 // Chaves ficam como secrets do Supabase; consome créditos.
 //
-// generate_site é um pipeline: usa imagens reais do contexto (Apify/Places)
+// generate_site é um pipeline: usa imagens reais do contexto (Serper/ScrapeCreators)
 // e, se faltar material visual, gera imagens dedicadas via modelo de imagem
 // antes de montar o HTML — sem emojis, visual high-end.
 
@@ -24,7 +24,7 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { getSecret } from "../_shared/secrets.ts";
-import { igCachePut, igMediaCached } from "../_shared/instagram.ts";
+import { igMediaCached } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
@@ -327,7 +327,7 @@ function siteLangFor(lead: Record<string, unknown>): string {
   return COUNTRY_LANG[pais] ?? "en";
 }
 
-/** languageCode pro Google Places / language do Apify / hl do Serper. */
+/** languageCode pro Places / hl do Serper. */
 function placesLang(lang: string): string {
   return { pt: "pt-BR", en: "en", es: "es", fr: "fr", de: "de", it: "it" }[lang] ?? "en";
 }
@@ -1490,24 +1490,7 @@ async function resolveLeadImageSources(
   add(lead.imagem);
   add(context.imagem);
 
-  // gphoto:places/.../photos/... precisa resolver via Places API.
-  const resolved = new Set<string>();
-  const googleKey = await getSecret("GOOGLE_PLACES_API_KEY");
-  for (const src of [asString(lead.imagem, 800), asString(context.imagem, 800)]) {
-    if (src?.startsWith("gphoto:") && googleKey) {
-      const ref = src.slice(7);
-      if (/^places\/[A-Za-z0-9_-]+\/photos\/[A-Za-z0-9_-]+$/.test(ref)) {
-        const res = await fetch(
-          `https://places.googleapis.com/v1/${ref}/media?maxWidthPx=1600&skipHttpRedirect=true&key=${googleKey}`,
-          { signal: AbortSignal.timeout(15_000) },
-        ).catch(() => null);
-        const data = res?.ok ? await res.json().catch(() => null) : null;
-        const uri = isRecord(data) ? asString(data.photoUri, 1200) : null;
-        if (uri) resolved.add(uri);
-      }
-    }
-  }
-  return [...resolved, ...sources].slice(0, MAX_SITE_IMAGES);
+  return [...sources].slice(0, MAX_SITE_IMAGES);
 }
 
 /** Baixa uma imagem remota → bytes, ou null se falhar. */
@@ -1534,8 +1517,6 @@ async function fetchVideoBytes(
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
 }
 
-const APIFY_PLACES_ACTOR = (optionalEnv("APIFY_PLACES_ACTOR") ?? "compass/crawler-google-places").replace("/", "~");
-const APIFY_IG_ACTOR = (optionalEnv("APIFY_IG_ACTOR") ?? "apify/instagram-scraper").replace("/", "~");
 
 interface PlaceReview { autor: string; nota: number; texto: string; quando?: string; foto?: string }
 interface PlaceDetails {
@@ -1605,7 +1586,7 @@ function parseOpeningHours(hours: string): [string, string][] | null {
     return `${String(hh).padStart(2, "0")}:${mm}`;
   };
   const out: [string, string][] = [];
-  // Separadores reais que chegam do Maps/Apify/Serper: "to", "às", "a",
+  // Separadores reais que chegam do Maps/Serper: "to", "às", "a",
   // "até", "until", "bis" e os traços – — -.
   const re = /(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?\s*(?:to|às|até|until|bis|a\b|–|—|-)\s*(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?/gi;
   let m: RegExpExecArray | null;
@@ -1613,93 +1594,6 @@ function parseOpeningHours(hours: string): [string, string][] | null {
   return out.length ? out : null;
 }
 
-/**
- * Avaliações + horários reais do Maps via Apify — o scraper da busca
- * roda com maxReviews: 0, então aqui fazemos uma chamada mirada só
- * quando o site está sendo gerado (até 6 reviews).
- */
-async function fetchPlaceDetails(lead: Record<string, unknown>, lang = "pt"): Promise<PlaceDetails> {
-  const empty: PlaceDetails = { reviews: [], imageUrls: [] };
-  const token = await getSecret("APIFY_API_TOKEN");
-  if (!token) return empty;
-  const nome = asString(lead.nome, 150) ?? "";
-  const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
-  // reviewsSort liga o scrape de reviews; placeIds é match exato quando o
-  // lead guardou o placeId real do Google (ChIJ...). Social/contatos ficam
-  // fora daqui — é crawl pesado que derruba a chamada inteira.
-  const placeId = asString(lead.place_id, 300);
-  const body = {
-    ...(placeId?.startsWith("ChIJ") ? { placeIds: [placeId] }
-      : { searchStringsArray: [`${nome} ${cidade}`.trim()] }),
-    maxCrawledPlacesPerSearch: 1,
-    maxReviews: 6,
-    reviewsSort: "newest",
-    maxImages: 10,
-    language: placesLang(lang),
-  };
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_PLACES_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=55`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(70_000) },
-  ).catch(() => null);
-  if (!res?.ok) {
-    console.error("[site] apify reviews falhou:", res?.status ?? "network");
-    return empty;
-  }
-  const items = (await res.json().catch(() => [])) as unknown[];
-  const place = isRecord(items[0]) ? items[0] : {};
-  // Fotos reais do Maps além da capa — galeria enriquecida com mídia do local.
-  const imageUrls = (Array.isArray(place.imageUrls) ? place.imageUrls : [])
-    .map((u) => asString(u, 800)).filter((u): u is string => Boolean(u)).slice(0, 6);
-
-  // Instagram do lugar via scrapeSocialMediaProfiles — chamada à parte e
-  // só quando o lead não tem @, porque esse crawl visita o site do lugar
-  // (lento) e não pode derrubar a chamada de reviews.
-  const instagramFromPlace = (p: Record<string, unknown>): string | undefined => {
-    const bags = [
-      ...(Array.isArray(p.instagrams) ? p.instagrams : []),
-      p.instagram, p.instagramUrl, p.website,
-    ];
-    for (const raw of bags) {
-      const match = asString(raw, 500)?.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]+)/i);
-      if (match) return `@${match[1]}`;
-    }
-    return undefined;
-  };
-  const instagram = instagramFromPlace(place);
-  const reviews = (Array.isArray(place.reviews) ? place.reviews : [])
-    .slice(0, 6).flatMap((r): PlaceReview[] => {
-      if (!isRecord(r)) return [];
-      const texto = asString(r.text ?? r.reviewText, 500);
-      const autor = asString(r.name ?? r.reviewerName, 80) ?? "Cliente";
-      if (!texto || texto.length < 12) return [];
-      return [{
-        autor,
-        nota: typeof r.stars === "number" ? r.stars : 5,
-        texto,
-        quando: asString(r.publishAt ?? r.publishedAtDate ?? r.reviewPublishedDate, 40) ?? undefined,
-        foto: asString(r.reviewerPhotoUrl ?? r.photoUrl, 800) ?? undefined,
-      }];
-    });
-
-  // Horários reais do Maps → horarios/horariosLabel determinísticos.
-  const horarios: Record<string, [string, string][] | null> = {};
-  const byDay = new Map<string, [string, string]>();
-  for (const d of Array.isArray(place.openingHours) ? place.openingHours : []) {
-    if (!isRecord(d)) continue;
-    const key = DAY_KEY[(asString(d.day, 20) ?? "").toLowerCase()];
-    if (!key) continue;
-    const windows = parseOpeningHours(asString(d.hours, 160) ?? "");
-    horarios[key] = windows;
-    byDay.set(key, [dayLabel(key, lang), windows ? windows.map((w) => `${w[0]} – ${w[1]}`).join(", ") : closedLabel(lang)]);
-  }
-  const horariosLabel = ["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []);
-  return {
-    reviews, imageUrls, instagram,
-    ...(horariosLabel.length ? { horarios, horariosLabel } : {}),
-    avaliacao: typeof place.totalScore === "number" ? place.totalScore : undefined,
-    totalAvaliacoes: typeof place.reviewsCount === "number" ? place.reviewsCount : undefined,
-  };
-}
 
 /** Extrai @ do HTML de um site (barato — uma requisição, sem Apify). */
 async function instagramFromWebsite(url: string): Promise<string | undefined> {
@@ -1720,112 +1614,9 @@ async function instagramFromWebsite(url: string): Promise<string | undefined> {
   return `@${h}`;
 }
 
-/**
- * Fallback quando a Apify está fora do ar (ex.: sem crédito): Google
- * Places (New) devolve reviews, horários, fotos e rating pelo place_id
- * que o lead já guarda da busca.
- */
-async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>, lang = "pt"): Promise<PlaceDetails> {
-  const empty: PlaceDetails = { reviews: [], imageUrls: [] };
-  const key = await getSecret("GOOGLE_PLACES_API_KEY");
-  if (!key) return empty;
-  const lc = placesLang(lang);
-  const MASK = "id,displayName,rating,userRatingCount,reviews,regularOpeningHours,photos,websiteUri";
-  const placeId = asString(lead.place_id, 300);
-  let place: Record<string, unknown> | null = null;
-  if (placeId) {
-    const res = await fetch(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=${lc}`,
-      { headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": MASK }, signal: AbortSignal.timeout(20_000) },
-    ).catch(() => null);
-    if (res?.ok) place = await res.json().catch(() => null) as Record<string, unknown>;
-    else console.error("[site] google places get falhou:", res?.status ?? "network");
-  }
-  if (!place) {
-    const nome = asString(lead.nome, 150) ?? "";
-    const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key, "X-Goog-FieldMask": MASK },
-      body: JSON.stringify({ textQuery: `${nome} ${cidade}`.trim(), languageCode: lc, maxResultCount: 1 }),
-      signal: AbortSignal.timeout(20_000),
-    }).catch(() => null);
-    const data = res?.ok ? await res.json().catch(() => null) : null;
-    if (!res?.ok) console.error("[site] google places search falhou:", res?.status ?? "network");
-    place = isRecord(data?.places?.[0]) ? data.places[0] : null;
-  }
-  if (!place) return empty;
-
-  const reviews = (Array.isArray(place.reviews) ? place.reviews : [])
-    .slice(0, 5).flatMap((r): PlaceReview[] => {
-      if (!isRecord(r)) return [];
-      const texto = isRecord(r.text) ? asString(r.text.text, 500) : undefined;
-      if (!texto || texto.length < 12) return [];
-      const autor = isRecord(r.authorAttribution)
-        ? asString(r.authorAttribution.displayName, 80)
-        : undefined;
-      return [{
-        autor: autor ?? "Cliente",
-        nota: typeof r.rating === "number" ? r.rating : 5,
-        texto,
-        quando: asString(r.relativePublishTimeDescription, 40) ?? undefined,
-        foto: isRecord(r.authorAttribution)
-          ? asString(r.authorAttribution.photoUri, 800) ?? undefined
-          : undefined,
-      }];
-    });
-
-  const hoursObj = isRecord(place.regularOpeningHours) ? place.regularOpeningHours : null;
-  // weekdayDescriptions já vem localizado ("segunda-feira: 09:00–19:00").
-  const horariosLabel: [string, string][] = (Array.isArray(hoursObj?.weekdayDescriptions)
-    ? hoursObj.weekdayDescriptions : [])
-    .flatMap((d): [string, string][] => {
-      const m = asString(d, 200)?.match(/^(.+?):\s*(.+)$/);
-      return m ? [[m[1][0].toUpperCase() + m[1].slice(1), m[2].trim()]] : [];
-    });
-  // Sem descriptions, monta dos períodos (day 0 = domingo).
-  if (!horariosLabel.length) {
-    const horarios: Record<string, [string, string][] | null> = {};
-    const byDay = new Map<string, [string, string]>();
-    for (const p of Array.isArray(hoursObj?.periods) ? hoursObj.periods : []) {
-      if (!isRecord(p) || !isRecord(p.open) || typeof p.open.day !== "number") continue;
-      const fmt = (t: Record<string, unknown>) =>
-        `${String(typeof t.hour === "number" ? t.hour : 0).padStart(2, "0")}:${String(typeof t.minute === "number" ? t.minute : 0).padStart(2, "0")}`;
-      const key2 = String(p.open.day);
-      const win = isRecord(p.close) ? `${fmt(p.open)} – ${fmt(p.close)}` : open24Label(lang);
-      if (!byDay.has(key2)) {
-        horarios[key2] = [isRecord(p.close) ? [fmt(p.open), fmt(p.close)] : ["00:00", "23:59"]];
-        byDay.set(key2, [dayLabel(key2, lang), win]);
-      }
-    }
-    horariosLabel.push(...["1", "2", "3", "4", "5", "6", "0"].flatMap((k) => byDay.get(k) ? [byDay.get(k)!] : []));
-  }
-
-  // Fotos do Maps: photos[].name → endpoint de mídia retorna photoUri.
-  const imageUrls = (await Promise.all(
-    (Array.isArray(place.photos) ? place.photos : []).slice(0, 4).map(async (ph) => {
-      if (!isRecord(ph) || typeof ph.name !== "string") return null;
-      const res = await fetch(
-        `https://places.googleapis.com/v1/${ph.name}/media?maxWidthPx=1600&skipHttpRedirect=true&key=${encodeURIComponent(key)}`,
-        { signal: AbortSignal.timeout(15_000) },
-      ).catch(() => null);
-      const data = res?.ok ? await res.json().catch(() => null) : null;
-      return isRecord(data) ? asString(data.photoUri, 800) : null;
-    }),
-  )).filter((u): u is string => Boolean(u));
-
-  const site = asString(place.websiteUri, 500);
-  const instagram = site ? await instagramFromWebsite(site) : undefined;
-  return {
-    reviews, imageUrls, instagram,
-    ...(horariosLabel.length ? { horariosLabel } : {}),
-    avaliacao: typeof place.rating === "number" ? place.rating : undefined,
-    totalAvaliacoes: typeof place.userRatingCount === "number" ? place.userRatingCount : undefined,
-  };
-}
 
 /**
- * Dados do Maps via Serper — cobre Apify/Google fora do ar.
+ * Dados do Maps via Serper — reviews, horários e foto do lugar.
  * /reviews devolve texto, data em pt-BR e thumbnail do avaliador;
  * /maps (só quando o lead não guarda cid) resolve o cid e traz
  * horários/rating do estabelecimento (~$0.002 a dupla chamada).
@@ -1833,12 +1624,13 @@ async function fetchPlaceDetailsGoogle(lead: Record<string, unknown>, lang = "pt
 interface SerperDetails {
   reviews: PlaceReview[];
   horariosLabel: [string, string][];
+  imageUrls: string[];
   avaliacao?: number;
   totalAvaliacoes?: number;
 }
 
 async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): Promise<SerperDetails> {
-  const empty: SerperDetails = { reviews: [], horariosLabel: [] };
+  const empty: SerperDetails = { reviews: [], horariosLabel: [], imageUrls: [] };
   // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
   const keys = [
     await getSecret("SERPER_API_KEY_5"),
@@ -1915,55 +1707,16 @@ async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): P
         foto: asString(user.thumbnail, 800) ?? undefined,
       }];
     });
+  const thumb = hit ? asString(hit.thumbnailUrl, 1200) : null;
   return {
     reviews,
     horariosLabel,
+    imageUrls: thumb ? [thumb] : [],
     avaliacao: hit && typeof hit.rating === "number" ? hit.rating : undefined,
     totalAvaliacoes: hit && typeof hit.ratingCount === "number" ? hit.ratingCount : undefined,
   };
 }
 
-/**
- * Descoberta pesada de Instagram: scrapeSocialMediaProfiles visita o site
- * do estabelecimento. Roda à parte — se demorar, não sacrifica reviews.
- */
-async function fetchPlaceInstagram(lead: Record<string, unknown>): Promise<string | null> {
-  const token = await getSecret("APIFY_API_TOKEN");
-  if (!token) return null;
-  const nome = asString(lead.nome, 150) ?? "";
-  const cidade = [asString(lead.cidade, 80), asString(lead.uf, 4)].filter(Boolean).join(" ");
-  const placeId = asString(lead.place_id, 300);
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_PLACES_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=85`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...(placeId?.startsWith("ChIJ") ? { placeIds: [placeId] }
-          : { searchStringsArray: [`${nome} ${cidade}`.trim()] }),
-        maxCrawledPlacesPerSearch: 1,
-        scrapeSocialMediaProfiles: {
-          facebooks: false, instagrams: true, youtubes: false, tiktoks: false,
-          twitters: false, linkedins: false, pinterests: false, discords: false,
-          githubs: false, patreons: false, telegrams: false, mediums: false,
-          spotifys: false, threads: false,
-        },
-        maxReviews: 0,
-        language: placesLang(siteLangFor(lead)),
-      }),
-      signal: AbortSignal.timeout(100_000),
-    },
-  ).catch(() => null);
-  if (!res?.ok) return null;
-  const items = (await res.json().catch(() => [])) as unknown[];
-  const p = isRecord(items[0]) ? items[0] : {};
-  const bags = [...(Array.isArray(p.instagrams) ? p.instagrams : []), p.instagram, p.instagramUrl, p.website];
-  for (const raw of bags) {
-    const match = asString(raw, 500)?.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9._%]+)/i);
-    if (match) return `@${match[1]}`;
-  }
-  return null;
-}
 
 interface IgMedia {
   images: string[];
@@ -1975,7 +1728,7 @@ interface IgMedia {
 }
 
 /**
- * Scraper de Instagram via Apify — pega posts do @ do lead:
+ * Scraper de Instagram via ScrapeCreators — pega posts do @ do lead:
  * imagens (displayUrl/sidecar), vídeos (videoUrl/reels) e legendas.
  * As legendas viram contexto pra IA (serviços/diferenciais reais) e
  * a mídia real re-hospedada popula galeria e reels do site.
@@ -1986,61 +1739,20 @@ async function fetchInstagramMedia(handleOrUrl: string | null | undefined): Prom
   const handle = raw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1] ?? raw.replace(/^@/, "").replace(/\/+$/, "");
   if (!/^[A-Za-z0-9._]{1,60}$/.test(handle)) return null;
 
-  // Fonte barata primeiro — cache (7d) + ScrapeCreators.
+  // Fonte única: cache (7d) + ScrapeCreators — sem Apify.
   try {
     const sc = await igMediaCached(handle);
-    if (sc && (sc.images.length || sc.videos.length || sc.captions.length)) return sc;
-  } catch { /* cai pro Apify */ }
-
-  const token = await getSecret("APIFY_API_TOKEN");
-  if (!token) return null;
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=80`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        directUrls: [`https://www.instagram.com/${handle}/`],
-        resultsType: "posts",
-        resultsLimit: 12,
-      }),
-      signal: AbortSignal.timeout(95_000),
-    },
-  ).catch(() => null);
-  if (!res?.ok) {
-    console.error("[site] apify instagram falhou:", res?.status ?? "network");
-    return { images: [], videos: [], captions: [], erro: `http:${res?.status ?? "network"}` };
-  }
-  const items = (await res.json().catch(() => [])) as unknown[];
-  const media: IgMedia = { images: [], videos: [], captions: [] };
-  if (!Array.isArray(items) || !items.length) media.erro = "vazio";
-  for (const item of items) {
-    if (!isRecord(item)) continue;
-    const caption = asString(item.caption, 600);
-    if (caption) media.captions.push(caption);
-    const type = asString(item.type, 40);
-    if (type === "Video" || asString(item.isVideo) === "true") {
-      const videoUrl = asString(item.videoUrl, 1200);
-      if (videoUrl) {
-        media.videos.push({ src: videoUrl, titulo: caption?.split("\n")[0]?.slice(0, 80) || "Reel" });
-      }
+    if (sc && (sc.images.length || sc.videos.length || sc.captions.length)) {
+      const media: IgMedia = {
+        images: sc.images.slice(0, 8),
+        videos: sc.videos.slice(0, 3),
+        captions: sc.captions.slice(0, 10),
+      };
+      return media;
     }
-    const pushImg = (v: unknown) => {
-      const u = asString(v, 1200);
-      if (u && u.startsWith("http")) media.images.push(u);
-    };
-    // Sidecar traz filhos em campos diferentes conforme a versão do actor.
-    const children = [item.images, item.childPosts, item.sidecarImages].filter(Array.isArray)[0] as unknown[] | undefined;
-    if (children?.length) for (const c of children) pushImg(isRecord(c) ? c.displayUrl ?? c.url : c);
-    else pushImg(item.displayUrl ?? item.imageUrl);
-  }
-  media.images = media.images.slice(0, 8);
-  media.videos = media.videos.slice(0, 2);
-  media.captions = media.captions.slice(0, 10);
-  if (!media.images.length && !media.videos.length && !media.erro) media.erro = "sem-midia";
-  // Apify também alimenta o cache — mesmo dado, fonte mais cara.
-  if (!media.erro) await igCachePut(handle, "media", media);
-  return media;
+    if (sc) return { images: [], videos: [], captions: [], erro: "sem-midia" };
+  } catch { /* sem chave/erro de rede → segue com cache vazio */ }
+  return { images: [], videos: [], captions: [], erro: "indisponivel" };
 }
 
 /** Upload pro bucket público site-assets, com retry — Storage falha intermitente. */
@@ -2496,48 +2208,30 @@ async function publishPremiumSite(
   onStep?.(30, "Coletando Maps e Instagram");
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  // Scrapes secundários em paralelo — Apify demora e o gateway corta em
-  // ~150s, então cada consumidor faz race com um cap próprio.
-  // Apify primeiro; sem reviews/horários (ex.: sem crédito) o Google
-  // Places cobre com os dados que o place_id do lead já referencia.
+  // Reviews/horários/foto do Maps vêm SÓ do Serper — sem Apify nem
+  // Google Places. Instagram sai do @ do lead ou do HTML do site.
   const placePromise = (async () => {
-    const ap = await fetchPlaceDetails(lead, siteLang);
-    if (ap.reviews.length || ap.horariosLabel?.length) return ap;
-    console.log("[site] apify vazio — fallback Google Places");
-    const g = await fetchPlaceDetailsGoogle(lead, siteLang);
-    const merged = {
-      reviews: ap.reviews.length ? ap.reviews : g.reviews,
-      imageUrls: ap.imageUrls.length ? ap.imageUrls : g.imageUrls,
-      instagram: ap.instagram ?? g.instagram,
-      horarios: ap.horarios ?? g.horarios,
-      horariosLabel: ap.horariosLabel ?? g.horariosLabel,
-      avaliacao: ap.avaliacao ?? g.avaliacao,
-      totalAvaliacoes: ap.totalAvaliacoes ?? g.totalAvaliacoes,
+    const sp = await fetchSerperReviews(lead, siteLang);
+    const site = asString(lead.site, 500);
+    const instagram = asString(lead.instagram, 300)
+      ?? (site ? await instagramFromWebsite(site) : undefined);
+    return {
+      reviews: sp.reviews,
+      imageUrls: sp.imageUrls,
+      instagram,
+      horarios: undefined,
+      horariosLabel: sp.horariosLabel.length ? sp.horariosLabel : undefined,
+      avaliacao: sp.avaliacao,
+      totalAvaliacoes: sp.totalAvaliacoes,
     };
-    // Faltou reviews/fotos ou horários → Serper cobre os três de uma vez.
-    if (!merged.reviews.length || !merged.reviews.some((r) => r.foto)
-      || !merged.horariosLabel?.length || !merged.avaliacao) {
-      const sp = await fetchSerperReviews(lead, siteLang);
-      if (sp.reviews.length
-        && (!merged.reviews.length || !merged.reviews.some((r) => r.foto))) {
-        merged.reviews = sp.reviews;
-      }
-      merged.horariosLabel = merged.horariosLabel?.length
-        ? merged.horariosLabel : (sp.horariosLabel.length ? sp.horariosLabel : undefined);
-      merged.avaliacao = merged.avaliacao ?? sp.avaliacao;
-      merged.totalAvaliacoes = merged.totalAvaliacoes ?? sp.totalAvaliacoes;
-    }
-    return merged;
   })();
-  // Instagram: o @ do lead (vem do Maps) dispara o scrape já; sem @, tenta
-  // o website do place e, por último, a descoberta social (crawl pesado).
+  // Instagram: o @ do lead (vem do Serper) dispara o scrape já; sem @,
+  // o placePromise já procurou no HTML do site.
   const igPromise = (async () => {
     let handle = asString(lead.instagram, 300) ?? null;
     if (!handle) {
       const place = await placePromise;
-      handle = place.instagram ?? (await fetchPlaceInstagram(lead))
-        ?? (asString(lead.site, 500) ? await instagramFromWebsite(asString(lead.site, 500)!) : null)
-        ?? null;
+      handle = place.instagram ?? null;
       if (handle) {
         await db.from("leads").update({ instagram: handle }).eq("id", leadId).is("instagram", null);
       }
@@ -2583,7 +2277,7 @@ async function publishPremiumSite(
     return configPatchFromAi(apiKey, lead, extra ? `\n${extra}` : "", siteLang);
   })();
 
-  // 1) Imagens reais: baixa e re-hospeda (URLs do Google/Apify expiram).
+  // 1) Imagens reais: baixa e re-hospeda (URLs de terceiros expiram).
   const sources = await resolveLeadImageSources(lead, context);
   // Instagram é bonus — não pode segurar o pipeline. Com @ no lead o
   // scrape é direto; sem @ a descoberta social pode demorar mais.

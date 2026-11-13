@@ -1,6 +1,6 @@
 // Instagram via ScrapeCreators — fonte barata primária com fallback de
 // key (duas contas) e cache por handle no ig_cache (TTL 7 dias).
-// O Apify continua como fallback de última instância nos callers.
+// Sem fallback externo — cache + ScrapeCreators apenas.
 
 import { isRecord, serviceClient } from "./common.ts";
 import { getSecret } from "./secrets.ts";

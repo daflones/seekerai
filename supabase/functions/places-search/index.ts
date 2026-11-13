@@ -1,6 +1,5 @@
-// Busca de estabelecimentos — provedor configurável no admin (app_settings):
-//   "google_places" → Places API (New) Text Search
-//   "apify"         → Actor compass~crawler-google-places (run-sync)
+// Busca de estabelecimentos — provedor único: Serper (/maps, keys 5–7).
+// Instagram enriquecido via ScrapeCreators + cache (sem Apify).
 // Consome créditos (ação 'search'). Chaves ficam como secrets do Supabase.
 
 import {
@@ -18,33 +17,11 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { getSecret, getSetting, requireSecret } from "../_shared/secrets.ts";
-import { igProfileCached, igCachePut } from "../_shared/instagram.ts";
+import { igProfileCached } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-const FIELD_MASK = [
-  "places.id",
-  "places.displayName",
-  "places.formattedAddress",
-  "places.nationalPhoneNumber",
-  "places.internationalPhoneNumber",
-  "places.websiteUri",
-  "places.rating",
-  "places.userRatingCount",
-  "places.businessStatus",
-  "places.primaryTypeDisplayName",
-  "places.regularOpeningHours.openNow",
-  "places.regularOpeningHours.weekdayDescriptions",
-  "places.addressComponents",
-  "places.photos",
-  // Paginação: o token é campo top-level da resposta — sem ele na
-  // máscara a API nunca devolve e só viria a 1ª página (20).
-  "nextPageToken",
-].join(",");
-
-const APIFY_ACTOR = "compass~crawler-google-places";
 
 interface SearchBody {
   query?: string;
@@ -97,171 +74,6 @@ interface IgProfile {
 interface SiteCheck {
   estado: "bom" | "ok" | "desatualizado" | "fora";
   sinais: string[];
-}
-
-async function searchGooglePlaces(query: string, regionCode: string, pages = 1): Promise<NormalizedPlace[]> {
-  const key = await requireSecret("GOOGLE_PLACES_API_KEY");
-  const all: Record<string, unknown>[] = [];
-  let pageToken: string | null = null;
-  for (let p = 0; p < pages; p++) {
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": FIELD_MASK,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        textQuery: query,
-        languageCode: "pt-BR",
-        regionCode,
-        pageSize: 20,
-        ...(pageToken ? { pageToken } : {}),
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) {
-      const detail = isRecord(data.error) ? asString(data.error.message, 300) : null;
-      console.error("[places-search] Google respondeu", res.status, detail ?? "");
-      // Primeira página falhou = provedor fora; página seguinte falhou =
-      // devolve o que já veio em vez de perder a busca toda.
-      if (!all.length) throw httpError(502, "Google Places indisponível no momento");
-      break;
-    }
-    const batch = (Array.isArray(data.places) ? data.places : []) as Record<string, unknown>[];
-    all.push(...batch);
-    pageToken = asString(data.nextPageToken, 300);
-    if (!pageToken || !batch.length) break;
-    // O pageToken só fica válido alguns segundos depois de emitido.
-    if (p < pages - 1) await sleep(2000);
-  }
-  return all.map((p) => {
-    const place = isRecord(p) ? p : {};
-    // País/cidade/bairro saem dos addressComponents — alimenta o código de
-    // discagem correto pra verificação de WhatsApp em qualquer país.
-    const comps = (Array.isArray(place.addressComponents) ? place.addressComponents : [])
-      .filter(isRecord);
-    const comp = (...types: string[]) =>
-      comps.find((c) =>
-        Array.isArray(c.types) && types.some((t) => (c.types as unknown[]).includes(t)));
-    return {
-      id: asString(place.id, 300),
-      nome: isRecord(place.displayName) ? asString(place.displayName.text) : null,
-      endereco: asString(place.formattedAddress),
-      bairro: asString(comp("neighborhood", "sublocality_level_1")?.longText, 150),
-      cidade: asString(comp("locality", "postal_town", "administrative_area_level_2")?.longText, 150),
-      uf: asString(comp("administrative_area_level_1")?.shortText, 50),
-      pais: asString(comp("country")?.shortText, 2)?.toUpperCase() ?? null,
-      // Internacional primeiro: vem com "+DDI" e alimenta a verificação de WhatsApp.
-      telefone: asString(place.internationalPhoneNumber ?? place.nationalPhoneNumber),
-      site: asString(place.websiteUri, 500),
-      avaliacao: typeof place.rating === "number" ? place.rating : null,
-      totalAvaliacoes:
-        typeof place.userRatingCount === "number" ? place.userRatingCount : null,
-      status: asString(place.businessStatus),
-      categoria: isRecord(place.primaryTypeDisplayName)
-        ? asString(place.primaryTypeDisplayName.text)
-        : null,
-      mapsUrl: null,
-      // Referência da foto (places/.../photos/...) — resolvida via /api/place-photo,
-      // assim a chave do Google nunca chega ao navegador.
-      imagem: (() => {
-        const photos = Array.isArray(place.photos) ? place.photos : [];
-        const name = isRecord(photos[0]) ? asString(photos[0].name, 500) : null;
-        return name ? `gphoto:${name}` : null;
-      })(),
-      lat: null,
-      lng: null,
-      whatsapp: null,
-      instagram: null,
-      horariosLabel: parseWeekdayDescriptions(
-        isRecord(place.regularOpeningHours)
-          ? place.regularOpeningHours.weekdayDescriptions
-          : null,
-      ),
-    };
-  });
-}
-
-/** "segunda-feira: 09:00–19:00" (já localizado) → ["Segunda-feira","09:00–19:00"]. */
-function parseWeekdayDescriptions(list: unknown): [string, string][] | null {
-  const out = (Array.isArray(list) ? list : [])
-    .flatMap((d): [string, string][] => {
-      const m = asString(d, 200)?.match(/^(.+?):\s*(.+)$/);
-      if (!m) return [];
-      return [[m[1][0].toUpperCase() + m[1].slice(1), m[2].trim()]];
-    });
-  return out.length ? out : null;
-}
-
-const DAY_PT_SEARCH: Record<string, string> = {
-  monday: "Segunda", tuesday: "Terça", wednesday: "Quarta", thursday: "Quinta",
-  friday: "Sexta", saturday: "Sábado", sunday: "Domingo",
-};
-
-async function searchApify(query: string, target = 20): Promise<NormalizedPlace[]> {
-  const token = await requireSecret("APIFY_API_TOKEN");
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        searchStringsArray: [query],
-        maxCrawledPlacesPerSearch: target,
-        language: "pt-BR",
-        maxReviews: 0,
-      }),
-      signal: AbortSignal.timeout(120_000),
-    },
-  );
-  const items = (await res.json().catch(() => [])) as unknown;
-  if (!res.ok) throw httpError(502, "Apify indisponível no momento");
-  return (Array.isArray(items) ? items : []).map((item) => {
-    const p = isRecord(item) ? item : {};
-    const loc = isRecord(p.location) ? p.location : {};
-    return {
-      id: asString(p.placeId ?? p.fid ?? p.cid, 300),
-      nome: asString(p.title),
-      endereco: asString(p.address, 500),
-      bairro: asString(p.neighborhood),
-      cidade: asString(p.city),
-      uf: asString(p.state),
-      telefone: asString(p.phone ?? p.phoneUnformatted),
-      site: asString(p.website, 500),
-      avaliacao: typeof p.totalScore === "number" ? p.totalScore : null,
-      totalAvaliacoes: typeof p.reviewsCount === "number" ? p.reviewsCount : null,
-      status: p.permanentlyClosed === true
-        ? "CLOSED_PERMANENTLY"
-        : p.temporarilyClosed === true
-          ? "CLOSED_TEMPORARILY"
-          : "OPERATIONAL",
-      categoria: asString(p.categoryName) ??
-        (Array.isArray(p.categories) && typeof p.categories[0] === "string"
-          ? p.categories[0]
-          : null),
-      mapsUrl: asString(p.url, 800),
-      imagem: asString(p.imageUrl, 800),
-      lat: typeof loc.lat === "number" ? loc.lat : null,
-      lng: typeof loc.lng === "number" ? loc.lng : null,
-      pais: asString(p.countryCode, 2)?.toUpperCase() ?? null,
-      whatsapp: null,
-      instagram: asString(p.instagramUrl ?? p.instagram, 300) ?? null,
-      // openingHours: [{day:"Monday", hours:"9:00 AM to 7:00 PM"}] — os
-      // horários reais do Maps chegam ao site via dados.horariosLabel.
-      horariosLabel: (() => {
-        const out = (Array.isArray(p.openingHours) ? p.openingHours : [])
-          .flatMap((d): [string, string][] => {
-            if (!isRecord(d)) return [];
-            const day = DAY_PT_SEARCH[(asString(d.day, 30) ?? "").toLowerCase()];
-            const hours = asString(d.hours, 120);
-            return day && hours ? [[day, hours]] : [];
-          });
-        return out.length ? out : null;
-      })(),
-    };
-  });
 }
 
 /**
@@ -385,30 +197,9 @@ function extractInstagram(place: NormalizedPlace): void {
   }
 }
 
-const APIFY_IG_ACTOR = "apify~instagram-scraper";
-
-async function igApifyCall(token: string, body: Record<string, unknown>, timeoutMs: number): Promise<unknown[]> {
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${Math.round(timeoutMs / 1000)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs + 15_000),
-    },
-  ).catch(() => null);
-  if (!res?.ok) {
-    console.error("[ig-enrich] apify falhou:", res?.status ?? "network");
-    return [];
-  }
-  const items = (await res.json().catch(() => [])) as unknown[];
-  return Array.isArray(items) ? items : [];
-}
-
 /**
- * Enriquecimento Instagram: depois que o Maps revela o @, uma chamada
- * batelada no instagram-scraper traz perfil (seguidores/posts/foto/bio)
- * e os últimos posts (média de curtidas + mídia/legendas pro site).
+ * Enriquecimento Instagram: depois que o Maps revela o @, o perfil
+ * (seguidores/posts/foto/bio) vem do cache (7d) + ScrapeCreators.
  * Cap por plano (8 base, até 16) e corrido com timeout — nunca
  * derruba a busca.
  */
@@ -431,70 +222,13 @@ async function enrichInstagram(places: NormalizedPlace[], cap = 8): Promise<void
     }
   };
 
-  // Fonte 1: cache (7d) + ScrapeCreators — barato, por handle.
-  const misses: NormalizedPlace[] = [];
+  // Fonte única: cache (7d) + ScrapeCreators — barato, por handle.
   await Promise.all(comIg.map(async (p) => {
-    const handle = p.instagram!.replace(/^@/, "");
     try {
-      const prof = await igProfileCached(handle);
+      const prof = await igProfileCached(p.instagram!.replace(/^@/, ""));
       if (prof) applyProfile(p, prof);
-      else misses.push(p);
-    } catch {
-      misses.push(p);
-    }
+    } catch { /* sem perfil — segue sem dados de IG */ }
   }));
-  if (!misses.length) return;
-
-  // Fonte 2: Apify batelado — só pros que o ScrapeCreators não achou.
-  let token: string;
-  try {
-    token = await requireSecret("APIFY_API_TOKEN");
-  } catch {
-    return;
-  }
-  // instagram pode vir como "@user", "user" ou URL completa — extrai o handle.
-  const igHandleOf = (v: string) => {
-    const m = v.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9_.]+)/i);
-    return (m ? m[1] : v.replace(/^@+/, "")).replace(/\/+$/, "");
-  };
-  const urls = misses
-    .map((p) => igHandleOf(p.instagram!))
-    .filter((h) => /^[A-Za-z0-9_.]{1,30}$/.test(h))
-    .map((h) => `https://www.instagram.com/${h}/`);
-  // Uma chamada só: "details" volta rápido (~10s) e já traz latestPosts
-  // com curtidas — o resultsType "posts" estoura o tempo e nunca retorna.
-  const details = await Promise.race([
-    igApifyCall(token, { directUrls: urls, resultsType: "details", resultsLimit: misses.length }, 55_000),
-    sleep(48_000).then(() => [] as unknown[]),
-  ]);
-
-  const profiles = new Map<string, Record<string, unknown>>();
-  for (const d of details) {
-    if (!isRecord(d)) continue;
-    const uname = asString(d.username, 80)?.toLowerCase();
-    if (uname) profiles.set(uname, d);
-  }
-  for (const p of misses) {
-    const uname = p.instagram!.replace(/^@/, "").toLowerCase();
-    const prof = profiles.get(uname);
-    if (!prof) continue;
-    const recent = (Array.isArray(prof.latestPosts) ? prof.latestPosts : [])
-      .filter(isRecord);
-    const likes = recent
-      .map((post) => (typeof post.likesCount === "number" ? post.likesCount : null))
-      .filter((n): n is number => n !== null);
-    const normalized = {
-      seguidores: typeof prof.followersCount === "number" ? prof.followersCount : null,
-      posts: typeof prof.postsCount === "number" ? prof.postsCount
-        : recent.length || null,
-      curtidas: likes.length ? Math.round(likes.reduce((a, b) => a + b, 0) / likes.length) : null,
-      foto: asString(prof.profilePicUrl, 1000),
-      bio: asString(prof.biography, 600),
-      verificado: prof.verified === true,
-    };
-    applyProfile(p, normalized);
-    await igCachePut(uname, "perfil", normalized);
-  }
 }
 
 /** Extrai o @ do Instagram dos links do HTML (grátis — já baixado no scan). */
@@ -811,7 +545,7 @@ Deno.serve(async (req) => {
       if (isDemo) resultados = resultados.slice(0, 15);
       for (const place of resultados) extractInstagram(place);
       const igCap = Math.min(16, Math.max(8, Math.ceil(planTarget / 4)));
-      // Handles já conhecidos (Apify/Maps/site=instagram.com) enriquecem
+      // Handles já conhecidos (Serper/Maps/site=instagram.com) enriquecem
       // EM PARALELO com a varredura de sites — antes o IG só começava
       // depois de tudo e somava até ~55s na cauda da busca. Os @ que a
       // varredura descobrir no HTML entram num segundo passe curto.
