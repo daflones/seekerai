@@ -103,7 +103,7 @@ const server = createServer(async (req, res) => {
     const request = new Request(`http://gen.local${url.pathname}${url.search}`, {
       method: req.method,
       headers,
-      body: bodyBuf.length ? bodyBuf : undefined,
+      body: bodyBuf.length ? new Uint8Array(bodyBuf) : undefined,
     });
     const response = await handle(request);
 

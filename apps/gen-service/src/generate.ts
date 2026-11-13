@@ -286,6 +286,8 @@ interface GenerateBody {
   prompt?: string;
   lang?: string;
   context?: Record<string, unknown>;
+  jobId?: string;
+  jobTable?: string;
 }
 
 // Nome do idioma pra instrução de sistema — o modelo responde na língua do usuário.
@@ -2573,8 +2575,9 @@ async function publishPremiumSite(
       ?? nicheVocab(nicho?.paleta ?? paleta, asString(lead.categoria, 150));
     // Fotos reais descritas pela visão — o redator casa cada serviço à
     // foto certa pelo índice (card de destaque com foto, estilo Porem).
-    const fotos = descsPromise
-      ? (await Promise.race([descsPromise, sleep(50_000).then(() => [])]))
+    const descsNow = descsPromise as Promise<{ i: number; d: string | null }[]> | null;
+    const fotos = descsNow
+      ? (await Promise.race([descsNow, sleep(50_000).then(() => [] as { i: number; d: string | null }[])]))
         .filter((x) => x.d)
       : [];
     const extra = [
@@ -2684,7 +2687,7 @@ async function publishPremiumSite(
       if (!dl) continue;
       const ext = dl.contentType.includes("png") ? "png" : dl.contentType.includes("webp") ? "webp" : "jpg";
       const url = await uploadSiteAsset(db, slug, `ai-${++i}.${ext}`, dl.bytes, dl.contentType);
-      if (url) publicUrls.push({ url, real: false });
+      if (url) publicUrls.push({ url, real: false, src: -1 });
     }
   }
 
@@ -3130,7 +3133,7 @@ export async function handle(req: Request): Promise<Response> {
 
       // Só o prompt — a pessoa copia e usa na IA que quiser (grátis).
       if (action === "image_prompt") {
-        const enhanced = await enhanceImagePrompt(prompt, context);
+        const enhanced = await enhanceImagePrompt(prompt ?? "", context);
         await settleAction(db, user.id, requestRef, "completed");
         return json({ conteudo: enhanced, modelo: NVIDIA_TEXT_MODEL, creditosCobrados: reservation.cost });
       }
@@ -3140,7 +3143,7 @@ export async function handle(req: Request): Promise<Response> {
       if (action === "generate_app") {
         try {
           await reportJob(25, "Recebendo o pedido");
-          const app = await generateAppHtml(apiKey, prompt, context,
+          const app = await generateAppHtml(apiKey, prompt ?? "", context,
             (p, e) => { void reportJob(p, e); });
           await reportJob(85, "Montando o HTML");
           await settleAction(db, user.id, requestRef, "completed");
@@ -3189,7 +3192,7 @@ export async function handle(req: Request): Promise<Response> {
       // Imagem avulsa: o pedido do usuário vira prompt em inglês otimizado
       // com a identidade do estabelecimento embutida.
       const enhancedImagePrompt = action === "generate_image"
-        ? await enhanceImagePrompt(prompt, context)
+        ? await enhanceImagePrompt(prompt ?? "", context)
         : null;
 
       const userContent = action === "generate_image"
@@ -3222,8 +3225,8 @@ export async function handle(req: Request): Promise<Response> {
             `HTML ATUAL:\n${asString(context.html, 250_000) ?? ""}`,
           ].filter(Boolean).join("\n\n")
         : body.context
-          ? `${prompt}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
-          : prompt;
+          ? `${prompt ?? ""}\n\nContexto do estabelecimento:\n${JSON.stringify(context)}`
+          : prompt ?? "";
 
       // editor_assist com anexos: as URLs vão como texto (fallbacks
       // sem visão ainda conseguem inserir como <img src>) E como
