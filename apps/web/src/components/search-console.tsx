@@ -23,6 +23,9 @@ const STORE_KEY = "seekerai_search_v1";
 // 8min — a busca inteligente expande pra região vizinha e pode levar
 // vários minutos; o feed ao vivo (SSE) mostra o progresso real.
 const SLOW_MS = 70_000;
+// O aviso "demorando" só aparece se o radar ESTAGNAR — evento ou card
+// novo zera o relógio. Busca ativa encontrando leads nunca mostra o aviso.
+const STALL_MS = 75_000;
 const DEAD_MS = 480_000;
 
 interface SearchResponse {
@@ -119,6 +122,8 @@ export function SearchConsole({
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   const deadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sseRef = useRef<EventSource | null>(null);
+  // Última atividade real do job (evento ou estabelecimento ao vivo).
+  const lastAct = useRef<number>(0);
 
   // Persistência: resultado e job ativo sobrevivem a troca de página/aba.
   function store(state: StoredState) {
@@ -157,6 +162,9 @@ export function SearchConsole({
       es.onmessage = (m) => {
         try {
           const e = JSON.parse(m.data) as GenEvent & { achados?: PlaceResult[] };
+          if ((Array.isArray(e.achados) && e.achados.length) || e.etapa) {
+            lastAct.current = Date.now();
+          }
           if (Array.isArray(e.achados) && e.achados.length) {
             setLivePlaces((cur) => {
               const seen = new Set(cur.map((p) => p.id ?? `${p.nome}|${p.imagem}`));
@@ -214,6 +222,8 @@ export function SearchConsole({
     setTimedOut(false);
     clearLive();
     setJobStart(Date.now());
+    lastAct.current = Date.now();
+    setSlow(false);
     openStream(jobId);
     // Backstop: se nenhum tick responder, corta mesmo assim.
     deadTimer.current = setTimeout(() => cancelSearch(true), DEAD_MS);
@@ -226,11 +236,17 @@ export function SearchConsole({
           const job = data.job;
           // Fallback sem SSE: eventos persistidos no banco alimentam o chat.
           if (Array.isArray(job.eventos) && job.eventos.length) {
-            setLiveEvents((cur) => mergeEvents(cur, job.eventos!));
+            setLiveEvents((cur) => {
+              const next = mergeEvents(cur, job.eventos!);
+              if (next !== cur) lastAct.current = Date.now();
+              return next;
+            });
           }
           // Idade real do job — restaurado de outra aba já conta o tempo certo.
           const elapsed = Date.now() - new Date(job.created_at).getTime();
-          if (elapsed >= SLOW_MS) setSlow(true);
+          // Aviso só com radar parado: passou do mínimo E nada novo há
+          // STALL_MS. Job encontrando coisas ao vivo nunca dispara.
+          setSlow(elapsed >= SLOW_MS && Date.now() - lastAct.current > STALL_MS);
           if (elapsed >= DEAD_MS) { cancelSearch(true); return; }
           if (job.status === "done" && job.result) {
             applyDone(job.result);
