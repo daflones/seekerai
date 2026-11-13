@@ -68,6 +68,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
   const imgInput = useRef<HTMLInputElement>(null);
   const vidInput = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamRef = useRef<EventSource | null>(null);
   const popRef = useRef<HTMLDivElement>(null);
 
   const imgCount = refs.filter(r => r.kind === "image").length;
@@ -107,27 +108,57 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (streamRef.current) { streamRef.current.close(); streamRef.current = null; }
+  }
+
+  // Um fetch de status — usado pelo poll de segurança e pelo evento
+  // terminal do SSE (done/erro chega instantâneo pelo stream).
+  async function checkProject(id: string): Promise<boolean> {
+    try {
+      const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${id}`);
+      if (!p) return false;
+      if (p.status === "running") {
+        // Sem SSE (edge fallback), o poll alimenta o feed pelo banco.
+        if (streamRef.current?.readyState !== 1) {
+          setLive({ progresso: p.progresso ?? 0, etapa: p.etapa ?? null, eventos: p.eventos ?? [] });
+        }
+        return false;
+      }
+      stopPoll();
+      setRunning(false);
+      setLive(null);
+      setProject(p);
+      if (p.status === "error") setError(p.erro ?? t.failed);
+      else setPreview(p.target);
+      void refreshHistory();
+      return true;
+    } catch { return false; }
+  }
+
+  // SSE do Gen Service: eventos de progresso em tempo real. Se o serviço
+  // não existir (edge fallback), o EventSource falha quieto e o poll
+  // de 3s continua cobrindo — com os eventos do banco como antes.
+  function startStream(id: string) {
+    if (streamRef.current) streamRef.current.close();
+    const es = new EventSource(`/api/gen-stream/${id}`);
+    streamRef.current = es;
+    es.onmessage = (m) => {
+      try {
+        const e = JSON.parse(m.data) as GenEvent & { done?: boolean; erro?: string };
+        setLive((prev) => ({
+          progresso: e.p ?? prev?.progresso ?? 0,
+          etapa: e.etapa ?? prev?.etapa ?? null,
+          eventos: [...(prev?.eventos ?? []), e],
+        }));
+        if (typeof e.done === "boolean") void checkProject(id);
+      } catch { /* keep-alive/ping ou payload estranho */ }
+    };
   }
 
   function startPoll(id: string) {
     stopPoll();
-    pollRef.current = setInterval(async () => {
-      try {
-        const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${id}`);
-        if (!p) return;
-        if (p.status === "running") {
-          setLive({ progresso: p.progresso ?? 0, etapa: p.etapa ?? null, eventos: p.eventos ?? [] });
-          return;
-        }
-        stopPoll();
-        setRunning(false);
-        setLive(null);
-        setProject(p);
-        if (p.status === "error") setError(p.erro ?? t.failed);
-        else setPreview(p.target);
-        void refreshHistory();
-      } catch { /* tenta no próximo tick */ }
-    }, 3000);
+    startStream(id);
+    pollRef.current = setInterval(() => { void checkProject(id); }, 5000);
   }
 
   async function onPick(files: FileList | null, kind: "image" | "video") {

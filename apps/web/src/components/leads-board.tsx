@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight, Building2, CheckCircle2, ChevronLeft, ChevronRight,
@@ -45,6 +45,14 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
   t?: Messages["leadsPage"];
 }) {
   const lt = getMessages(lang).lead;
+
+  // Limpa polls/streams de geração ao desmontar o quadro.
+  useEffect(() => () => {
+    for (const cur of Object.values(sitePollers.current)) {
+      if (cur.poll) clearInterval(cur.poll);
+      cur.stream?.close();
+    }
+  }, []);
   const [leads, setLeads] = useState(initialLeads);
   const [done, setDone] = useState<Record<string, Set<string>>>(() =>
     Object.fromEntries(Object.entries(doneByLead).map(([k, v]) => [k, new Set(v)])));
@@ -56,6 +64,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
   const [wonLead, setWonLead] = useState<LeadRow | null>(null);
   const [wonValue, setWonValue] = useState("");
   const [siteJobs, setSiteJobs] = useState<Record<string, { progresso: number; etapa: string | null; eventos: GenEvent[] }>>({});
+  const sitePollers = useRef<Record<string, { poll?: ReturnType<typeof setInterval>; stream?: EventSource }>>({});
 
   function markDone(leadId: string, kind: string) {
     setDone((d) => ({ ...d, [leadId]: new Set([...(d[leadId] ?? []), kind]) }));
@@ -158,21 +167,49 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       setSiteJobs((m) => ({ ...m, [lead.id]: {
         progresso: j.progresso ?? 0, etapa: j.etapa ?? null, eventos: j.eventos ?? [],
       } }));
-    const poller = setInterval(async () => {
+    const clearJob = () => {
+      const cur = sitePollers.current[lead.id];
+      if (cur?.poll) clearInterval(cur.poll);
+      cur?.stream?.close();
+      delete sitePollers.current[lead.id];
+      setSiteJobs((m) => { const n = { ...m }; delete n[lead.id]; return n; });
+      setBusy(null);
+    };
+    const check = async () => {
       const r = await fetch(`/api/ai-jobs/${data.jobId}`, { cache: "no-store" }).catch(() => null);
       const j = r ? (await r.json().catch(() => null)) as { job?: { status: string; erro?: string | null; progresso?: number; etapa?: string | null; eventos?: GenEvent[] } } | null : null;
       if (!j?.job) return;
-      if (j.job.status === "running") { setJob(j.job); return; }
-      clearInterval(poller);
-      setSiteJobs((m) => { const n = { ...m }; delete n[lead.id]; return n; });
-      setBusy(null);
+      if (j.job.status === "running") {
+        // Sem SSE (edge fallback), o poll alimenta o feed pelo banco.
+        if (sitePollers.current[lead.id]?.stream?.readyState !== 1) setJob(j.job);
+        return;
+      }
+      clearJob();
       if (j.job.status === "done") {
         markDone(lead.id, "generate_site");
         notice(lead.id, `${t.actSite} — ${t.generated}`);
       } else if (j.job.status === "error") {
         setError(j.job.erro ?? "Erro");
       }
-    }, 4000);
+    };
+    // SSE do Gen Service — eventos em tempo real; falha quieta quando a
+    // edge responde (sem serviço) e o poll cobre com os eventos do banco.
+    const stream = new EventSource(`/api/gen-stream/${data.jobId}`);
+    stream.onmessage = (m) => {
+      try {
+        const e = JSON.parse(m.data) as GenEvent & { done?: boolean };
+        setSiteJobs((prev) => ({ ...prev, [lead.id]: {
+          progresso: e.p ?? prev[lead.id]?.progresso ?? 0,
+          etapa: e.etapa ?? prev[lead.id]?.etapa ?? null,
+          eventos: [...(prev[lead.id]?.eventos ?? []), e],
+        } }));
+        if (typeof e.done === "boolean") void check();
+      } catch { /* ping */ }
+    };
+    sitePollers.current[lead.id] = {
+      stream,
+      poll: setInterval(() => { void check(); }, 5000),
+    };
   }
 
   async function generate(lead: LeadRow, kind: ActionKind) {

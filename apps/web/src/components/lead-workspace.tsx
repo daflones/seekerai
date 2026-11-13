@@ -108,37 +108,64 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
   const siteAbsoluteUrl = () =>
     siteSlug ? `${window.location.origin}/site/${siteSlug}` : "";
   const sitePoller = useRef<ReturnType<typeof setInterval> | null>(null);
+  const siteStream = useRef<EventSource | null>(null);
   const [siteActivity, setSiteActivity] = useState<{ progresso: number; etapa: string | null; eventos: GenEvent[] } | null>(null);
+
+  function stopSiteWatch() {
+    if (sitePoller.current) clearInterval(sitePoller.current);
+    sitePoller.current = null;
+    siteStream.current?.close();
+    siteStream.current = null;
+  }
+
+  // Um fetch de status — poll de segurança + evento terminal do SSE.
+  async function checkSiteJob(jobId: string): Promise<boolean> {
+    const res = await fetch(`/api/ai-jobs/${jobId}`, { cache: "no-store" }).catch(() => null);
+    const data = res ? (await res.json().catch(() => null)) as { job?: { status: string; erro?: string | null; progresso?: number; etapa?: string | null; eventos?: GenEvent[] } } | null : null;
+    if (!data?.job) return false;
+    if (data.job.status === "running") {
+      // Sem SSE (edge fallback), o poll alimenta o feed pelo banco.
+      if (siteStream.current?.readyState !== 1) {
+        setSiteActivity({
+          progresso: data.job.progresso ?? 0,
+          etapa: data.job.etapa ?? null,
+          eventos: data.job.eventos ?? [],
+        });
+      }
+      return false;
+    }
+    stopSiteWatch();
+    setSiteActivity(null);
+    setBusyKey("generate_site", false);
+    if (data.job.status === "done") {
+      setNotice(t.siteDone);
+      router.refresh();
+    } else {
+      setError(data.job.erro ?? t.errNoContent);
+    }
+    return true;
+  }
 
   // Site completo leva minutos quando o provedor principal falha e o
   // fallback gratuito assume — roda como job no servidor, com polling.
   function pollSiteJob(jobId: string) {
-    if (sitePoller.current) clearInterval(sitePoller.current);
-    sitePoller.current = setInterval(() => {
-      void (async () => {
-        const res = await fetch(`/api/ai-jobs/${jobId}`, { cache: "no-store" }).catch(() => null);
-        const data = res ? (await res.json().catch(() => null)) as { job?: { status: string; erro?: string | null; progresso?: number; etapa?: string | null; eventos?: GenEvent[] } } | null : null;
-        if (!data?.job) return;
-        if (data.job.status === "running") {
-          setSiteActivity({
-            progresso: data.job.progresso ?? 0,
-            etapa: data.job.etapa ?? null,
-            eventos: data.job.eventos ?? [],
-          });
-          return;
-        }
-        setSiteActivity(null);
-        if (sitePoller.current) clearInterval(sitePoller.current);
-        sitePoller.current = null;
-        setBusyKey("generate_site", false);
-        if (data.job.status === "done") {
-          setNotice(t.siteDone);
-          router.refresh();
-        } else {
-          setError(data.job.erro ?? t.errNoContent);
-        }
-      })();
-    }, 4000);
+    stopSiteWatch();
+    // SSE do Gen Service — eventos em tempo real; falha quieta quando a
+    // edge responde (sem serviço) e o poll cobre com os eventos do banco.
+    const es = new EventSource(`/api/gen-stream/${jobId}`);
+    siteStream.current = es;
+    es.onmessage = (m) => {
+      try {
+        const e = JSON.parse(m.data) as GenEvent & { done?: boolean };
+        setSiteActivity((prev) => ({
+          progresso: e.p ?? prev?.progresso ?? 0,
+          etapa: e.etapa ?? prev?.etapa ?? null,
+          eventos: [...(prev?.eventos ?? []), e],
+        }));
+        if (typeof e.done === "boolean") void checkSiteJob(jobId);
+      } catch { /* ping */ }
+    };
+    sitePoller.current = setInterval(() => { void checkSiteJob(jobId); }, 5000);
   }
 
   // Ao voltar na página com uma geração em andamento, retoma o polling.
@@ -152,7 +179,7 @@ export function LeadWorkspace({ lead: initialLead, outputs: initialOutputs, serv
         pollSiteJob(data.job.id);
       }
     })();
-    return () => { if (sitePoller.current) clearInterval(sitePoller.current); };
+    return () => { stopSiteWatch(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

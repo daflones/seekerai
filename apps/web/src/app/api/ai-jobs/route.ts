@@ -6,6 +6,7 @@ import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { refundCreditAction } from "@/lib/billing/refund";
+import { genServiceUrl } from "@/lib/gen-service";
 
 // Geração pesada (site completo) roda detached: a edge pode demorar minutos
 // quando o provedor principal falha e o fallback gratuito assume. O cliente
@@ -31,8 +32,11 @@ function slugify(text: string): string {
 async function runJob(jobId: string, leadId: string, userId: string, token: string, payload: z.infer<typeof bodySchema>) {
   const admin = createSupabaseAdminClient();
   const config = supabasePublicConfig();
+  // Gen Service próprio tem prioridade — sem o wall-clock da edge.
+  const genBase = genServiceUrl();
+  const upstreamUrl = genBase ? `${genBase}/ai-generate` : `${config!.url}/functions/v1/ai-generate`;
   try {
-    const upstream = await fetch(`${config!.url}/functions/v1/ai-generate`, {
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -50,7 +54,7 @@ async function runJob(jobId: string, leadId: string, userId: string, token: stri
         jobId,
         jobTable: "ai_jobs",
       }),
-      signal: AbortSignal.timeout(EDGE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(genBase ? 560_000 : EDGE_TIMEOUT_MS),
     });
     const data = (await upstream.json().catch(() => ({}))) as Record<string, unknown>;
     if (!upstream.ok || typeof data.conteudo !== "string" || !data.conteudo) {

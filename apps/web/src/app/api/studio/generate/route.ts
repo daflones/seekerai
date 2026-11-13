@@ -7,6 +7,7 @@ import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { refundCreditAction } from "@/lib/billing/refund";
 import { planAllowsPaidFeatures, userPlanSlug } from "@/lib/plans/capabilities";
+import { genServiceUrl } from "@/lib/gen-service";
 
 // Estúdio: prompt livre → app/site HTML completo via edge ai-generate
 // (action generate_app). Geração detached com polling — sair da página
@@ -22,13 +23,17 @@ const bodySchema = z.object({
 });
 
 const EDGE_TIMEOUT_MS = 300_000;
+const GEN_TIMEOUT_MS = 560_000;
 const STALE_MS = 8 * 60_000;
 
 async function runJob(projectId: string, userId: string, token: string, payload: z.infer<typeof bodySchema>) {
   const admin = createSupabaseAdminClient();
   const config = supabasePublicConfig();
+  // Gen Service próprio tem prioridade — sem o wall-clock da edge.
+  const genBase = genServiceUrl();
+  const upstreamUrl = genBase ? `${genBase}/ai-generate` : `${config!.url}/functions/v1/ai-generate`;
   try {
-    const upstream = await fetch(`${config!.url}/functions/v1/ai-generate`, {
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -46,7 +51,7 @@ async function runJob(projectId: string, userId: string, token: string, payload:
         jobId: projectId,
         jobTable: "studio_projects",
       }),
-      signal: AbortSignal.timeout(EDGE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(genBase ? GEN_TIMEOUT_MS : EDGE_TIMEOUT_MS),
     });
     const data = (await upstream.json().catch(() => ({}))) as Record<string, unknown>;
     const html = typeof data.conteudo === "string" && data.conteudo.includes("<") ? data.conteudo : null;
