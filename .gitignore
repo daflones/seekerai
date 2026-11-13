@@ -19,3 +19,13 @@ referencias/
 site-teste.html
 gen-site-test.mjs
 scripts/prospect-state.json
+
+# artefatos locais de teste/preview
+logo.png
+stripe.png
+mock/
+posts.json
+prof.json
+prof2.json
+sc-openapi.json
+sc-posts.json
