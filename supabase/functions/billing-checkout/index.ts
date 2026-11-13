@@ -35,7 +35,7 @@ interface CheckoutBody {
   fbc?: string;
 }
 
-type BillingCurrency = "brl" | "usd" | "eur";
+type BillingCurrency = "brl" | "usd" | "eur" | "gbp";
 
 // Período de cobrança — mesmos fatores do front (lib/plans/periods.ts).
 const PERIODS: Record<string, { months: number; discount: number; label: string }> = {
@@ -469,7 +469,8 @@ Deno.serve(async (req) => {
     const method = body.method === "pix" ? "pix" : body.method === "card" ? "card" : null;
     if (!method) throw httpError(400, "Informe method (card|pix)");
     const currency: BillingCurrency =
-      body.currency === "usd" || body.currency === "eur" ? body.currency : "brl";
+      body.currency === "usd" || body.currency === "eur" || body.currency === "gbp"
+        ? body.currency : "brl";
     // Fora do Brasil: PIX é método brasileiro — só cartão via Stripe.
     if (currency !== "brl" && method === "pix") {
       throw httpError(400, "PIX is only available in Brazil — use card");
@@ -512,6 +513,7 @@ Deno.serve(async (req) => {
         provider_ref: internalRef,
         method,
         amount_cents: currency === "brl" ? pack.amountCents : pack.intlCents,
+        currency,
         status: "pending",
         metadata: { kind: "credit_pack", credits: pack.credits, currency, ...fbMeta },
       });
@@ -615,6 +617,7 @@ Deno.serve(async (req) => {
         provider_ref: internalRef,
         method,
         amount_cents: priceCents,
+        currency: "brl",
         status: "pending",
         metadata: { kind: "domain", domain_id: domain.id, currency: "brl", ...fbMeta },
       }).select("id").single();
@@ -668,7 +671,7 @@ Deno.serve(async (req) => {
     if (!planSlug) throw httpError(400, "Informe planSlug");
     const { data: plan, error: planError } = await db
       .from("plans")
-      .select("id, slug, nome, preco_centavos, ativo, ordem")
+      .select("id, slug, nome, preco_centavos, intl_prices, ativo, ordem")
       .eq("slug", planSlug)
       .maybeSingle();
     if (planError || !plan) throw httpError(404, "Plano não encontrado");
@@ -702,12 +705,19 @@ Deno.serve(async (req) => {
       ? { plan_change: planChange, from_plan: String(curPlan?.slug ?? "") }
       : {};
 
-    // Preço cobrado: BRL usa o preço do banco; USD/EUR usam a tabela
-    // internacional. Desconto do período aplica sobre a mensalidade
-    // equivalente; o ciclo cobra o total (equivalente × meses).
+    // Preço cobrado: BRL usa o preço do banco; USD/EUR/GBP usam o
+    // intl_prices configurado no admin (fallback: tabela antiga p/ USD/EUR).
+    // Desconto do período aplica sobre a mensalidade equivalente; o ciclo
+    // cobra o total (equivalente × meses).
+    const intlCfg = isRecord(plan.intl_prices) ? plan.intl_prices : {};
+    const intlCents = Number(intlCfg[currency]);
     const baseCents = currency === "brl"
       ? plan.preco_centavos
-      : INTL_PRICES[plan.slug];
+      : Number.isFinite(intlCents) && intlCents > 0
+        ? Math.trunc(intlCents)
+        : (currency === "usd" || currency === "eur") && INTL_PRICES[plan.slug]
+          ? INTL_PRICES[plan.slug]
+          : undefined;
     if (!baseCents) {
       throw httpError(409, "Este plano não está disponível nesta região");
     }
@@ -767,6 +777,7 @@ Deno.serve(async (req) => {
           provider_ref: internalRef,
           method: "card",
           amount_cents: chargedCents,
+          currency,
           status: "pending",
           metadata: { period, months: periodDef.months, currency, ...discMeta, ...changeMeta, ...fbMeta },
         });
@@ -795,6 +806,7 @@ Deno.serve(async (req) => {
         provider_ref: session.id,
         method: "card",
         amount_cents: chargedCents,
+        currency,
         status: "pending",
         metadata: { currency, period, months: periodDef.months, ...discMeta, ...changeMeta, ...fbMeta },
       });
@@ -811,6 +823,7 @@ Deno.serve(async (req) => {
       provider_ref: internalRef,
       method: "pix",
       amount_cents: chargedCents,
+      currency: "brl",
       status: "pending",
       metadata: { period, months: periodDef.months, ...discMeta, ...changeMeta, ...fbMeta },
     });

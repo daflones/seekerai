@@ -8,7 +8,7 @@ import { CalendarClock, CheckCircle2, ChevronDown, Copy, CreditCard, Loader2, Qr
 import type { BillingStatus } from "./checkout-success";
 import { callAction } from "@/lib/app-client";
 import { metaCookies, trackMeta } from "@/lib/meta";
-import { CREDIT_PACKS, formatMoney, INTL_PRICES, type CreditPack, type Locale } from "@/lib/i18n/shared";
+import { CREDIT_PACKS, formatMoney, planIntlCents, type CreditPack, type Locale } from "@/lib/i18n/shared";
 import { BILLING_PERIODS, periodDef, periodMonthlyCents, periodTotalCents, type BillingPeriod } from "@/lib/plans/periods";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 
@@ -18,6 +18,7 @@ interface PlanItem {
   priceCents: number;
   featured: boolean;
   order: number;
+  intlPrices?: import("@/lib/i18n/shared").IntlPrices;
   content: {
     badge?: string;
     description?: string;
@@ -107,11 +108,14 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
   const tc = getMessages(locale.lang).common;
   const money = (cents: number) => formatMoney(cents, locale.currency, locale.lang);
   const def = periodDef(period);
-  // Gringo: preços em USD/EUR ($5/$15/$25). Brasil: preço em BRL vindo do banco.
+  // Gringo: preço internacional configurado no admin (USD/EUR/GBP por plano).
+  // Brasil: preço em BRL vindo do banco.
+  const intlBase = (plan: PlanItem) =>
+    isIntl && locale.currency !== "brl" ? planIntlCents(plan, locale.currency) ?? 0 : plan.priceCents;
   const priceFor = (plan: PlanItem) =>
-    periodMonthlyCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
+    periodMonthlyCents(isIntl ? intlBase(plan) : plan.priceCents, def);
   const totalFor = (plan: PlanItem) =>
-    periodTotalCents(isIntl ? (INTL_PRICES[plan.slug] ?? 0) : plan.priceCents, def);
+    periodTotalCents(isIntl ? intlBase(plan) : plan.priceCents, def);
   const packCents = (pack: CreditPack) => isIntl ? pack.intlCents : pack.brlCents;
   // Desconto de primeira compra — mesmo arredondamento da edge.
   const disc = (cents: number) =>

@@ -8,13 +8,32 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AdminFinanceiro } from "@/components/admin-financeiro";
 import { AdminDiscount } from "@/components/admin-discount";
 import { FinList } from "@/components/fin-list";
+import {
+  addCents, emptyTotals, fmtMoney, fmtTotals, payCurrency,
+  type CurTotals, type PayCurrency,
+} from "@/lib/admin/money";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Financeiro", robots: { index: false } };
 
 const DAY = 24 * 60 * 60 * 1000;
-const brl = (cents: number) =>
-  (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brl = (cents: number) => fmtMoney(cents, "brl");
+// Totais por moeda em centavos — nunca soma moedas diferentes.
+const curOf = (p: PayRow) => payCurrency(p);
+const sumPaid = (rows: PayRow[]): CurTotals => {
+  const t = emptyTotals();
+  for (const p of rows) addCents(t, curOf(p), p.amount_cents);
+  return t;
+};
+const subBaseCents = (s: { currency?: string | null; plans?: unknown; plano?: unknown }, fallback?: number): { cur: PayCurrency; cents: number } => {
+  const raw = String(s.currency ?? "brl").toLowerCase();
+  const cur: PayCurrency = raw === "usd" || raw === "eur" || raw === "gbp" ? raw : "brl";
+  const plano = (s.plans ?? s.plano) as unknown as { preco_centavos?: number; intl_prices?: Record<string, number> } | null;
+  const cents = cur === "brl"
+    ? (plano?.preco_centavos ?? fallback ?? 0)
+    : (plano?.intl_prices?.[cur] ?? 0);
+  return { cur, cents };
+};
 const fmtHora = (iso: string) => new Date(iso).toLocaleString("pt-BR", {
   day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
   timeZone: "America/Sao_Paulo",
@@ -34,7 +53,7 @@ const STATUS_LABEL: Record<string, string> = {
 type PayRow = {
   id: string; user_id: string | null; plan_id: string | null;
   status: string; provider: string | null; method: string | null;
-  amount_cents: number; metadata: unknown; created_at: string;
+  amount_cents: number; currency: string | null; metadata: unknown; created_at: string;
 };
 
 function kindOf(p: PayRow): string {
@@ -69,12 +88,16 @@ function daySum(pairs: { date: string; amount: number }[], days: number) {
   });
 }
 
-function Delta({ now, before }: { now: number; before: number }) {
-  if (now === 0 && before === 0) return null;
-  const diff = now - before;
-  const cls = diff > 0 ? "adm-delta-up" : diff < 0 ? "adm-delta-down" : "adm-delta-flat";
-  const arrow = diff > 0 ? "↗" : diff < 0 ? "↘" : "→";
-  return <span className={`adm-delta ${cls}`}>{arrow} {brl(Math.abs(diff))} vs 30d anterior</span>;
+function Delta({ now, before }: { now: CurTotals; before: CurTotals }) {
+  const keys = (["brl", "usd", "eur", "gbp"] as const).filter((c) => now[c] !== 0 || before[c] !== 0);
+  if (!keys.length) return null;
+  return <>{keys.map((c) => {
+    const diff = now[c] - before[c];
+    if (diff === 0) return null;
+    const cls = diff > 0 ? "adm-delta-up" : "adm-delta-down";
+    const arrow = diff > 0 ? "↗" : "↘";
+    return <span key={c} className={`adm-delta ${cls}`}>{arrow} {fmtMoney(Math.abs(diff), c)} {c.toUpperCase()} vs 30d</span>;
+  })}</>;
 }
 
 function Bars({ data }: { data: { label: string; value: number }[] }) {
@@ -90,13 +113,15 @@ function Bars({ data }: { data: { label: string; value: number }[] }) {
   );
 }
 
-function DistRow({ label, value, max }: { label: string; value: number; max: number }) {
-  const pct = Math.max(2, (value / Math.max(1, max)) * 100);
+function DistRow({ label, value, max }: { label: string; value: number | CurTotals | string; max: number }) {
+  const n = typeof value === "object" ? value.brl : typeof value === "number" ? value : 0;
+  const pct = Math.max(2, (n / Math.max(1, max)) * 100);
+  const text = typeof value === "string" ? value : fmtTotals(typeof value === "object" ? value : { brl: value, usd: 0, eur: 0, gbp: 0 });
   return (
     <li className="adm-dist-row">
       <span className="adm-dist-label">{label}</span>
       <span className="adm-dist-track"><span className="adm-dist-fill" style={{ width: `${pct}%` }} /></span>
-      <strong>{brl(value)}</strong>
+      <strong>{text}</strong>
     </li>
   );
 }
@@ -122,10 +147,10 @@ export default async function AdminFinanceiroPage() {
     { data: discSetting },
   ] = await Promise.all([
     supabase.from("payments")
-      .select("id,user_id,plan_id,status,provider,method,amount_cents,metadata,created_at")
+      .select("id,user_id,plan_id,status,provider,method,amount_cents,currency,metadata,created_at")
       .order("created_at", { ascending: false }).limit(3000),
     supabase.from("subscriptions")
-      .select("status,billing_months,current_period_end,provider,user_id, plans(slug,nome,preco_centavos)")
+      .select("status,billing_months,currency,current_period_end,provider,user_id, plans(slug,nome,preco_centavos,intl_prices)")
       .eq("status", "active"),
     supabase.from("plans").select("id,slug,nome,preco_centavos").eq("ativo", true),
     supabase.from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle(),
@@ -141,20 +166,30 @@ export default async function AdminFinanceiroPage() {
     return t <= now - days * DAY && t > now - 2 * days * DAY;
   };
 
-  // KPIs
-  const gross = paid.reduce((a, p) => a + p.amount_cents, 0);
+  // KPIs — cada moeda soma na sua própria chave (nada de dólar virando real).
+  const gross = sumPaid(paid);
   const paid30 = paid.filter((p) => inWin(p.created_at, 30));
-  const cents30 = paid30.reduce((a, p) => a + p.amount_cents, 0);
-  const centsPrev30 = paid.filter((p) => inPrev(p.created_at, 30)).reduce((a, p) => a + p.amount_cents, 0);
-  const cents7 = paid.filter((p) => inWin(p.created_at, 7)).reduce((a, p) => a + p.amount_cents, 0);
-  const ticket30 = paid30.length ? Math.round(cents30 / paid30.length) : 0;
+  const totals30 = sumPaid(paid30);
+  const totalsPrev30 = sumPaid(paid.filter((p) => inPrev(p.created_at, 30)));
+  const totals7 = sumPaid(paid.filter((p) => inWin(p.created_at, 7)));
+  const countByCur = paid30.reduce<Partial<Record<PayCurrency, number>>>((acc, p) => {
+    const c = curOf(p); acc[c] = (acc[c] ?? 0) + 1; return acc;
+  }, {});
+  const ticket30 = emptyTotals();
+  for (const c of ["brl", "usd", "eur", "gbp"] as const) {
+    const n = countByCur[c] ?? 0;
+    if (n) ticket30[c] = Math.round(totals30[c] / n);
+  }
 
-  // MRR/ARR — mesma normalização do dashboard (anual -20%, trimestral -10%).
-  const mrr = (subs ?? []).reduce((acc, s) => {
-    const plano = s.plans as unknown as { preco_centavos: number } | null;
-    const months = s.billing_months ?? 1;
-    return acc + (plano ? plano.preco_centavos * (months === 12 ? 0.8 : months === 3 ? 0.9 : 1) : 0);
-  }, 0);
+  // MRR/ARR por moeda — mensalidade equivalente na moeda da assinatura
+  // (anual -20%, trimestral -10%), preço intl do plano quando não é BRL.
+  const mrr = emptyTotals();
+  for (const s of subs ?? []) {
+    const { cur, cents } = subBaseCents(s as { currency?: string | null; plans?: unknown });
+    const months = Number((s as { billing_months?: number }).billing_months) || 1;
+    const factor = months === 12 ? 0.8 : months === 3 ? 0.9 : 1;
+    addCents(mrr, cur, Math.round(cents * factor));
+  }
 
   // Funil de conversão de pagamento
   const statusCount = pays.reduce<Record<string, number>>((acc, p) => {
@@ -188,37 +223,44 @@ export default async function AdminFinanceiroPage() {
     if (p.user_id && !lastAnyAt.has(p.user_id)) lastAnyAt.set(p.user_id, p.created_at);
   }
 
-  // Distribuições (valores pagos)
-  const byKind = Object.entries(paid.reduce<Record<string, number>>((acc, p) => {
-    acc[kindOf(p)] = (acc[kindOf(p)] ?? 0) + p.amount_cents;
-    return acc;
-  }, {})).sort((a, b) => b[1] - a[1]);
-  const byMethod = Object.entries(paid.reduce<Record<string, number>>((acc, p) => {
-    acc[p.method ?? "?"] = (acc[p.method ?? "?"] ?? 0) + p.amount_cents;
-    return acc;
-  }, {})).sort((a, b) => b[1] - a[1]);
-  const byProvider = Object.entries(paid.reduce<Record<string, number>>((acc, p) => {
-    acc[p.provider ?? "?"] = (acc[p.provider ?? "?"] ?? 0) + p.amount_cents;
-    return acc;
-  }, {})).sort((a, b) => b[1] - a[1]);
-
+  // Distribuições (valores pagos) — CurTotals por moeda.
   const planName = new Map((plansData ?? []).map((pl) => [pl.id, pl.nome]));
   const planNameBySlug = new Map((plansData ?? []).map((pl) => [pl.slug, pl.nome]));
-  const byPlan = Object.entries(paid.reduce<Record<string, number>>((acc, p) => {
+  const accCur = () => emptyTotals();
+  const bump = (map: Record<string, CurTotals>, key: string, p: PayRow) => {
+    map[key] = map[key] ?? accCur();
+    addCents(map[key], curOf(p), p.amount_cents);
+  };
+  const byKindMap: Record<string, CurTotals> = {};
+  const byMethodMap: Record<string, CurTotals> = {};
+  const byProviderMap: Record<string, CurTotals> = {};
+  const byPlanMap: Record<string, CurTotals> = {};
+  for (const p of paid) {
+    bump(byKindMap, kindOf(p), p);
+    bump(byMethodMap, p.method ?? "?", p);
+    bump(byProviderMap, p.provider ?? "?", p);
     const k = kindOf(p);
     const label = k === "plan"
       ? String(planName.get(p.plan_id ?? "") ?? "Plano")
       : (KIND_LABEL[k] ?? k);
-    acc[label] = (acc[label] ?? 0) + p.amount_cents;
-    return acc;
-  }, {})).sort((a, b) => b[1] - a[1]);
-  const distMax = Math.max(1, ...byKind.map(([, v]) => v), ...byMethod.map(([, v]) => v),
-    ...byProvider.map(([, v]) => v), ...byPlan.map(([, v]) => v));
+    bump(byPlanMap, label, p);
+  }
+  const sortCur = (m: Record<string, CurTotals>) =>
+    Object.entries(m).sort((a, b) =>
+      (b[1].brl + b[1].usd + b[1].eur + b[1].gbp) - (a[1].brl + a[1].usd + a[1].eur + a[1].gbp));
+  const byKind = sortCur(byKindMap);
+  const byMethod = sortCur(byMethodMap);
+  const byProvider = sortCur(byProviderMap);
+  const byPlan = sortCur(byPlanMap);
+  const sizeOf = (t: CurTotals) => t.brl + t.usd + t.eur + t.gbp;
+  const distMax = Math.max(1, ...byKind.map(([, v]) => sizeOf(v)), ...byMethod.map(([, v]) => sizeOf(v)),
+    ...byProvider.map(([, v]) => sizeOf(v)), ...byPlan.map(([, v]) => sizeOf(v)));
   const statusMax = Math.max(1, ...Object.values(statusCount));
 
-  // Série de receita 30d
+  // Série de receita 30d — o gráfico soma em BRL (moedas não se misturam);
+  // pagamentos USD/EUR/GBP aparecem nas distribuições e totais por moeda.
   const revSeries = daySum(
-    paid.map((p) => ({ date: p.created_at, amount: p.amount_cents })), 30,
+    paid.filter((p) => curOf(p) === "brl").map((p) => ({ date: p.created_at, amount: p.amount_cents })), 30,
   );
 
   // Nomes: últimos pagamentos + assinaturas + follow-ups
@@ -261,7 +303,7 @@ export default async function AdminFinanceiroPage() {
   const subsRows = (subs ?? [])
     .map((s) => ({
       ...s,
-      plano: s.plans as unknown as { nome: string; preco_centavos: number } | null,
+      plano: s.plans as unknown as { nome: string; preco_centavos: number; intl_prices?: Record<string, number> } | null,
     }))
     .sort((a, b) => String(a.current_period_end ?? "").localeCompare(String(b.current_period_end ?? "")));
 
@@ -279,32 +321,32 @@ export default async function AdminFinanceiroPage() {
       <section className="stat-card fin-saldo">
         <span className="stat-icon"><Banknote size={18} /></span>
         <small>RECEITA TOTAL</small>
-        <strong>{brl(gross)}</strong>
+        <strong>{fmtTotals(gross)}</strong>
         <span className="stat-sub">{paid.length} pagamentos confirmados</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><TrendingUp size={18} /></span>
         <small>RECEITA 30D</small>
-        <strong>{brl(cents30)}</strong>
-        <Delta now={cents30} before={centsPrev30} />
+        <strong>{fmtTotals(totals30)}</strong>
+        <Delta now={totals30} before={totalsPrev30} />
       </section>
       <section className="stat-card">
         <span className="stat-icon"><ReceiptText size={18} /></span>
         <small>RECEITA 7D</small>
-        <strong>{brl(cents7)}</strong>
+        <strong>{fmtTotals(totals7)}</strong>
         <span className="stat-sub">{paid.filter((p) => inWin(p.created_at, 7)).length} vendas na semana</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><RefreshCcw size={18} /></span>
         <small>MRR → ARR</small>
-        <strong>{brl(mrr)}</strong>
-        <span className="stat-sub">ARR ≈ {brl(mrr * 12)} · {subsRows.length} assinaturas</span>
+        <strong>{fmtTotals(mrr)}</strong>
+        <span className="stat-sub">ARR ≈ {fmtTotals({ brl: mrr.brl * 12, usd: mrr.usd * 12, eur: mrr.eur * 12, gbp: mrr.gbp * 12 })} · {subsRows.length} assinaturas</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><CreditCard size={18} /></span>
         <small>TICKET MÉDIO 30D</small>
-        <strong>{brl(ticket30)}</strong>
-        <span className="stat-sub">por pagamento confirmado</span>
+        <strong>{fmtTotals(ticket30)}</strong>
+        <span className="stat-sub">por pagamento confirmado, em cada moeda</span>
       </section>
       <section className="stat-card">
         <span className="stat-icon"><Target size={18} /></span>
@@ -316,8 +358,8 @@ export default async function AdminFinanceiroPage() {
 
     <section className="adm-chart fin-rev-chart">
       <div className="adm-chart-head">
-        <small>RECEITA POR DIA · 30 DIAS</small>
-        <strong>{brl(cents30)}</strong>
+        <small>RECEITA POR DIA · 30 DIAS · SOMENTE R$</small>
+        <strong>{fmtTotals(totals30)}</strong>
       </div>
       <Bars data={revSeries} />
       <div className="adm-chart-foot"><span>{revSeries[0]?.label}</span><span>passa o mouse pra ver o dia</span><span>{revSeries[29]?.label}</span></div>
@@ -397,7 +439,7 @@ export default async function AdminFinanceiroPage() {
                       {email && email !== userName.get(uid) ? <small className="fin-follow-mail"> {email}</small> : null}
                       <br />
                       <small>
-                        {rows.length} tentativa{rows.length > 1 ? "s" : ""} · última: {oQue} · {brl(last.amount_cents)} via {last.method ?? "?"} — <em>{motivo}</em>
+                        {rows.length} tentativa{rows.length > 1 ? "s" : ""} · última: {oQue} · {fmtMoney(last.amount_cents, curOf(last))} via {last.method ?? "?"} — <em>{motivo}</em>
                       </small>
                     </span>
                     <small title={last.created_at}>{fmtHora(last.created_at)}</small>
@@ -416,7 +458,7 @@ export default async function AdminFinanceiroPage() {
             {subsRows.map((s, i) => (
               <li key={i} className="adm-feed-row">
                 <span className="adm-tag adm-tag-paid">{s.provider}</span>
-                <span><strong>{userName.get(s.user_id) ?? "—"}</strong> · {s.plano?.nome ?? "Plano"} · {s.billing_months === 12 ? "anual" : s.billing_months === 3 ? "trimestral" : "mensal"} · {s.plano ? brl(s.plano.preco_centavos) : "—"}</span>
+                <span><strong>{userName.get(s.user_id) ?? "—"}</strong> · {s.plano?.nome ?? "Plano"} · {s.billing_months === 12 ? "anual" : s.billing_months === 3 ? "trimestral" : "mensal"} · {(() => { const { cur, cents } = subBaseCents(s); return cents ? fmtMoney(cents, cur) : "—"; })()}</span>
                 <small title={String(s.current_period_end ?? "")}>renova {s.current_period_end ? fmtDia(s.current_period_end) : "—"}</small>
               </li>
             ))}
@@ -431,7 +473,7 @@ export default async function AdminFinanceiroPage() {
             {lastPayments.map((p) => (
               <li key={p.id} className="adm-feed-row">
                 <span className={`adm-tag adm-tag-${p.status}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
-                <span className="adm-mono">{brl(p.amount_cents)}</span>
+                <span className="adm-mono">{fmtMoney(p.amount_cents, curOf(p))}</span>
                 <span title={String(p.user_id ?? "")}>
                   <strong>{userName.get(p.user_id ?? "") ?? "—"}</strong>
                   {" · "}{p.method ?? "?"} · {p.provider ?? "?"} · {KIND_LABEL[kindOf(p)] ?? kindOf(p)}

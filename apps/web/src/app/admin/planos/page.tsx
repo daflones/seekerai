@@ -1,5 +1,5 @@
 import { requireSession } from "@/lib/auth/session";
-import { cardContentSchema, planSlug, type PlanCard } from "@/lib/plans/model";
+import { cardContentSchema, parseIntlPrices, planSlug, type PlanCard } from "@/lib/plans/model";
 import { defaultCardContent } from "@/lib/plans/preview";
 import { CREDIT_PACKS, parseCreditPacks } from "@/lib/i18n/shared";
 import { PlanEditor } from "@/components/plan-editor";
@@ -10,7 +10,7 @@ import { AdminUpgradeDiscount } from "@/components/admin-upgrade-discount";
 export default async function PlanAdminPage() {
   const { supabase } = await requireSession("/admin/planos", { admin: true });
   const { data, error } = await supabase.from("plans")
-    .select("id,slug,nome,preco_centavos,ordem,destaque,landing_visible,card_content,card_revision").order("ordem");
+    .select("id,slug,nome,preco_centavos,intl_prices,ordem,destaque,landing_visible,card_content,card_revision").order("ordem");
   const { data: packsRow } = await supabase.from("app_settings")
     .select("value").eq("key", "credit_packs").maybeSingle();
   const { data: hiddenRow } = await supabase.from("app_settings")
@@ -34,6 +34,7 @@ export default async function PlanAdminPage() {
       id: row.id, slug: slug.data, name: row.nome, priceCents: row.preco_centavos, order: row.ordem,
       featured: row.destaque, visible: row.landing_visible, revision: row.card_revision,
       content: content.success ? content.data : defaultCardContent(slug.data),
+      intlPrices: parseIntlPrices(row.intl_prices),
     });
   }
   return <>

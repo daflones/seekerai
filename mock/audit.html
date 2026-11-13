@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../apps/web/src/app/globals.css">
+<link rel="stylesheet" href="../apps/web/src/app/auth-ui.css">
+<link rel="stylesheet" href="../apps/web/src/app/pricing-ui.css">
+<link rel="stylesheet" href="../apps/web/src/app/workspace-ui.css">
+<style>body{padding:26px;max-width:860px;margin:0 auto}h3.mock{font-size:10px;letter-spacing:.14em;color:#8a6f9e;text-transform:uppercase;margin:34px 0 10px}</style>
+</head><body class="shell-workspace">
+
+<h3 class="mock">Lead — cabeçalho (lixeira no header + status ganho)</h3>
+<header class="lead-head">
+  <div class="lead-head-title">
+    <h1>Padaria Estrela <span class="gradient-text">.</span></h1>
+    <div class="lead-head-meta">
+      <span class="lead-status lead-status-ganho">Ganho</span>
+      <button type="button" class="lead-won-value">Fechado por R$ 1.200,00</button>
+      <button type="button" class="lead-head-del" title="Excluir lead">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="lead-head-ig">
+    <a class="seek-ig" href="#">
+      <span class="seek-ig-head">
+        <span class="seek-ig-pic seek-ig-pic-empty"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></span>
+        <span class="seek-ig-handle">@padaria.estrela</span>
+        <svg class="seek-ig-ext" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+      </span>
+      <span class="seek-ig-stats">
+        <span class="seek-ig-stat">12,4 mil</span><span class="seek-ig-stat">342 posts</span><span class="seek-ig-stat">89 curt./post</span>
+      </span>
+    </a>
+    <p class="lead-ig-bio">Pães artesanais desde 1998. Pedidos pelo WhatsApp</p>
+  </div>
+</header>
+
+<h3 class="mock">Lead — outputs (heading com ação de estratégia)</h3>
+<section class="lead-outputs">
+  <div class="lead-outputs-head">
+    <h2>Materiais gerados</h2>
+    <button type="button" class="button button-glass button-small">Gerar estratégia</button>
+  </div>
+  <p class="seek-empty">Nenhum material gerado ainda.</p>
+</section>
+
+<h3 class="mock">Lead — anotações (painel padrão)</h3>
+<section class="dash-panel lead-notes">
+  <div class="dash-panel-heading"><h2>Anotações</h2></div>
+  <textarea placeholder="Observações sobre esse lead...">Ligou pedindo orçamento de identidade visual. Retornar sexta.</textarea>
+  <div class="lead-notes-foot"><button type="button" class="button button-glass button-small" disabled>Salvar anotações</button></div>
+</section>
+
+<h3 class="mock">Domínios — empty state + lista flat + status novos</h3>
+<section class="dash-panel">
+  <div class="dash-panel-heading"><h2>Domínio personalizado</h2></div>
+  <div class="dash-empty">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    <p>Você ainda não tem sites publicados. Gere um site no radar ou no estúdio.</p>
+    <a class="text-link" href="#">Buscar clientes no radar</a>
+  </div>
+</section>
+<section class="dash-panel domain-mine">
+  <div class="dash-panel-heading"><h2>Meus domínios</h2></div>
+  <ul class="dash-usage domain-list">
+    <li><span class="domain-list-host">padariaestrela.com.br</span><span class="domain-list-site">Padaria Estrela</span><span class="domain-status domain-status-active">Ativo · até 12/2027</span></li>
+    <li><span class="domain-list-host">studiox.com.br</span><span class="domain-list-site">Studio X</span><span class="domain-status domain-status-expired">Expirado — renovar</span></li>
+    <li><span class="domain-list-host">lojay.com.br</span><span class="domain-list-site">Loja Y</span><span class="domain-status domain-status-pending_setup">Pago — configuração em até 48h</span></li>
+  </ul>
+</section>
+
+<h3 class="mock">Estúdio — histórico em painel + badge ganho em token</h3>
+<section class="dash-panel st-history">
+  <div class="dash-panel-heading"><h2>Histórico</h2></div>
+  <ul>
+    <li><button type="button"><span class="st-h-name">Landing Petshop</span><span class="st-h-status st-h-done">done</span></button></li>
+    <li><button type="button"><span class="st-h-name">App Barbearia</span><span class="st-h-status st-h-running">running</span></button></li>
+  </ul>
+  <p><span class="st-won-badge">Ganho · Studio X</span></p>
+</section>
+
+<h3 class="mock">Chat — composer no padrão</h3>
+<div class="chat">
+  <div class="chat-composer">
+    <textarea placeholder="Escreva sua mensagem..." rows="2"></textarea>
+    <button type="button" class="chat-enhance">AI</button>
+    <button type="button" class="button button-primary chat-send">Enviar</button>
+  </div>
+</div>
+
+<h3 class="mock">Planos — pacotes com tokens</h3>
+<div class="pack-rows">
+  <div class="pack-row"><span class="pack-amount"><strong>150</strong><small>créditos</small></span><span class="pack-price"><strong>R$ 29,97</strong></span><span class="plan-actions"><button class="button button-primary button-small">Comprar</button></span></div>
+  <div class="pack-row"><span class="pack-amount"><strong>250</strong><small>créditos</small></span><span class="pack-price"><strong>R$ 39,97</strong></span><span class="plan-actions"><button class="button button-primary button-small">Comprar</button></span></div>
+</div>
+
+</body></html>

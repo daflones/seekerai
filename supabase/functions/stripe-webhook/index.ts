@@ -205,6 +205,7 @@ async function processEvent(
       p_period_end: periodEnd,
       p_cycle_ref: `stripe:${subscriptionId}:${periodStart ?? invoiceId}`,
       p_months: months,
+      p_currency: typeof object.currency === "string" ? object.currency : null,
     });
     if (error) throw httpError(500, `record_renewal_payment: ${error.message}`);
     // Renovação também é receita — Purchase alimenta o ROAS da campanha.

@@ -46,6 +46,9 @@
 .editor-plan-tabs button { padding: 14px; text-align: left; font-size: 13px; background: #9e6bc409; color: #c6a8da; border: 1px solid #b17bc52b; border-radius: 10px; }
 .editor-plan-tabs button[aria-pressed="true"] { color: #eedaff; background: #9c67ce20; border-color: #b77ce36b; }
 .editor-plan-tabs small { display: block; font-size: 8px; color: #9375a6; margin-top: 6px; }
+.editor-cur-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.editor-cur-tabs button { padding: 5px 12px; font-size: 10px; font-weight: 700; color: #a586b9; background: #9e6bc409; border: 1px solid #b17bc52b; border-radius: 999px; cursor: pointer; }
+.editor-cur-tabs button[aria-pressed="true"] { color: #eedaff; background: #9c67ce20; border-color: #b77ce36b; }
 .editor-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(270px, 1fr); gap: 40px; align-items: start; }
 .editor-form { min-width: 0; }
 .editor-form fieldset { margin: 0 0 25px; padding: 22px; border: 1px solid #b07bcb2b; border-radius: 12px; min-width: 0; }

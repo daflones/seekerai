@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { unstable_noStore as noStore } from "next/cache";
 import { supabasePublicConfig } from "../auth/config";
-import { cardContentSchema, planSlug, type PlanCard, type PlanSource } from "./model";
+import { cardContentSchema, parseIntlPrices, planSlug, type PlanCard, type PlanSource } from "./model";
 import { previewPlanCards } from "./preview";
 
 export async function publicPlanCards(): Promise<{ plans: PlanCard[]; source: PlanSource }> {
@@ -16,7 +16,7 @@ export async function publicPlanCards(): Promise<{ plans: PlanCard[]; source: Pl
   });
   try {
     const { data, error } = await supabase.from("public_plan_cards")
-      .select("id,slug,nome,preco_centavos,ordem,destaque,card_content,card_revision").order("ordem");
+      .select("id,slug,nome,preco_centavos,intl_prices,ordem,destaque,card_content,card_revision").order("ordem");
     if (error || !data) return { plans: [], source: "unavailable" };
     const plans: PlanCard[] = [];
     for (const row of data) {
@@ -30,7 +30,8 @@ export async function publicPlanCards(): Promise<{ plans: PlanCard[]; source: Pl
       }
       plans.push({
         id: row.id, slug: slug.data, name: row.nome, priceCents: row.preco_centavos,
-        order: row.ordem, featured: row.destaque, visible: true, revision: row.card_revision, content: content.data,
+        order: row.ordem, featured: row.destaque, visible: true, revision: row.card_revision,
+        content: content.data, intlPrices: parseIntlPrices(row.intl_prices),
       });
     }
     return { plans, source: "database" };

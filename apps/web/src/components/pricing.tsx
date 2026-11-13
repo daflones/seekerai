@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CalendarClock, CreditCard, QrCode, ShieldCheck } from "lucide-react";
 import type { PlanCard, PlanSource } from "@/lib/plans/model";
 import { BILLING_PERIODS, periodDef, periodTotalCents, type BillingPeriod } from "@/lib/plans/periods";
-import { formatMoney, INTL_PRICES, type Locale } from "@/lib/i18n/shared";
+import { formatMoney, planIntlCents, type Locale } from "@/lib/i18n/shared";
 import type { Messages } from "@/lib/i18n/messages";
 import { PlanCardView } from "./plan-card";
 
@@ -18,7 +18,8 @@ export function Pricing({ plans, source, locale, t, discountPct = 0 }: { plans: 
   // Legenda do total cobrado no ciclo ("R$ 53,97 a cada trimestre").
   const billedCaption = (plan: PlanCard) => {
     if (def.months === 1) return "";
-    const base = locale.isBrazil ? plan.priceCents : INTL_PRICES[plan.slug] ?? plan.priceCents;
+    const base = locale.isBrazil ? plan.priceCents
+      : planIntlCents(plan, locale.currency) ?? plan.priceCents;
     const total = formatMoney(disc(periodTotalCents(base, def)), locale.currency, locale.lang);
     return `${total} ${period === "trimestral" ? t.billedTri : t.billedYear}`;
   };

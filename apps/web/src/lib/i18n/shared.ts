@@ -1,7 +1,10 @@
 // Tipos e constantes de i18n seguros para componentes cliente (sem next/headers).
 
 export type Lang = "pt" | "en" | "es" | "fr" | "de" | "it";
-export type Currency = "brl" | "usd" | "eur";
+export type Currency = "brl" | "usd" | "eur" | "gbp";
+/** Moedas internacionais com preço próprio por plano (centavos). */
+export type IntlCurrency = Exclude<Currency, "brl">;
+export type IntlPrices = Partial<Record<IntlCurrency, number>>;
 
 export interface Locale {
   lang: Lang;
@@ -15,13 +18,16 @@ export const THEME_COOKIE = "sk_theme";
 export type Theme = "dark" | "light";
 
 const EUR_REGIONS = new Set([
-  "PT", "IE", "GB", "ES", "FR", "DE", "IT", "NL", "BE", "AT", "FI", "GR",
+  "PT", "IE", "ES", "FR", "DE", "IT", "NL", "BE", "AT", "FI", "GR",
   "LU", "SI", "SK", "EE", "LV", "LT", "CY", "MT", "HR", "AD", "MC",
   "SM", "VA", "ME", "XK", "CH", "NO", "DK", "SE", "IS", "PL", "CZ", "HU",
-  "RO", "BG", "AL", "RS", "BA", "MK", "UA", "MD", "LI", "GI", "IM", "JE",
-  "GG", "FO", "GL", "AX", "SJ", "GP", "MQ", "RE", "YT", "GF", "PM", "BL",
+  "RO", "BG", "AL", "RS", "BA", "MK", "UA", "MD", "LI", "GI", "FO", "GL",
+  "AX", "SJ", "GP", "MQ", "RE", "YT", "GF", "PM", "BL",
   "MF", "NC", "PF", "WF", "TF", "EA", "IC", "AC", "TA",
 ]);
+
+// Reino Unido e dependências da coroa — moeda própria (libra).
+const GBP_REGIONS = new Set(["GB", "GG", "IM", "JE"]);
 
 const SUPPORTED = new Set<Lang>(["pt", "en", "es", "fr", "de", "it"]);
 
@@ -33,6 +39,7 @@ function normLang(tag: string): Lang {
 export function currencyForRegion(region: string): Currency {
   const r = region.toUpperCase();
   if (r === "BR") return "brl";
+  if (GBP_REGIONS.has(r)) return "gbp";
   if (EUR_REGIONS.has(r)) return "eur";
   return "usd";
 }
@@ -44,12 +51,28 @@ export function parseLocaleTag(tag: string): Locale {
   return { lang, region, currency: currencyForRegion(region), isBrazil: region === "BR" };
 }
 
-// Preços para fora do Brasil (centavos de USD/EUR — mesmo número nas duas).
+// Fallback de preços internacionais (centavos) — o valor de verdade vem de
+// plans.intl_prices (editável no admin); estes só valem pra prévia/seed.
 export const INTL_PRICES: Record<string, number> = {
   essencial: 500,
   pro: 1500,
   king: 2500,
 };
+/** Preço mensal do plano na moeda — admin-configurado, com fallback. */
+export function planIntlCents(
+  plan: { slug: string; intlPrices?: IntlPrices | null },
+  currency: Currency,
+): number | undefined {
+  if (currency === "brl") return undefined;
+  const configured = plan.intlPrices?.[currency];
+  if (typeof configured === "number" && configured > 0) return configured;
+  if (currency === "usd" || currency === "eur") return INTL_PRICES[plan.slug];
+  if (currency === "gbp") {
+    const usd = INTL_PRICES[plan.slug];
+    return usd ? Math.round(usd * 0.8) : undefined;
+  }
+  return undefined;
+}
 // Pacotes avulsos de créditos — o valor de verdade vem de
 // app_settings.credit_packs (editável no admin); estes são o fallback.
 export interface CreditPack { id: string; credits: number; brlCents: number; intlCents: number }

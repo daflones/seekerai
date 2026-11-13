@@ -6,15 +6,17 @@ import {
   RefreshCw, Save, Trash2, TrendingUp, Wallet,
 } from "lucide-react";
 import { FinList } from "@/components/fin-list";
+import { fmtTotals, unitsToTotals, type PayCurrency } from "@/lib/admin/money";
 
 interface Chave { id: string; label: string; pixKeyMask: string; pix_key_type: string; hasDocument: boolean }
 interface Saque { id: string; amount: number; pixKeyMask: string; pix_key_type: string; status: string; erro: string | null; created_at: string }
+type CurUnits = Record<PayCurrency, number>;
 
 interface Data {
   saldo: number | null;
   saldoAt?: string | null;
-  receita: { cartao: number; pix: number };
-  previsao: { proximoMes: number; trimestre: number; assinaturas: number };
+  receita: { cartao: CurUnits; pix: number };
+  previsao: { proximoMes: CurUnits; trimestre: CurUnits; assinaturas: number };
   chaves: Chave[];
   saques: Saque[];
 }
@@ -34,6 +36,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 const brl = (v: number | null) =>
   v === null ? "—" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+// Totais por moeda vindos da API (em unidades) — cada moeda formatada na sua.
+const fmtUnits = (u?: Partial<CurUnits> | null) =>
+  u ? fmtTotals(unitsToTotals(u)) : "—";
 
 export function AdminFinanceiro() {
   const [data, setData] = useState<Data | null>(null);
@@ -109,13 +114,13 @@ export function AdminFinanceiro() {
           </div>
           <div className="fin-mini">
             <span><CreditCard size={13} /> ENTRADAS EM CARTÃO</span>
-            <strong>{loading ? "…" : brl(data?.receita.cartao ?? 0)}</strong>
-            <small>Stripe — sacado pelo painel da Stripe</small>
+            <strong>{loading ? "…" : fmtUnits(data?.receita.cartao)}</strong>
+            <small>Stripe — cada moeda no seu valor</small>
           </div>
           <div className="fin-mini">
             <span><TrendingUp size={13} /> PREVISÃO PRÓXIMO MÊS</span>
-            <strong>{loading ? "…" : brl(data?.previsao.proximoMes ?? 0)}</strong>
-            <small>{data ? `${data.previsao.assinaturas} assinaturas · ~${brl(data.previsao.trimestre)} em 3m` : "Assinaturas mantidas"}</small>
+            <strong>{loading ? "…" : fmtUnits(data?.previsao.proximoMes)}</strong>
+            <small>{data ? `${data.previsao.assinaturas} assinaturas · ~${fmtUnits(data.previsao.trimestre)} em 3m` : "Assinaturas mantidas"}</small>
           </div>
         </div>
       </div>

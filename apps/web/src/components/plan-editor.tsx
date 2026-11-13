@@ -3,7 +3,20 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, CheckCircle2, Eye, Plus, Save, Trash2 } from "lucide-react";
 import { cardContentSchema, formatPlanPrice, planEditSchema, type PlanCard } from "@/lib/plans/model";
+import { type Currency, type IntlPrices, type Locale } from "@/lib/i18n/shared";
 import { PlanCardView } from "./plan-card";
+
+const INTL_CURS = ["usd", "eur", "gbp"] as const;
+const INTL_LABEL: Record<(typeof INTL_CURS)[number], string> = { usd: "US$", eur: "€", gbp: "£" };
+const fmtIntl = (cents?: number) => (cents ? (cents / 100).toFixed(2) : "");
+
+// Locales de prévia — um por moeda, pra mostrar o card como o visitante vê.
+const PREVIEW_LOCALES: Record<Currency, Locale> = {
+  brl: { lang: "pt", currency: "brl", region: "BR", isBrazil: true },
+  usd: { lang: "en", currency: "usd", region: "US", isBrazil: false },
+  eur: { lang: "en", currency: "eur", region: "DE", isBrazil: false },
+  gbp: { lang: "en", currency: "gbp", region: "GB", isBrazil: false },
+};
 
 function cents(value: string): number | null {
   const normalized = value.trim().includes(",") ? value.trim().replace(/\./g, "").replace(",", ".") : value.trim();
@@ -16,6 +29,10 @@ export function PlanEditor({ initialPlans }: { initialPlans: PlanCard[] }) {
   const [plans, setPlans] = useState(initialPlans);
   const [selected, setSelected] = useState(initialPlans[0].slug);
   const [prices, setPrices] = useState(Object.fromEntries(initialPlans.map((plan) => [plan.slug, formatPlanPrice(plan.priceCents)])));
+  const [intl, setIntl] = useState(() => Object.fromEntries(initialPlans.map((plan) => [plan.slug, {
+    usd: fmtIntl(plan.intlPrices?.usd), eur: fmtIntl(plan.intlPrices?.eur), gbp: fmtIntl(plan.intlPrices?.gbp),
+  }])) as Record<string, Record<(typeof INTL_CURS)[number], string>>);
+  const [cur, setCur] = useState<Currency>("brl");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
@@ -41,9 +58,18 @@ export function PlanEditor({ initialPlans }: { initialPlans: PlanCard[] }) {
     const price = cents(prices[selected]);
     if (price === null) { setError("Informe um preço válido, como 49,90."); return; }
     if (plan.slug === "gratis" && price !== 0) { setError("O plano Grátis precisa continuar com preço zero."); return; }
+    const intlPrices: IntlPrices = {};
+    for (const c of INTL_CURS) {
+      const raw = intl[selected]?.[c]?.trim() ?? "";
+      if (!raw) continue;
+      const v = cents(raw);
+      if (v === null) { setError(`Preço ${INTL_LABEL[c]} inválido — use o formato 9.90 ou deixe vazio.`); return; }
+      intlPrices[c] = v;
+    }
     const parsed = planEditSchema.safeParse({
       id: plan.id, name: plan.name, priceCents: price, order: plan.order,
       featured: plan.featured, visible: plan.visible, content: plan.content, revision: plan.revision, reason,
+      intlPrices,
     });
     if (!parsed.success) { setError(parsed.error.issues[0]?.message || "Revise os campos."); return; }
     setSaving(true);
@@ -51,13 +77,24 @@ export function PlanEditor({ initialPlans }: { initialPlans: PlanCard[] }) {
       const response = await fetch("/api/admin/plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsed.data) });
       const result = await response.json();
       if (!response.ok) { setError(result.error || "Não foi possível salvar."); return; }
-      change({ revision: result.revision, priceCents: price });
+      change({ revision: result.revision, priceCents: price, intlPrices });
       setSaved("Salvo. A landing e o cadastro passam a ler essa configuração."); setReason("");
     } catch { setError("Não foi possível conectar. Tente novamente."); }
     finally { setSaving(false); }
   }
-  const preview = { ...plan, priceCents: cents(prices[selected]) ?? plan.priceCents };
+  function setIntlPrice(c: (typeof INTL_CURS)[number], value: string) {
+    const current = Object.fromEntries(INTL_CURS.map((k) => [k, intl[selected]?.[k] ?? ""])) as Record<(typeof INTL_CURS)[number], string>;
+    current[c] = value;
+    setIntl({ ...intl, [selected]: current });
+  }
+  const previewIntl: IntlPrices = {};
+  for (const c of INTL_CURS) {
+    const v = cents(intl[selected]?.[c] ?? "");
+    if (v !== null) previewIntl[c] = v;
+  }
+  const preview = { ...plan, priceCents: cents(prices[selected]) ?? plan.priceCents, intlPrices: previewIntl };
   const validPreview = cardContentSchema.safeParse(preview.content).success;
+  const previewLocale = PREVIEW_LOCALES[cur];
 
   return <div className="plan-editor">
     <div className="editor-plan-tabs" role="group" aria-label="Plano em edição">{plans.map((item) => <button key={item.slug} type="button" disabled={saving} aria-pressed={selected === item.slug} onClick={() => { setSelected(item.slug); setError(""); setSaved(""); setReason(""); }}>{item.name}<small>{item.visible ? "Publicado" : "Rascunho"}</small></button>)}</div>
@@ -66,6 +103,7 @@ export function PlanEditor({ initialPlans }: { initialPlans: PlanCard[] }) {
         <fieldset disabled={saving}><legend>Oferta do plano</legend><div className="editor-fields">
           <label>Nome<input value={plan.name} maxLength={60} onChange={(event) => change({ name: event.target.value })} /></label>
           <label>Preço mensal (R$)<input inputMode="decimal" value={prices[selected]} onChange={(event) => { const value = event.target.value; setPrices({ ...prices, [selected]: value }); const price = cents(value); if (price !== null) change({ priceCents: price }); }} /></label>
+          {INTL_CURS.map((c) => <label key={c}>Preço mensal ({INTL_LABEL[c]}) — visitante internacional<input inputMode="decimal" placeholder="Vazio = não vende nessa moeda" value={intl[selected]?.[c] ?? ""} onChange={(event) => setIntlPrice(c, event.target.value)} /></label>)}
           <label>Ordem na landing<input type="number" min={0} max={99} value={plan.order} onChange={(event) => change({ order: Number(event.target.value) })} /></label>
           <label>Selo<input value={plan.content.badge} maxLength={40} onChange={(event) => content({ badge: event.target.value })} placeholder="Ex.: Mais popular" /></label>
         </div><label className="editor-block-label">Descrição<textarea maxLength={180} rows={3} value={plan.content.description} onChange={(event) => content({ description: event.target.value })} /></label>
@@ -93,7 +131,11 @@ export function PlanEditor({ initialPlans }: { initialPlans: PlanCard[] }) {
         {saved && <p role="status" className="editor-saved"><CheckCircle2 size={16} />{saved}</p>}
         <button className="button button-primary" disabled={saving}><Save size={16} />{saving ? "Salvando..." : "Salvar plano e card"}</button>
       </form>
-      <aside className="editor-preview"><span><Eye size={15} />PRÉVIA EM TEMPO REAL</span>{validPreview ? <PlanCardView plan={preview} preview /> : <p className="auth-notice">Revise os textos e mantenha ao menos um benefício visível para visualizar.</p>}<p>A prévia não inicia cadastro ou cobrança.</p></aside>
+      <aside className="editor-preview"><span><Eye size={15} />PRÉVIA EM TEMPO REAL</span>
+        <div className="editor-cur-tabs" role="group" aria-label="Moeda da prévia">
+          {(["brl", "usd", "eur", "gbp"] as const).map((c) => <button key={c} type="button" aria-pressed={cur === c} onClick={() => setCur(c)}>{c === "brl" ? "R$" : INTL_LABEL[c]}</button>)}
+        </div>
+        {validPreview ? <PlanCardView plan={preview} preview locale={previewLocale} perMonth={cur === "brl" ? "/ mês" : "/ month"} freeSuffix={cur === "brl" ? "/ para conhecer" : "/ to explore"} freeNote={cur === "brl" ? "Conheça antes de decidir." : "Explore before deciding."} paidNote={cur === "brl" ? "Sua próxima fase, no seu ritmo." : "Your next phase, at your pace."} /> : <p className="auth-notice">Revise os textos e mantenha ao menos um benefício visível para visualizar.</p>}<p>A prévia não inicia cadastro ou cobrança.</p></aside>
     </div>
   </div>;
 }

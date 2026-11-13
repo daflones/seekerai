@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Bot, Check, Crown, Globe, Sparkles, Zap } from "lucide-react";
 import { formatPlanPrice, type PlanCard } from "@/lib/plans/model";
 import { periodDef, periodMonthlyCents, type BillingPeriod } from "@/lib/plans/periods";
-import { formatMoney, INTL_PRICES, type Locale } from "@/lib/i18n/shared";
+import { formatMoney, planIntlCents, type Locale } from "@/lib/i18n/shared";
 import { planText } from "@/lib/catalog-i18n";
 
 const featureIcons = { check: Check, bot: Bot, sparkles: Sparkles, globe: Globe };
@@ -40,7 +40,7 @@ export function PlanCardView({
   const L = (s: string) => planText(s, lang);
   const BadgeIcon = plan.slug === "king" ? Crown : plan.featured ? Sparkles : Zap;
   const isIntl = locale && !locale.isBrazil;
-  const intlCents = isIntl ? INTL_PRICES[plan.slug] : undefined;
+  const intlCents = isIntl && locale!.currency !== "brl" ? planIntlCents(plan, locale!.currency) : undefined;
   const baseCents = isIntl ? intlCents : plan.priceCents;
   const showDisc = discountPct > 0 && (baseCents ?? 0) > 0;
   const monthly = periodMonthlyCents(baseCents ?? 0, periodDef(period));
@@ -52,7 +52,9 @@ export function PlanCardView({
     {isIntl
       ? <div className="plan-price">{intlCents !== undefined
           ? <>{showDisc && <s className="plan-price-was">{formatMoney(monthly, locale.currency, locale.lang)}</s>}{formatMoney(disc(monthly), locale.currency, locale.lang)}<small>{perMonth}</small></>
-          : <>{formatMoney(0, locale.currency, locale.lang)}<small>{freeSuffix}</small></>}</div>
+          : plan.priceCents === 0
+            ? <>{formatMoney(0, locale.currency, locale.lang)}<small>{freeSuffix}</small></>
+            : <span className="plan-price-na">—</span>}</div>
       : <div className="plan-price"><span>R$</span>{showDisc && <s className="plan-price-was">{formatPlanPrice(monthly)}</s>}{formatPlanPrice(disc(monthly))}<small>{plan.slug === "gratis" ? freeSuffix : perMonth}</small></div>}
     {showDisc && <span className="plan-off-tag">{discountPct}% {firstBuy}</span>}
     {billedCaption && <span className="plan-billed-note">{billedCaption}</span>}

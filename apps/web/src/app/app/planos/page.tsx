@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { publicPlanCards } from "@/lib/plans/server";
-import { cardContentSchema, planSlug, type PlanCard } from "@/lib/plans/model";
+import { cardContentSchema, parseIntlPrices, planSlug, type PlanCard } from "@/lib/plans/model";
 import { defaultCardContent } from "@/lib/plans/preview";
 import { CREDIT_PACKS, parseCreditPacks } from "@/lib/i18n/shared";
 import { PlanCheckout } from "@/components/plan-checkout";
@@ -46,7 +46,7 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
   let lookupPlans = plans;
   if (currentPlanSlug && !plans.some((p) => p.slug === currentPlanSlug)) {
     const { data: cur } = await supabase.from("plans")
-      .select("id,slug,nome,preco_centavos,ordem,destaque,card_content,card_revision")
+      .select("id,slug,nome,preco_centavos,intl_prices,ordem,destaque,card_content,card_revision")
       .eq("slug", currentPlanSlug).maybeSingle();
     const slug = cur ? planSlug.safeParse(cur.slug) : null;
     if (cur && slug?.success) {
@@ -55,6 +55,7 @@ export default async function PlanosPage({ searchParams }: { searchParams: Promi
         id: cur.id, slug: slug.data, name: cur.nome, priceCents: cur.preco_centavos,
         order: cur.ordem, featured: cur.destaque, visible: false, revision: cur.card_revision,
         content: content.success ? content.data : defaultCardContent(slug.data),
+        intlPrices: parseIntlPrices(cur.intl_prices),
       } satisfies PlanCard];
     }
   }

@@ -6,7 +6,7 @@ function feature(id: string, text: string, icon: "check" | "bot" | "sparkles" | 
 
 export const previewPlanCards: PlanCard[] = [
   {
-    id: null, slug: "essencial", name: "Essencial", priceCents: 2490, order: 1, featured: false, visible: true, revision: 0,
+    id: null, slug: "essencial", name: "Essencial", priceCents: 2490, order: 1, featured: false, visible: true, revision: 0, intlPrices: { usd: 500, eur: 500, gbp: 400 },
     content: {
       badge: "PARA CRIAR CONSTÂNCIA", theme: "teal", buttonStyle: "solid", cta: "Escolher Essencial",
       description: "Para quem está começando a prospectar com mais direção.",
@@ -21,7 +21,7 @@ export const previewPlanCards: PlanCard[] = [
     },
   },
   {
-    id: null, slug: "pro", name: "Pro", priceCents: 4990, order: 2, featured: true, visible: true, revision: 0,
+    id: null, slug: "pro", name: "Pro", priceCents: 4990, order: 2, featured: true, visible: true, revision: 0, intlPrices: { usd: 1500, eur: 1500, gbp: 1200 },
     content: {
       badge: "MAIS POPULAR", theme: "violet", buttonStyle: "light", cta: "Quero o SeekerAi Pro",
       description: "Para quem quer mais contexto em cada negociação.",
@@ -37,7 +37,7 @@ export const previewPlanCards: PlanCard[] = [
     },
   },
   {
-    id: null, slug: "king", name: "King", priceCents: 6490, order: 3, featured: false, visible: true, revision: 0,
+    id: null, slug: "king", name: "King", priceCents: 6490, order: 3, featured: false, visible: true, revision: 0, intlPrices: { usd: 2500, eur: 2500, gbp: 2000 },
     content: {
       badge: "SEU PRÓXIMO NÍVEL", theme: "gold", buttonStyle: "solid", cta: "Escolher King",
       description: "Para quem prospecta com frequência e quer ir além.",

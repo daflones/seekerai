@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const { error } = await session.supabase.rpc("configure_plan_card", {
       p_plan: plan.id, p_name: plan.name, p_price: plan.priceCents, p_order: plan.order,
       p_featured: plan.featured, p_visible: plan.visible, p_content: plan.content,
-      p_revision: plan.revision, p_reason: plan.reason,
+      p_revision: plan.revision, p_reason: plan.reason, p_intl: plan.intlPrices,
     });
     if (error?.code === "40001") return NextResponse.json({ error: "Este card foi alterado em outra sessão. Recarregue antes de salvar." }, { status: 409 });
     if (error) return NextResponse.json({ error: "Não foi possível salvar. Verifique os dados e tente novamente." }, { status: 400 });

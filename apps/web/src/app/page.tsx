@@ -7,7 +7,7 @@ import { ProductDemo } from "@/components/product-demo";
 import { publicPlanCards } from "@/lib/plans/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatPlanPrice } from "@/lib/plans/model";
-import { formatMoney, INTL_PRICES } from "@/lib/i18n/shared";
+import { formatMoney, planIntlCents } from "@/lib/i18n/shared";
 import { getLocale, getTheme } from "@/lib/i18n";
 import { getMessages } from "@/lib/i18n/messages";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -150,10 +150,10 @@ export default async function Home() {
                     {plan.priceCents > 0 && discountPct > 0 &&
                       <s className="cta-plan-was">{loc.isBrazil
                         ? `R$ ${formatPlanPrice(plan.priceCents)}`
-                        : formatMoney(INTL_PRICES[plan.slug] ?? plan.priceCents, loc.currency, loc.lang)}</s>}
+                        : formatMoney(planIntlCents(plan, loc.currency) ?? 0, loc.currency, loc.lang)}</s>}
                     {loc.isBrazil
                       ? <>R$ {formatPlanPrice(disc(plan.priceCents))}</>
-                      : formatMoney(disc(INTL_PRICES[plan.slug] ?? plan.priceCents), loc.currency, loc.lang)}
+                      : formatMoney(disc(planIntlCents(plan, loc.currency) ?? 0), loc.currency, loc.lang)}
                     <small>{t.pricing.perMonth}</small>
                   </span>
                   <em>{plan.content.cta} <ArrowUpRight size={13} /></em>

@@ -1,6 +1,20 @@
 import { z } from "zod";
+import type { IntlPrices } from "@/lib/i18n/shared";
 
 export const planSlug = z.enum(["gratis", "essencial", "pro", "king"]);
+
+const intlPrice = z.number().int().min(1).max(10_000_000);
+export const intlPricesSchema = z.object({
+  usd: intlPrice.optional(),
+  eur: intlPrice.optional(),
+  gbp: intlPrice.optional(),
+}).strict();
+
+/** Lê o jsonb do banco — chaves inválidas são descartadas. */
+export function parseIntlPrices(value: unknown): IntlPrices {
+  const parsed = intlPricesSchema.safeParse(value ?? {});
+  return parsed.success ? parsed.data : {};
+}
 
 export function marketingTextAllowed(text: string): boolean {
   const withoutCard = text.replace(/cart[aã]o de cr[eé]dito/gi, "");
@@ -39,6 +53,7 @@ export const planEditSchema = z.object({
   revision: z.number().int().nonnegative(),
   reason: z.string().trim().min(5).max(300),
   content: cardContentSchema,
+  intlPrices: intlPricesSchema,
 }).strict();
 
 export type CardContent = z.infer<typeof cardContentSchema>;
@@ -53,6 +68,7 @@ export type PlanCard = {
   visible: boolean;
   revision: number;
   content: CardContent;
+  intlPrices: IntlPrices;
 };
 export type PlanSource = "database" | "preview" | "unavailable";
 

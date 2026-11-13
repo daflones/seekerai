@@ -9,6 +9,10 @@ import { authReady } from "@/lib/auth/config";
 import { fetchAllRows } from "@/lib/supabase/admin";
 import { AdminCreditos } from "@/components/admin-creditos";
 import { AdminTools } from "@/components/admin-tools";
+import {
+  addCents, emptyTotals, fmtMoney, fmtTotals, payCurrency,
+  type CurTotals, type PayCurrency,
+} from "@/lib/admin/money";
 
 const ACTION_LABELS: Record<string, string> = {
   search: "Busca",
@@ -155,14 +159,14 @@ export default async function AdminPage() {
       (f, t) => supabase.from("profiles").select("created_at").gte("created_at", since60).range(f, t)),
     supabase.from("credit_settings").select("welcome_credits").single(),
     supabase.from("credit_action_rules").select("action,cost,enabled").order("action"),
-    supabase.from("subscriptions").select("status,billing_months, plans(slug,nome,preco_centavos)").eq("status", "active"),
+    supabase.from("subscriptions").select("status,billing_months,currency, plans(slug,nome,preco_centavos,intl_prices)").eq("status", "active"),
     fetchAllRows<{ status: string }>(
       (f, t) => supabase.from("leads").select("status").range(f, t)),
     fetchAllRows<{ action: string; cost: number; status: string; created_at: string }>(
       (f, t) => supabase.from("credit_operations").select("action,cost,status,created_at").gte("created_at", since60).range(f, t)),
     supabase.from("support_tickets").select("status,atendente").limit(500),
-    fetchAllRows<{ status: string; provider: string | null; method: string | null; amount_cents: number; metadata: unknown; created_at: string; user_id: string | null }>(
-      (f, t) => supabase.from("payments").select("status,provider,method,amount_cents,metadata,created_at,user_id").gte("created_at", since60).range(f, t)),
+    fetchAllRows<{ status: string; provider: string | null; method: string | null; amount_cents: number; currency: string | null; metadata: unknown; created_at: string; user_id: string | null }>(
+      (f, t) => supabase.from("payments").select("status,provider,method,amount_cents,currency,metadata,created_at,user_id").gte("created_at", since60).range(f, t)),
     fetchAllRows<{ status: string; created_at: string }>(
       (f, t) => supabase.from("search_jobs").select("status,created_at").range(f, t)),
     fetchAllRows<{ status: string; created_at: string }>(
@@ -175,12 +179,20 @@ export default async function AdminPage() {
 
   const signDates = (profilesRecent ?? []).map((p) => p.created_at as string);
   const paidRows = (payments60 ?? []).filter((p) => p.status === "paid");
-  const paidCents30 = paidRows.filter((p) => new Date(p.created_at).getTime() > Date.now() - 30 * DAY)
-    .reduce((a, p) => a + (p.amount_cents ?? 0), 0);
-  const paidCentsPrev = paidRows.filter((p) => {
-    const t = new Date(p.created_at).getTime();
-    return t <= Date.now() - 30 * DAY && t > Date.now() - 60 * DAY;
-  }).reduce((a, p) => a + (p.amount_cents ?? 0), 0);
+  // Receita por moeda — dólar/euro/libra nunca somam com real.
+  const payCur = (p: { currency?: string | null; metadata?: unknown }) => payCurrency(p);
+  const sumCur = (rows: typeof paidRows, daysBack: number, daysSpan: number): CurTotals => {
+    const t = emptyTotals();
+    const lo = Date.now() - (daysBack + daysSpan) * DAY;
+    const hi = Date.now() - daysBack * DAY;
+    for (const p of rows) {
+      const ts = new Date(p.created_at).getTime();
+      if (ts >= lo && ts < hi) addCents(t, payCur(p), p.amount_cents ?? 0);
+    }
+    return t;
+  };
+  const paidCents30 = sumCur(paidRows, 0, 30);
+  const paidCentsPrev = sumCur(paidRows, 30, 30);
 
   const searchesDates = (ops30 ?? []).filter((o) => o.action === "search" && o.status === "completed")
     .map((o) => o.created_at as string);
@@ -198,12 +210,16 @@ export default async function AdminPage() {
   ).sort((a, b) => b[1] - a[1]);
   const maxAcao = Math.max(1, ...porAcao.map(([, v]) => v));
 
-  const mrr = (subs ?? []).reduce((acc, s) => {
-    const plano = s.plans as unknown as { preco_centavos: number } | null;
+  const mrr = emptyTotals();
+  for (const s of subs ?? []) {
+    const raw = String((s as { currency?: string | null }).currency ?? "brl").toLowerCase();
+    const cur: PayCurrency = raw === "usd" || raw === "eur" || raw === "gbp" ? raw : "brl";
+    const plano = s.plans as unknown as { preco_centavos?: number; intl_prices?: Record<string, number> } | null;
     const months = (s as { billing_months?: number }).billing_months ?? 1;
-    const monthly = plano ? (plano.preco_centavos * (months === 12 ? 0.8 : months === 3 ? 0.9 : 1)) : 0;
-    return acc + monthly;
-  }, 0);
+    const factor = months === 12 ? 0.8 : months === 3 ? 0.9 : 1;
+    const base = cur === "brl" ? (plano?.preco_centavos ?? 0) : (plano?.intl_prices?.[cur] ?? 0);
+    addCents(mrr, cur, Math.round(base * factor));
+  }
   const byPlan = (subs ?? []).reduce<Record<string, number>>((acc, s) => {
     const slug = (s.plans as unknown as { slug?: string })?.slug ?? "?";
     acc[slug] = (acc[slug] ?? 0) + 1;
@@ -285,10 +301,10 @@ export default async function AdminPage() {
         <span className="stat-sub"><Delta now={signup7} before={signupPrev7} /></span></section>
       <section className="stat-card"><span className="stat-icon"><CreditCard size={18} /></span>
         <small>ASSINATURAS ATIVAS</small><strong>{(subs ?? []).length}</strong>
-        <span className="stat-sub">MRR ≈ {brl(mrr)}</span></section>
+        <span className="stat-sub">MRR ≈ {fmtTotals(mrr)}</span></section>
       <section className="stat-card"><span className="stat-icon"><ReceiptText size={18} /></span>
-        <small>RECEITA 30D</small><strong>{brl(paidCents30)}</strong>
-        <span className="stat-sub">{paidCentsPrev > 0 ? `vs ${brl(paidCentsPrev)} nos 30d anteriores` : `${paidRows.length} pagamentos em 60d`}</span></section>
+        <small>RECEITA 30D</small><strong>{fmtTotals(paidCents30)}</strong>
+        <span className="stat-sub">{paidCentsPrev.brl + paidCentsPrev.usd + paidCentsPrev.eur + paidCentsPrev.gbp > 0 ? `vs ${fmtTotals(paidCentsPrev)} nos 30d anteriores` : `${paidRows.length} pagamentos em 60d`}</span></section>
       <section className="stat-card"><span className="stat-icon"><Compass size={18} /></span>
         <small>BUSCAS 30D</small><strong>{sumDays(searchesDates, 30)}</strong>
         <span className="stat-sub"><Delta now={search7} before={searchPrev7} /></span></section>
@@ -303,8 +319,8 @@ export default async function AdminPage() {
     <div className="adm-charts">
       <ChartCard title="NOVOS USUÁRIOS / DIA" hint="30 dias" data={daySeries(signDates)} />
       <ChartCard title="BUSCAS / DIA" hint="30 dias" data={daySeries(searchesDates)} />
-      <ChartCard title="RECEITA / DIA" hint="30 dias" money data={daySum(
-        paidRows.map((p) => ({ date: p.created_at as string, amount: p.amount_cents ?? 0 })),
+      <ChartCard title="RECEITA / DIA · SOMENTE R$" hint="30 dias" money data={daySum(
+        paidRows.filter((p) => payCur(p) === "brl").map((p) => ({ date: p.created_at as string, amount: p.amount_cents ?? 0 })),
       )} />
       <ChartCard title="CRÉDITOS / DIA" hint="30 dias" data={daySeries(creditDates)} />
     </div>
@@ -394,7 +410,7 @@ export default async function AdminPage() {
               {lastPayments.map((p, i) => (
                 <li key={i} className="adm-feed-row">
                   <span className={`adm-tag adm-tag-${p.status}`}>{p.status}</span>
-                  <span className="adm-mono">{brl(p.amount_cents ?? 0)}</span>
+                  <span className="adm-mono">{fmtMoney(p.amount_cents ?? 0, payCur(p))}</span>
                   <span title={payUser.get(p.user_id)?.email ?? ""}><strong>{payUser.get(p.user_id)?.nome || "—"}</strong> · {p.method ?? "?"} · {p.provider ?? "?"} · {(p.metadata as Record<string, unknown> | null)?.kind as string ?? "plan"}</span>
                   <small>{fmtHora(p.created_at)}</small>
                 </li>

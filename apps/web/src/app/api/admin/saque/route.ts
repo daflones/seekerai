@@ -5,6 +5,7 @@ import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
 import { decryptSecret } from "@/lib/security/encryption";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { addCents, emptyTotals, payCurrency, totalsToUnits, type CurTotals, type PayCurrency } from "@/lib/admin/money";
 
 // Painel financeiro: saldo/sacável vem só do MercosulPay (PIX). A receita do
 // Stripe (cartão) é separada nos rendimentos — não entra no saque.
@@ -83,8 +84,8 @@ export async function GET() {
     admin.from("admin_withdrawals")
       .select("id,amount,pix_key,pix_key_type,status,provider_ref,erro,created_at")
       .order("created_at", { ascending: false }).limit(50),
-    admin.from("payments").select("provider,method,amount_cents").eq("status", "paid").limit(5000),
-    admin.from("subscriptions").select("status, plans(preco_centavos)")
+    admin.from("payments").select("provider,method,amount_cents,currency,metadata").eq("status", "paid").limit(5000),
+    admin.from("subscriptions").select("status,currency,billing_months, plans(preco_centavos,intl_prices)")
       .in("status", ["active", "past_due"]),
   ]);
 
@@ -102,25 +103,41 @@ export async function GET() {
     }
   } catch { /* saldo indisponível sem a chave */ }
 
-  // Receita separada por provedor: cartão (Stripe) vs PIX (MercosulPay).
-  const receita = { stripe: 0, mercosulpay: 0 };
+  // Receita por moeda: PIX é sempre BRL (MercosulPay); cartão pode vir em
+  // USD/EUR/GBP via Stripe — cada moeda soma na sua própria chave.
+  const pixCents: CurTotals = emptyTotals();
+  const cartaoCents: CurTotals = emptyTotals();
   for (const p of payments.data ?? []) {
-    const prov = p.provider.toLowerCase();
-    if (prov.includes("stripe")) receita.stripe += p.amount_cents;
-    else receita.mercosulpay += p.amount_cents;
+    const cur = payCurrency(p);
+    const cents = Number(p.amount_cents) || 0;
+    if (p.method === "pix") addCents(pixCents, "brl", cents);
+    else addCents(cartaoCents, cur, cents);
   }
 
-  // Projeção: soma dos planos das assinaturas ativas/vencendo (se mantidas).
-  const mrr = (subs.data ?? []).reduce((acc, s) => {
-    const plano = s.plans as unknown as { preco_centavos: number } | null;
-    return acc + (plano?.preco_centavos ?? 0);
-  }, 0);
+  // Projeção por moeda: assinatura cobra na moeda dela — BRL usa o preço
+  // do plano, internacional usa o intl_prices configurado.
+  const mrrCents: CurTotals = emptyTotals();
+  for (const s of subs.data ?? []) {
+    const cur = ((s.currency as string | null) ?? "brl").toLowerCase() as PayCurrency;
+    const plano = s.plans as unknown as { preco_centavos: number; intl_prices?: Record<string, number> } | null;
+    const months = Number((s as { billing_months?: number }).billing_months) || 1;
+    const factor = months === 12 ? 0.8 : months === 3 ? 0.9 : 1;
+    const base = cur === "brl"
+      ? (plano?.preco_centavos ?? 0)
+      : (plano?.intl_prices?.[cur] ?? 0);
+    addCents(mrrCents, cur === "brl" || cur === "usd" || cur === "eur" || cur === "gbp" ? cur : "brl",
+      Math.round(base * factor));
+  }
 
   return NextResponse.json({
     saldo,
     saldoAt,
-    receita: { cartao: receita.stripe / 100, pix: receita.mercosulpay / 100 },
-    previsao: { proximoMes: mrr / 100, trimestre: (mrr * 3) / 100, assinaturas: subs.data?.length ?? 0 },
+    receita: { cartao: totalsToUnits(cartaoCents), pix: pixCents.brl / 100 },
+    previsao: {
+      proximoMes: totalsToUnits(mrrCents),
+      trimestre: totalsToUnits({ brl: mrrCents.brl * 3, usd: mrrCents.usd * 3, eur: mrrCents.eur * 3, gbp: mrrCents.gbp * 3 }),
+      assinaturas: subs.data?.length ?? 0,
+    },
     chaves: (keys.data ?? []).map((k) => ({
       id: k.id,
       label: k.label,
