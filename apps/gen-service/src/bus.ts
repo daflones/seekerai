@@ -8,6 +8,8 @@ export interface JobEvent {
   at: string;
   done?: boolean;
   erro?: string;
+  /** Busca de leads: estabelecimentos confirmados neste estágio. */
+  achados?: unknown[];
 }
 
 type Listener = (e: JobEvent) => void;

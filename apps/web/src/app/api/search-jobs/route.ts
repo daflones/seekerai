@@ -6,6 +6,7 @@ import { authRateLimit } from "@/lib/auth/rate-limit";
 import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { refundCreditAction } from "@/lib/billing/refund";
+import { genServiceUrl } from "@/lib/gen-service";
 
 // Jobs de busca: a chamada à edge roda no servidor em background,
 // então trocar de aba ou sair da página não cancela o radar.
@@ -19,8 +20,12 @@ const bodySchema = z.object({
 async function runJob(jobId: string, userId: string, token: string, payload: z.infer<typeof bodySchema>) {
   const admin = createSupabaseAdminClient();
   const config = supabasePublicConfig();
+  // Gen Service próprio tem prioridade — busca inteligente roda sem o
+  // wall-clock da edge (expansão de região pode levar vários minutos).
+  const genBase = genServiceUrl();
+  const upstreamUrl = genBase ? `${genBase}/places-search` : `${config!.url}/functions/v1/places-search`;
   try {
-    const upstream = await fetch(`${config!.url}/functions/v1/places-search`, {
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -28,7 +33,7 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ ...payload, jobId }),
-      signal: AbortSignal.timeout(240_000),
+      signal: AbortSignal.timeout(genBase ? 900_000 : 240_000),
     });
     const data = (await upstream.json().catch(() => ({}))) as Record<string, unknown>;
     if (!upstream.ok) {
@@ -52,7 +57,9 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
   }
 }
 
-const STALE_MS = 6 * 60_000;
+// Busca inteligente pode expandir pra região vizinha — job "running"
+// além de 12min é órfão de verdade.
+const STALE_MS = 12 * 60_000;
 
 function stale(job: { status: string; created_at: string }) {
   return job.status === "running" && Date.now() - new Date(job.created_at).getTime() > STALE_MS;

@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import { verifiedSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-// A edge tem timeout de 240s; um "running" além disso é job órfão
-// (servidor reiniciou no meio) — expira pra o cliente parar de esperar.
-const STALE_MS = 6 * 60_000;
+// A edge tem timeout de 240s e o gen-service busca inteligente expande
+// região — "running" além de 12min é job órfão mesmo.
+const STALE_MS = 12 * 60_000;
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
   const { id } = await params;
   const { data, error } = await session.supabase.from("search_jobs")
-    .select("id,status,result,erro,created_at")
+    .select("id,status,result,erro,progresso,etapa,eventos,created_at")
     .eq("id", id).maybeSingle();
   if (error || !data) return NextResponse.json({ error: "Busca não encontrada." }, { status: 404 });
   if (data.status === "running" && Date.now() - new Date(data.created_at).getTime() > STALE_MS) {

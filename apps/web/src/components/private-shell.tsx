@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, ChevronDown, CircleDollarSign, ClipboardList, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Shapes, ShieldCheck, Sparkles, UserRound, Users, Zap } from "lucide-react";
+import { Activity, ChevronDown, CircleDollarSign, ClipboardList, Compass, Globe, Headset, Images, LayoutDashboard, LogOut, MessageCircle, PanelsTopLeft, Radar, Shapes, ShieldCheck, Sparkles, UserRound, Users, Zap } from "lucide-react";
 import { Brand } from "./brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { ThemeToggle } from "./theme-toggle";
@@ -35,6 +35,7 @@ const ADMIN_NAV = [
   { href: "/admin/criacoes", label: "Criações", icon: Shapes },
   { href: "/admin/dominios", label: "Domínios", icon: Globe },
   { href: "/admin/planos", label: "Cards de plano", icon: PanelsTopLeft },
+  { href: "/admin/busca", label: "Busca de leads", icon: Radar },
   { href: "/admin/integracoes", label: "Integrações", icon: ShieldCheck },
 ];
 

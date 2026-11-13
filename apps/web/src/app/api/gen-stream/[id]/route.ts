@@ -16,11 +16,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: "Inválido." }, { status: 400 });
 
   // Confirma que o job é do usuário antes de abrir o stream.
-  const [{ data: a }, { data: s }] = await Promise.all([
+  const [{ data: a }, { data: s }, { data: j }] = await Promise.all([
     session.supabase.from("ai_jobs").select("id").eq("id", id).eq("user_id", session.user.id).maybeSingle(),
     session.supabase.from("studio_projects").select("id").eq("id", id).eq("user_id", session.user.id).maybeSingle(),
+    session.supabase.from("search_jobs").select("id").eq("id", id).eq("user_id", session.user.id).maybeSingle(),
   ]);
-  if (!a && !s) return NextResponse.json({ error: "Geração não encontrada." }, { status: 404 });
+  if (!a && !s && !j) return NextResponse.json({ error: "Geração não encontrada." }, { status: 404 });
 
   const token = session.accessToken;
   if (!token) return NextResponse.json({ error: "Sessão expirada." }, { status: 401 });

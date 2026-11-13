@@ -6,7 +6,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createClient } from "@supabase/supabase-js";
 import { handle } from "./generate.ts";
-import { recentJobEvents, subscribeJob, clearJobEvents, type JobEvent } from "./bus.ts";
+import { handleSearch } from "./search.ts";
+import { recentJobEvents, subscribeJob, clearJobEvents, emitJobEvent, type JobEvent } from "./bus.ts";
 import { asString, isRecord, serviceClient } from "./common.ts";
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -30,14 +31,16 @@ async function sseAuth(req: IncomingMessage): Promise<{ id: string } | null> {
   return error || !data.user ? null : { id: data.user.id };
 }
 
-// O job precisa ser do usuário — ai_jobs e studio_projects carregam user_id.
+// O job precisa ser do usuário — ai_jobs, studio_projects e
+// search_jobs carregam user_id.
 async function ownsJob(userId: string, jobId: string): Promise<boolean> {
   const db = serviceClient();
-  const [{ data: a }, { data: s }] = await Promise.all([
+  const [{ data: a }, { data: s }, { data: j }] = await Promise.all([
     db.from("ai_jobs").select("id").eq("id", jobId).eq("user_id", userId).maybeSingle(),
     db.from("studio_projects").select("id").eq("id", jobId).eq("user_id", userId).maybeSingle(),
+    db.from("search_jobs").select("id").eq("id", jobId).eq("user_id", userId).maybeSingle(),
   ]);
-  return Boolean(a || s);
+  return Boolean(a || s || j);
 }
 
 function sseWrite(res: ServerResponse, data: unknown): void {
@@ -82,19 +85,8 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // POST /ai-generate — mesmo contrato da edge. Bufferiza o body pra
-    // espiar jobId/action e emitir evento terminal pro SSE no fim.
+    // Body bufferizado uma vez — ambos os handlers consomem como Request.
     const bodyBuf = await readBody(req);
-    let jobId: string | null = null;
-    let action: string | null = null;
-    try {
-      const peek = JSON.parse(bodyBuf.toString("utf8"));
-      if (isRecord(peek)) {
-        jobId = asString(peek.jobId, 40);
-        action = asString(peek.action, 40);
-      }
-    } catch { /* handle() devolve o 400 de JSON inválido */ }
-
     const headers = new Headers();
     for (const [k, v] of Object.entries(req.headers)) {
       if (typeof v === "string") headers.set(k, v);
@@ -105,6 +97,37 @@ const server = createServer(async (req, res) => {
       headers,
       body: bodyBuf.length ? new Uint8Array(bodyBuf) : undefined,
     });
+
+    // Busca de leads: handler próprio (pipeline inteligente + SSE).
+    if (req.method === "POST" && url.pathname === "/places-search") {
+      const peek = (() => { try { return JSON.parse(bodyBuf.toString("utf8")); } catch { return null; } })();
+      const searchJobId = isRecord(peek) ? asString(peek.jobId, 40) : null;
+      const response = await handleSearch(request);
+      const outH: Record<string, string> = {};
+      response.headers.forEach((v, k) => { outH[k] = v; });
+      res.writeHead(response.status, outH);
+      res.end(Buffer.from(await response.arrayBuffer()));
+      if (searchJobId) {
+        emitJobEvent(searchJobId, response.ok ? 100 : 0,
+          response.ok ? "Concluída" : "Falhou",
+          { done: response.ok });
+        if (response.ok) setTimeout(() => clearJobEvents(searchJobId), 60_000);
+      }
+      return;
+    }
+
+    // POST /ai-generate — mesmo contrato da edge. Bufferiza o body pra
+    // espiar jobId/action e emitir evento terminal pro SSE no fim.
+    let jobId: string | null = null;
+    let action: string | null = null;
+    try {
+      const peek = JSON.parse(bodyBuf.toString("utf8"));
+      if (isRecord(peek)) {
+        jobId = asString(peek.jobId, 40);
+        action = asString(peek.action, 40);
+      }
+    } catch { /* handle() devolve o 400 de JSON inválido */ }
+
     const response = await handle(request);
 
     // Evento terminal pro SSE — a UI fecha o feed sem esperar o poll.
@@ -120,7 +143,6 @@ const server = createServer(async (req, res) => {
         const data = await clone.json().catch(() => null) as Record<string, unknown> | null;
         terminal.erro = asString(data?.erro, 300) ?? asString(data?.error, 300) ?? `HTTP ${response.status}`;
       }
-      const { emitJobEvent } = await import("./bus.ts");
       emitJobEvent(jobId, terminal.p, terminal.etapa, { done: terminal.done, erro: terminal.erro });
       if (response.ok) setTimeout(() => clearJobEvents(jobId), 60_000);
     }

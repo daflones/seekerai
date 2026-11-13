@@ -87,6 +87,8 @@ export interface PlaceResult {
   leadId?: string | null;
   /** Lead salvo já tem site gerado. */
   sitePronto?: boolean;
+  /** Prioridade da busca inteligente: alta = Instagram sem site. */
+  prioridade?: "alta" | "media" | "baixa" | null;
 }
 
 export function fmtCompact(n: number, lang: string): string {

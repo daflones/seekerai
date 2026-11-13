@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   BookmarkPlus, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink,
   AlarmClock, Globe, Heart, Instagram, Loader2, MapPin, MessageCircle, Phone,
-  Search, SlidersHorizontal, Sparkles, Star, Users, XCircle,
+  Radar, Search, SlidersHorizontal, Sparkles, Star, Users, XCircle,
 } from "lucide-react";
 import { fmtCompact, igHandle, igUrl, placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
@@ -15,16 +15,15 @@ import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/l
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 import type { Locale } from "@/lib/i18n/shared";
 import { FancySelect } from "./fancy-select";
+import { GenActivity, type GenEvent } from "./gen-activity";
 
 const PAGE_SIZE = 9;
 const STORE_KEY = "seekerai_search_v1";
-// Proteção de espera: avisa aos 40s (busca continua), cancela aos 90s —
-// job que morre no edge ficaria "running" pra sempre sem isso.
-// O aviso de demora espera a busca trabalhar: Serper + enriquecimento
-// demoram ~1-2min, então só avisa depois de 1:10 sem resultado — e o
-// cancelamento automático dá folga de 3min antes de desistir.
+// Proteção de espera: avisa aos 40s (busca continua), cancela depois de
+// 8min — a busca inteligente expande pra região vizinha e pode levar
+// vários minutos; o feed ao vivo (SSE) mostra o progresso real.
 const SLOW_MS = 70_000;
-const DEAD_MS = 180_000;
+const DEAD_MS = 480_000;
 
 interface SearchResponse {
   resultados: PlaceResult[];
@@ -39,6 +38,9 @@ interface SearchJob {
   status: "running" | "done" | "error";
   result?: SearchResponse | null;
   erro?: string | null;
+  progresso?: number | null;
+  etapa?: string | null;
+  eventos?: GenEvent[] | null;
   created_at: string;
 }
 
@@ -109,8 +111,13 @@ export function SearchConsole({
   const [slow, setSlow] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  // Feed ao vivo da busca inteligente: etapas (chat) + estabelecimentos
+  // confirmados aparecendo em tempo real via SSE.
+  const [liveEvents, setLiveEvents] = useState<GenEvent[]>([]);
+  const [livePlaces, setLivePlaces] = useState<PlaceResult[]>([]);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   const deadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
 
   // Persistência: resultado e job ativo sobrevivem a troca de página/aba.
   function store(state: StoredState) {
@@ -120,6 +127,38 @@ export function SearchConsole({
   function stopPolling() {
     if (poller.current) { clearInterval(poller.current); poller.current = null; }
     if (deadTimer.current) { clearTimeout(deadTimer.current); deadTimer.current = null; }
+    sseRef.current?.close();
+    sseRef.current = null;
+  }
+
+  function clearLive() {
+    setLiveEvents([]);
+    setLivePlaces([]);
+  }
+
+  // SSE do gen-service: etapas da busca + estabelecimentos confirmados.
+  // Se o stream cair, o polling de 3s continua cobrindo (eventos do banco).
+  function openStream(jobId: string) {
+    sseRef.current?.close();
+    try {
+      const es = new EventSource(`/api/gen-stream/${jobId}`);
+      sseRef.current = es;
+      es.onmessage = (m) => {
+        try {
+          const e = JSON.parse(m.data) as GenEvent & { achados?: PlaceResult[] };
+          if (Array.isArray(e.achados) && e.achados.length) {
+            setLivePlaces((cur) => {
+              const seen = new Set(cur.map((p) => p.id ?? `${p.nome}|${p.imagem}`));
+              const add = e.achados!.filter((p) =>
+                !seen.has(p.id ?? `${p.nome}|${p.imagem}`));
+              return add.length ? [...cur, ...add].slice(-60) : cur;
+            });
+          }
+          if (e.etapa) setLiveEvents((cur) => [...cur, e].slice(-60));
+        } catch { /* evento malformado — ignora */ }
+      };
+      es.onerror = () => { es.close(); if (sseRef.current === es) sseRef.current = null; };
+    } catch { /* sem SSE — polling cobre */ }
   }
 
   // Cancela a espera no cliente (o job segue no servidor, mas some da tela).
@@ -128,6 +167,7 @@ export function SearchConsole({
     setBusy(false);
     setSlow(false);
     setTimedOut(timed);
+    clearLive();
     store({ jobId: null, results: null, meta: null });
   }
 
@@ -142,6 +182,7 @@ export function SearchConsole({
     const list = data.resultados ?? [];
     const m = { provedor: data.provedor, replay: data.replay, creditos: data.creditosCobrados };
     stopPolling();
+    clearLive();
     setResults(list);
     setMeta(m);
     setBusy(false);
@@ -160,6 +201,8 @@ export function SearchConsole({
     stopPolling();
     setBusy(true);
     setTimedOut(false);
+    clearLive();
+    openStream(jobId);
     // Backstop: se nenhum tick responder, corta mesmo assim.
     deadTimer.current = setTimeout(() => cancelSearch(true), DEAD_MS);
     poller.current = setInterval(() => {
@@ -169,6 +212,15 @@ export function SearchConsole({
           const data = (await res.json().catch(() => null)) as { job?: SearchJob } | null;
           if (!res.ok || !data?.job) return;
           const job = data.job;
+          // Fallback sem SSE: eventos persistidos no banco alimentam o chat.
+          if (Array.isArray(job.eventos) && job.eventos.length) {
+            setLiveEvents((cur) => {
+              const key = (e: GenEvent) => `${e.at ?? ""}|${e.etapa ?? ""}`;
+              const seen = new Set(cur.map(key));
+              const add = job.eventos!.filter((e) => !seen.has(key(e)));
+              return add.length ? [...cur, ...add].slice(-60) : cur;
+            });
+          }
           // Idade real do job — restaurado de outra aba já conta o tempo certo.
           const elapsed = Date.now() - new Date(job.created_at).getTime();
           if (elapsed >= SLOW_MS) setSlow(true);
@@ -177,6 +229,7 @@ export function SearchConsole({
             applyDone(job.result);
           } else if (job.status === "error") {
             stopPolling();
+            clearLive();
             setBusy(false);
             setSlow(false);
             setError(job.erro ?? t.errSearch);
@@ -437,6 +490,36 @@ export function SearchConsole({
         : `${freeSearchesLeft} ${dailyActive ? t.freeLeft : t.freeLeftExp}`}
     </p>}
 
+    {busy && <div className="seek-live">
+      <GenActivity events={liveEvents} running={busy} lang={lang} />
+      {livePlaces.length > 0 && <>
+        <p className="seek-live-title"><Radar size={13} /> {t.liveTitle} · {livePlaces.length}</p>
+        <div className="seek-live-grid">
+          {[...livePlaces].reverse().slice(0, 12).map((p) => (
+            <div key={p.id ?? `${p.nome}|${p.imagem}`} className="seek-live-card">
+              {p.imagem
+                ? <div className="seek-live-img" style={{ backgroundImage: `url(${placeImageSrc(p.imagem)})` }} role="img" aria-label={p.nome ?? ""} />
+                : <div className="seek-live-img seek-live-img-empty" aria-hidden><MapPin size={16} /></div>}
+              <div className="seek-live-body">
+                <strong>{p.nome ?? "—"}</strong>
+                <span>{[p.cidade, p.uf].filter(Boolean).join(" · ")}</span>
+                <span className="seek-live-tags">
+                  {p.prioridade === "alta" && <em className="seek-live-hot">{t.prioAlta}</em>}
+                  {p.prioridade === "media" && <em>{t.prioMedia}</em>}
+                  {p.instagram && <em><Instagram size={10} /> @{igHandle(p.instagram)}</em>}
+                  {!p.site
+                    ? <em className="seek-live-gap"><Globe size={10} /> {t.noSite}</em>
+                    : p.siteCheck?.estado === "fora" || p.siteCheck?.estado === "desatualizado"
+                    ? <em><Globe size={10} /> {p.siteCheck.estado === "fora" ? t.siteOut : t.siteOld}</em>
+                    : <em><Globe size={10} /> {t.hasSite}</em>}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>}
+    </div>}
+
     {upgradeOpen && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={t.tutT}
       onClick={() => setUpgradeOpen(false)}>
       <section className="pix-panel pix-modal seek-upgrade" onClick={(e) => e.stopPropagation()}>
@@ -558,6 +641,8 @@ export function SearchConsole({
             {p.endereco && <p className="seek-line"><MapPin size={12} /><span>{[p.endereco, p.cidade, p.uf].filter(Boolean).join(" · ")}</span></p>}
             {p.telefone && <p className="seek-line"><Phone size={12} /><span>{p.telefone}</span></p>}
             <div className="seek-badges">
+              {p.prioridade === "alta" && <span className="seek-badge seek-badge-hot"><Sparkles size={11} />{t.prioAlta}</span>}
+              {p.prioridade === "media" && <span className="seek-badge">{t.prioMedia}</span>}
               {p.site && check
                 ? <a className={`seek-badge ${check.cls}`} href={p.site} target="_blank" rel="noopener noreferrer" title={check.sinais}><Globe size={11} />{check.label}</a>
                 : p.site
