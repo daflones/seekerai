@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Loader2, Radar, Save } from "lucide-react";
-import type { LeadSearchConfig } from "@/app/api/admin/search-config/route";
+import type { LeadSearchConfig } from "@/lib/lead-search-config";
 
 const PLANOS = [
   { key: "default", label: "Padrão (trial/grátis)" },

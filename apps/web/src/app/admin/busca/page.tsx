@@ -1,6 +1,6 @@
 import { requireSession } from "@/lib/auth/session";
 import { AdminSearch } from "@/components/admin-search";
-import { LEAD_SEARCH_DEFAULTS, type LeadSearchConfig } from "@/app/api/admin/search-config/route";
+import { LEAD_SEARCH_DEFAULTS, type LeadSearchConfig } from "@/lib/lead-search-config";
 
 export default async function AdminSearchPage() {
   const { supabase } = await requireSession("/admin/busca", { admin: true });

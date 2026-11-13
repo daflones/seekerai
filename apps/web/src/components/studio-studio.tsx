@@ -82,22 +82,35 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
     } catch { /* histórico é best-effort */ }
   }, []);
 
+  // Abre um projeto do histórico/detail: running retoma poll+SSE na hora.
+  function openProject(p: Project) {
+    setProject(p);
+    setWonClient("");
+    if (p.status === "running") { setRunning(true); startPoll(p.id); }
+    else if (p.status === "error") setError(p.erro ?? t.failed);
+    else setPreview(p.target);
+  }
+
   useEffect(() => {
-    void refreshHistory();
     const openId = new URLSearchParams(window.location.search).get("p");
-    if (openId) {
-      void (async () => {
-        try {
+    void (async () => {
+      try {
+        const { projects } = await api<{ projects: Project[] }>("/api/studio/generate");
+        setHistory(projects);
+        if (openId) {
           const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${openId}`);
-          if (!p) return;
-          setProject(p);
-          setWonClient("");
-          if (p.status === "running") { setRunning(true); startPoll(p.id); }
-          else if (p.status === "error") setError(p.erro ?? t.failed);
-          else setPreview(p.target);
-        } catch { /* ignora — histórico continua disponível */ }
-      })();
-    }
+          if (p) openProject(p);
+          return;
+        }
+        // Sem ?p: se há geração rodando, retoma — trocar de aba não pode
+        // fazer o app "sumir". Pega o running mais recente.
+        const active = projects.find((p) => p.status === "running");
+        if (active) {
+          const { project: p } = await api<{ project: Project | null }>(`/api/studio/generate?id=${active.id}`);
+          if (p) openProject(p);
+        }
+      } catch { /* histórico é best-effort */ }
+    })();
     const close = (e: MouseEvent) => {
       if (popRef.current && !popRef.current.contains(e.target as Node)) setAttachOpen(false);
     };

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { verifiedSession } from "@/lib/auth/session";
 import { allowedOrigin } from "@/lib/auth/validation";
 import { authRateLimit } from "@/lib/auth/rate-limit";
+import { LEAD_SEARCH_DEFAULTS, type LeadSearchConfig } from "@/lib/lead-search-config";
 
 const target = z.number().int().min(5).max(200);
 const schema = z.object({
@@ -19,18 +20,6 @@ const schema = z.object({
   fallback_site_ok: z.boolean(),
   motivo: z.string().trim().max(300).optional().or(z.literal("")),
 });
-
-export type LeadSearchConfig = z.infer<typeof schema>;
-
-export const LEAD_SEARCH_DEFAULTS: LeadSearchConfig = {
-  targets: { default: 20, essencial: 20, pro: 40, king: 60 },
-  pool_multiplier: 2,
-  smart_filter: true,
-  expand_rounds: 2,
-  expand_radius_km: 25,
-  fallback_site_ok: true,
-  motivo: "",
-};
 
 async function requireAdmin() {
   const session = await verifiedSession();
