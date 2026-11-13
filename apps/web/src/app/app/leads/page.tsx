@@ -37,7 +37,7 @@ export default async function LeadsPage() {
     <p className="private-intro">{t.intro}</p>
     {(leads ?? []).length === 0
       ? <p className="private-intro">{t.empty} <Link className="text-link" href="/app/buscar">{t.emptyLink}</Link></p>
-      : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} doneByLead={doneByLead} lang={loc.lang} t={t}
+      : <LeadsBoard initialLeads={(leads ?? []) as LeadRow[]} serviceNames={serviceNames} serviceActions={serviceActions} costs={costs} doneByLead={doneByLead} lang={loc.lang} currency={loc.currency} t={t}
           trial={!subs?.length} dailyActive={false} />}
   </>;
 }

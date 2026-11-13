@@ -11,7 +11,7 @@ import { callAction, fmtCompact, igHandle, igUrl, LEAD_STATUS, placeImageSrc, ty
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
 import { promptFor } from "@/lib/ai-prompts";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
-import type { Lang } from "@/lib/i18n/shared";
+import { formatMoney, type Currency, type Lang } from "@/lib/i18n/shared";
 
 const PAGE_SIZE = 9;
 
@@ -31,17 +31,19 @@ const KIND_LABEL: Record<ActionKind, keyof Messages["leadsPage"]> = {
   generate_image: "actImage",
 };
 
-export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, lang = "pt", trial = false, dailyActive = true, t = getMessages("pt").leadsPage }: {
+export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, doneByLead = {}, lang = "pt", currency = "brl", trial = false, dailyActive = true, t = getMessages("pt").leadsPage }: {
   initialLeads: LeadRow[];
   serviceNames: Record<string, string>;
   serviceActions: Record<string, string[]>;
   costs: Record<string, number | null>;
   doneByLead?: Record<string, string[]>;
   lang?: Lang;
+  currency?: Currency;
   trial?: boolean;
   dailyActive?: boolean;
   t?: Messages["leadsPage"];
 }) {
+  const lt = getMessages(lang).lead;
   const [leads, setLeads] = useState(initialLeads);
   const [done, setDone] = useState<Record<string, Set<string>>>(() =>
     Object.fromEntries(Object.entries(doneByLead).map(([k, v]) => [k, new Set(v)])));
@@ -50,6 +52,8 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<Record<string, string>>({});
+  const [wonLead, setWonLead] = useState<LeadRow | null>(null);
+  const [wonValue, setWonValue] = useState("");
 
   function markDone(leadId: string, kind: string) {
     setDone((d) => ({ ...d, [leadId]: new Set([...(d[leadId] ?? []), kind]) }));
@@ -80,14 +84,14 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
 
   function pick(f: string) { setFilter(f); setPage(0); }
 
-  async function setStatus(id: string, status: LeadRow["status"]) {
+  async function setStatus(id: string, status: LeadRow["status"], valorFechado?: number | null) {
     if (busy) return;
     setBusy(id);
     setError("");
     const res = await fetch(`/api/leads/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(valorFechado == null ? { status } : { status, valor_fechado: valorFechado }),
     });
     setBusy(null);
     if (!res.ok) {
@@ -95,7 +99,29 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
       setError(data?.error ?? t.saveErr);
       return;
     }
-    setLeads((list) => list.map((l) => l.id === id ? { ...l, status } : l));
+    setLeads((list) => list.map((l) => l.id === id
+      ? { ...l, status, valor_fechado: valorFechado ?? l.valor_fechado }
+      : l));
+  }
+
+  function pickStatus(lead: LeadRow, status: LeadRow["status"]) {
+    // Marcar como ganho abre o modal do valor da venda — o select fica
+    // no status atual até confirmar (ou volta sozinho se cancelar).
+    if (status === "ganho" && lead.status !== "ganho") {
+      setWonLead(lead);
+      setWonValue(lead.valor_fechado ? String(lead.valor_fechado) : "");
+      return;
+    }
+    void setStatus(lead.id, status);
+  }
+
+  async function confirmWon(withValue: boolean) {
+    const lead = wonLead;
+    if (!lead) return;
+    const value = withValue ? Number(wonValue.replace(/\./g, "").replace(",", ".")) : null;
+    setWonLead(null);
+    await setStatus(lead.id, "ganho",
+      withValue && Number.isFinite(value) && value! >= 0 ? value : null);
   }
 
   function notice(id: string, msg: string) {
@@ -216,7 +242,7 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               aria-label={`${lead.nome}`}
               value={lead.status}
               disabled={busy === lead.id}
-              onChange={(e) => void setStatus(lead.id, e.target.value as LeadRow["status"])}
+              onChange={(e) => pickStatus(lead, e.target.value as LeadRow["status"])}
               className={`lead-status lead-status-${lead.status}`}
             >
               {LEAD_STATUS.map(([value]) => <option key={value} value={value}>{statusLabel(value)}</option>)}
@@ -238,6 +264,8 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
               {!lead.site && <span className="seek-badge seek-badge-gap">{t.siteNo}</span>}
               {lead.site && <span className="seek-badge seek-badge-ok"><Globe size={10} />{t.siteYes}</span>}
               {lead.whatsapp === "sim" && <span className="seek-badge seek-badge-ok">WhatsApp</span>}
+              {lead.status === "ganho" && lead.valor_fechado != null &&
+                <span className="seek-badge seek-badge-ok">{lt.wonBadge} {formatMoney(Math.round(lead.valor_fechado * 100), currency, lang)}</span>}
             </p>
             {lead.instagram && igUrl(lead.instagram) && <a className="seek-ig" href={igUrl(lead.instagram)!}
               target="_blank" rel="noopener noreferrer" title={ig?.bio ?? lead.instagram}>
@@ -295,5 +323,34 @@ export function LeadsBoard({ initialLeads, serviceNames, serviceActions, costs, 
         <button type="button" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>{t.next} <ChevronRight size={14} /></button>
       </nav>
     )}
+
+    {wonLead && <div className="pix-overlay" role="dialog" aria-modal="true" aria-label={lt.wonTitle}
+      onClick={() => setWonLead(null)}>
+      <section className="pix-panel pix-modal lead-won-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{lt.wonTitle}</h3>
+        <p className="seek-meta">{wonLead.nome} — {lt.wonHint}</p>
+        <div className="lead-won-input">
+          <span>{currency.toUpperCase()}</span>
+          <input
+            inputMode="decimal"
+            autoFocus
+            value={wonValue}
+            placeholder={lt.wonPh}
+            onChange={(e) => setWonValue(e.target.value.replace(/[^\d.,]/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void confirmWon(true); } }}
+          />
+        </div>
+        <div className="seek-confirm-actions">
+          <button type="button" className="button button-primary button-small"
+            disabled={!wonValue.trim() || busy !== null} onClick={() => void confirmWon(true)}>
+            {busy === wonLead.id ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+            {lt.wonSave}
+          </button>
+          <button type="button" className="button button-glass button-small" onClick={() => void confirmWon(false)}>
+            {lt.wonSkip}
+          </button>
+        </div>
+      </section>
+    </div>}
   </>;
 }
