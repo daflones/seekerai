@@ -128,11 +128,8 @@ async function searchConfig(): Promise<LeadSearchConfig> {
 async function searchSerper(
   query: string, regionCode: string, pages = 1, bias?: GeoBias,
 ): Promise<NormalizedPlace[]> {
+  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
   const keys = [
-    await getSecret("SERPER_API_KEY"),
-    await getSecret("SERPER_API_KEY_2"),
-    await getSecret("SERPER_API_KEY_3"),
-    await getSecret("SERPER_API_KEY_4"),
     await getSecret("SERPER_API_KEY_5"),
     await getSecret("SERPER_API_KEY_6"),
     await getSecret("SERPER_API_KEY_7"),

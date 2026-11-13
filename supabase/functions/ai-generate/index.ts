@@ -55,7 +55,7 @@ const MAX_GENERATED_IMAGES = 5;
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
 // gpt-oss-20b: responde JSON direto em ~8s. GLM "flash" gasta ~140s em
 // reasoning_content e estoura o budget de ~150s da function.
-const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
+const NVIDIA_TEXT_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "meta/llama-3.2-90b-vision-instruct";
 const NVIDIA_IMAGE_MODEL = optionalEnv("NVIDIA_IMAGE_MODEL") ?? "black-forest-labs/flux.2-klein-4b";
 // Modelos de visão pra descrever fotos reais — gemma ":free" primeiro
 // (custo zero), gemini pago só quando os gratuitos não respondem.
@@ -63,7 +63,7 @@ const VISION_MODELS = (optionalEnv("VISION_MODEL")
   ?? "google/gemma-4-26b-a4b-it:free,google/gemma-4-31b-it:free,google/gemini-2.5-flash")
   .split(",").map((s) => s.trim()).filter(Boolean);
 // Groq (api.groq.com) — gratuito, OpenAI-compatible, latência baixa.
-const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
+const GROQ_TEXT_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "openai/gpt-oss-120b";
 // Modelo ":free" do próprio OpenRouter — não consome crédito pago e
 // responde rápido (~10s). Rede de segurança quando a NVIDIA está fora.
 const OR_FREE_TEXT_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
@@ -144,6 +144,7 @@ async function groqChat(
       model: GROQ_TEXT_MODEL,
       stream: false,
       max_tokens: maxTokens ?? 1024,
+      ...(GROQ_TEXT_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
       messages: [
         { role: "system", content: system },
         { role: "user", content: userContent },
@@ -1838,13 +1839,8 @@ interface SerperDetails {
 
 async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): Promise<SerperDetails> {
   const empty: SerperDetails = { reviews: [], horariosLabel: [] };
-  // Principal + reservas (_2.._7): se uma chave falhar (cota/rate
-  // limit) a próxima responde a mesma requisição.
+  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
   const keys = [
-    await getSecret("SERPER_API_KEY"),
-    await getSecret("SERPER_API_KEY_2"),
-    await getSecret("SERPER_API_KEY_3"),
-    await getSecret("SERPER_API_KEY_4"),
     await getSecret("SERPER_API_KEY_5"),
     await getSecret("SERPER_API_KEY_6"),
     await getSecret("SERPER_API_KEY_7"),

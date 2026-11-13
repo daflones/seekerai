@@ -270,13 +270,8 @@ async function searchApify(query: string, target = 20): Promise<NormalizedPlace[
  * thumbnail e category em português. Terceira fonte da cadeia.
  */
 async function searchSerper(query: string, regionCode: string, pages = 1): Promise<NormalizedPlace[]> {
-  // Chave principal + reservas (_2.._7): se uma falhar (cota, rate
-  // limit, outage) a próxima responde a mesma requisição.
+  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
   const keys = [
-    await getSecret("SERPER_API_KEY"),
-    await getSecret("SERPER_API_KEY_2"),
-    await getSecret("SERPER_API_KEY_3"),
-    await getSecret("SERPER_API_KEY_4"),
     await getSecret("SERPER_API_KEY_5"),
     await getSecret("SERPER_API_KEY_6"),
     await getSecret("SERPER_API_KEY_7"),

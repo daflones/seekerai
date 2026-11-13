@@ -21,9 +21,9 @@ const FALLBACK_CLOSE = "Encerrando seu atendimento por inatividade. Foi um praze
 const SUMMARY_SYSTEM = `Você encerra um atendimento de suporte do SeekerAi porque o cliente ficou inativo. Com base no histórico, escreva UMA mensagem curta em pt-BR (até ~70 palavras) que: agradece o contato, resume em uma frase o que foi tratado/orientado, avisa que o chamado será encerrado por inatividade e convida a abrir um novo chamado quando precisar. Tom cordial e profissional, sem promessas e sem emojis. Saída OBRIGATÓRIA em JSON: {"action":"resolve","message":"texto"} — só o campo message importa.`;
 const OR_MODEL = optionalEnv("SUPPORT_AGENT_MODEL") ?? "openai/gpt-4o-mini";
 const NVIDIA_BASE = "https://integrate.api.nvidia.com/v1";
-const NVIDIA_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "openai/gpt-oss-20b";
+const NVIDIA_MODEL = optionalEnv("NVIDIA_TEXT_MODEL") ?? "meta/llama-3.2-90b-vision-instruct";
 const GROQ_BASE = "https://api.groq.com/openai/v1";
-const GROQ_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "llama-3.3-70b-versatile";
+const GROQ_MODEL = optionalEnv("GROQ_TEXT_MODEL") ?? "openai/gpt-oss-120b";
 // Modelo ":free" do OpenRouter — não gasta crédito, segura a cadeia
 // quando a NVIDIA free está fora (comum: modelos somem da conta).
 const OR_FREE_MODEL = optionalEnv("OR_FREE_TEXT_MODEL") ?? "nvidia/nemotron-3-ultra-550b-a55b:free";
@@ -222,6 +222,7 @@ async function llm(
       body: JSON.stringify({
         model: GROQ_MODEL,
         max_tokens: 700,
+        ...(GROQ_MODEL.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
         response_format: { type: "json_object" },
         messages: [{ role: "system", content: system }, ...convo],
       }),
