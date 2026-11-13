@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { ArrowUpRight, CheckCircle2, Eye, EyeOff, LoaderCircle, LockKeyhole } from "lucide-react";
 import { Turnstile } from "./turnstile";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
+import { CALLING_CODES } from "@/lib/phone";
 
 export type AuthMode = "login" | "signup" | "recover" | "password" | "onboarding";
 // next dev: Turnstile não funciona em 127.0.0.1 — o servidor também pula a
@@ -23,9 +24,21 @@ function GoogleMark() {
   </svg>;
 }
 
-export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
+// Exemplo de número local por país — o DDI vai num chip "+CC" fixo no
+// campo, então o gringo digita o número dele sem DDD brasileiro.
+const PHONE_EXAMPLES: Record<string, string> = {
+  US: "(555) 123-4567", CA: "(555) 123-4567", DO: "(555) 123-4567",
+  GB: "7700 900123", PT: "912 345 678", ES: "612 345 678",
+  FR: "6 12 34 56 78", DE: "151 23456789", IT: "333 1234567",
+  MX: "55 1234 5678", AR: "11 2345 6789", CO: "301 234 5678",
+  CL: "9 1234 5678", PE: "912 345 678", UY: "94 123 456",
+  JP: "90 1234 5678", AU: "412 345 678", NL: "6 12345678",
+  BE: "470 12 34 56", CH: "78 123 45 67", AT: "664 123456",
+};
+
+export function AuthForm({ mode, available, siteKey, next, plan, email, t, region }: {
   mode: AuthMode; available: boolean; siteKey: string; next?: string; plan?: string; email?: string;
-  t?: Messages["auth"];
+  t?: Messages["auth"]; region?: string;
 }) {
   const tt = t ?? getMessages("pt").auth;
   const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm<Fields>({
@@ -39,6 +52,15 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
   const profileMode = mode === "signup" || mode === "onboarding";
   const passwordMode = mode === "login" || mode === "signup" || mode === "password";
   const labels = { login: tt.loginBtn, signup: tt.signupBtn, recover: tt.recoverBtn, password: tt.passwordBtn, onboarding: tt.onboardingBtn };
+  // DDI do país de acesso: chip "+CC" no campo; se a pessoa já digitar
+  // "+", a entrada vale (outro país ou formato internacional explícito).
+  const phoneRegion = (region ?? "BR").toUpperCase();
+  const phoneCc = CALLING_CODES[phoneRegion] ?? (phoneRegion === "BR" ? "55" : null);
+  const phonePlaceholder = phoneRegion === "BR" ? "(11) 99999-9999" : (PHONE_EXAMPLES[phoneRegion] ?? "612 345 678");
+  const normPhone = (raw: string) => {
+    const v = raw.trim();
+    return !v || v.startsWith("+") || !phoneCc ? v : `+${phoneCc} ${v}`;
+  };
 
   async function submit(fields: Fields) {
     setError("");
@@ -46,7 +68,7 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
     const body = {
       ...(mode !== "onboarding" && mode !== "password" ? { email: fields.email } : {}),
       ...(passwordMode ? { password: fields.password } : {}),
-      ...(profileMode ? { name: fields.name, phone: fields.phone, terms: fields.terms, marketing: fields.marketing } : {}),
+      ...(profileMode ? { name: fields.name, phone: normPhone(fields.phone), terms: fields.terms, marketing: fields.marketing } : {}),
       ...(mode === "signup" && plan ? { plan } : {}),
       next, captchaToken: token,
     };
@@ -90,7 +112,10 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t }: {
       <input id="auth-name" autoComplete="name" maxLength={150} aria-invalid={Boolean(errors.name)} {...register("name", { required: tt.nameReq, minLength: { value: 2, message: tt.nameMin } })} />
       {errors.name && <span className="field-error">{errors.name.message}</span>}
       <label htmlFor="auth-phone">{tt.phone}</label>
-      <input id="auth-phone" type="tel" autoComplete="tel" maxLength={30} placeholder="(11) 99999-9999" aria-invalid={Boolean(errors.phone)} {...register("phone", { required: tt.phoneReq, validate: (value) => /^\+?[\d ()-]+$/.test(value) && value.replace(/\D/g, "").length >= 8 && value.replace(/\D/g, "").length <= 15 || tt.phoneInvalid })} />
+      <div className="auth-phone">
+        {phoneCc && <span className="auth-phone-cc" aria-hidden="true">+{phoneCc}</span>}
+        <input id="auth-phone" type="tel" autoComplete="tel" maxLength={30} placeholder={phonePlaceholder} style={phoneCc ? { paddingLeft: 26 + phoneCc.length * 9 } : undefined} aria-invalid={Boolean(errors.phone)} {...register("phone", { required: tt.phoneReq, validate: (value) => /^\+?[\d ()-]+$/.test(value) && value.replace(/\D/g, "").length >= 8 && value.replace(/\D/g, "").length <= 15 || tt.phoneInvalid })} />
+      </div>
       {errors.phone && <span className="field-error">{errors.phone.message}</span>}
     </>}
     {mode !== "password" && mode !== "onboarding" && <>

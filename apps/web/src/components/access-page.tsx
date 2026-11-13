@@ -32,7 +32,7 @@ export async function AccessPage({ login = false, mode, plan, next, state, email
       {state === "link-expirado" && <p className="auth-error" role="alert">{a.expired}</p>}
       {state === "perfil-pendente" && <p className="auth-error" role="alert">{a.pendingProfile}</p>}
       {(state === "oauth-falhou" || state === "oauth-indisponivel") && <p className="auth-error" role="alert">{t.auth.oauthErr}</p>}
-      <AuthForm mode={activeMode} available={authReady()} siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""} next={next} plan={selected?.slug} email={email} t={t.auth} />
+      <AuthForm mode={activeMode} available={authReady()} siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""} next={next} plan={selected?.slug} email={email} t={t.auth} region={loc.region} />
       <Link className="auth-demo-link" href="/explorar">{a.demoLink}</Link>
     </section></main></div>;
 }

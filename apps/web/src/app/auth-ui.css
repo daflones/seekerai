@@ -3,6 +3,8 @@
 .auth-form input:not([type="checkbox"]) { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #b387d133; background: var(--panel); color: var(--white); border-radius: 8px; font-size: 14px; min-width: 0; }
 .auth-form input::placeholder { color: var(--muted); }
 .auth-form input[aria-invalid="true"] { border-color: var(--danger); }
+.auth-phone { position: relative; }
+.auth-phone-cc { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; font-weight: 700; color: var(--violet-light); pointer-events: none; }
 .password-field { position: relative; }
 .password-field input { padding-right: 45px !important; }
 .password-field button { position: absolute; right: 7px; top: 6px; background: transparent; color: var(--muted); padding: 8px; display: flex; border-radius: 5px; }
