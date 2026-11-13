@@ -688,8 +688,14 @@ Deno.serve(async (req) => {
 
     const db = serviceClient();
     // Progresso vivo pro painel admin — best-effort, nunca quebra a busca.
+    // Também grava no feed `eventos` (mesmo RPC do gen-service) pro radar
+    // mostrar as etapas ao vivo quando quem atende é a edge (fallback).
     const progress = async (p: number, etapa: string) => {
       if (!jobId) return;
+      await db.rpc("report_job_event", {
+        p_table: "search_jobs", p_id: jobId,
+        p_pct: p, p_etapa: etapa,
+      }).then(() => {}, () => {});
       await db.from("search_jobs")
         .update({ progresso: p, etapa, updated_at: new Date().toISOString() })
         .eq("id", jobId).eq("status", "running")
@@ -828,6 +834,19 @@ Deno.serve(async (req) => {
         }
       }
       await progress(80, "Enriquecendo Instagram");
+      // Tier primeiro (igual ao gen-service): Instagram sem site é a
+      // melhor oportunidade — lead que já vive de rede social e não tem
+      // presença própria. Dentro do tier, score de contato/prova social.
+      const tier = (p: NormalizedPlace) => {
+        const ig = Boolean(p.instagram);
+        const noSite = !p.site;
+        const weakSite = p.siteCheck?.estado === "fora" ||
+          p.siteCheck?.estado === "desatualizado";
+        if (ig && noSite) return 0;
+        if (ig && weakSite) return 1;
+        if (!ig && noSite) return 2;
+        return 3;
+      };
       resultados.sort((a, b) => {
         const score = (p: NormalizedPlace) =>
           (p.telefone ? 4 : 0) + (p.whatsapp === true ? 2 : 0) +
@@ -835,7 +854,7 @@ Deno.serve(async (req) => {
           (p.status === "OPERATIONAL" ? 1 : 0) + (p.avaliacao ?? 0) / 10 +
           (!p.site ? 3 : p.siteCheck?.estado === "fora" ? 2.5
             : p.siteCheck?.estado === "desatualizado" ? 2 : 0);
-        return score(b) - score(a);
+        return tier(a) - tier(b) || score(b) - score(a);
       });
       if (resultados.length > planTarget) resultados = resultados.slice(0, planTarget);
 

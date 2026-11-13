@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
   const latest = request.nextUrl.searchParams.get("latest");
   if (latest) {
     const { data } = await session.supabase.from("search_jobs")
-      .select("id,status,payload,result,erro,created_at")
+      .select("id,status,payload,result,erro,progresso,etapa,eventos,created_at")
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (data && stale(data)) {
       const admin = createSupabaseAdminClient();
