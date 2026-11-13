@@ -477,10 +477,12 @@ Deno.serve(async (req) => {
     const db = serviceClient();
 
     // Provedor do botão Cartão — admin pode alternar em app_settings
-    // (card_provider = mercadopago | stripe). Padrão: Mercado Pago.
-    const cardProvider = (await getSetting("card_provider", "mercadopago")) === "stripe"
-      ? "stripe" : "mercadopago";
-    // Conta MP é BR/BRL — checkout internacional em cartão segue na Stripe.
+    // (card_provider = mercadopago | stripe) para o checkout em BRL.
+    // Internacional (USD/EUR) é sempre Stripe: a conta MP é BR/BRL.
+    const cardProvider = currency !== "brl"
+      ? "stripe"
+      : (await getSetting("card_provider", "mercadopago")) === "stripe"
+        ? "stripe" : "mercadopago";
     if (method === "card" && currency !== "brl" && cardProvider === "mercadopago") {
       throw httpError(400, "Card checkout is temporarily unavailable for international orders");
     }
