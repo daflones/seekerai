@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Clapperboard, Copy, Check, Download, FilePlus2, History, Image as ImageIcon,
-  Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, Trophy, X,
+  Loader2, Monitor, Paintbrush, Plus, RotateCcw, Smartphone, Globe, Trophy, X, AtSign,
 } from "lucide-react";
 import type { Messages } from "@/lib/i18n/messages";
 import type { Lang } from "@/lib/i18n/shared";
@@ -21,7 +21,7 @@ interface Project {
   lead_id?: string | null; ganho_em?: string | null;
   leads?: { nome?: string } | null;
   progresso?: number; etapa?: string | null; eventos?: GenEvent[];
-  prompt?: string; refs?: Ref[];
+  prompt?: string; refs?: Ref[]; ig?: string | null;
 }
 interface LiveState { progresso: number; etapa: string | null; eventos: GenEvent[]; }
 
@@ -48,6 +48,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
   const [target, setTarget] = useState<Target>("web");
   const [prompt, setPrompt] = useState("");
   const [refs, setRefs] = useState<Ref[]>([]);
+  const [ig, setIg] = useState("");
   const [attachOpen, setAttachOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [running, setRunning] = useState(false);
@@ -213,6 +214,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
         prompt: prompt.trim(),
         target,
         refs,
+        ig: ig.trim() || undefined,
       });
       startPoll(projectId);
     } catch (e) {
@@ -306,6 +308,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
         prompt: full.prompt,
         target: full.target,
         refs: full.refs ?? [],
+        ig: full.ig ?? undefined,
       });
       startPoll(projectId);
       void refreshHistory();
@@ -318,7 +321,7 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
 
   function reset() {
     stopPoll();
-    setProject(null); setPrompt(""); setRefs([]);
+    setProject(null); setPrompt(""); setRefs([]); setIg("");
     setError(""); setRunning(false); setPreview(null); setLive(null);
   }
 
@@ -386,6 +389,22 @@ export function StudioStudio({ t, lang = "pt", trial = false, dailyActive = true
           {running ? <><Loader2 size={16} className="spin" /> {t.generating}</>
             : <>{t.generate} <small>· {t.costNote}</small></>}
         </button>
+      </div>
+      <div className="st-ig">
+        <AtSign size={14} />
+        <input
+          value={ig}
+          onChange={e => setIg(e.target.value)}
+          placeholder={t.igPh}
+          disabled={running}
+          inputMode="text"
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={300}
+        />
+        {ig && <button type="button" className="st-ig-x" aria-label="Remover"
+          onClick={() => setIg("")}><X size={12} /></button>}
+        <small>{t.igHint}</small>
       </div>
       {uploading && <p className="st-note"><Loader2 size={13} className="spin" /> {t.uploading}</p>}
       {running && <GenActivity events={live?.eventos ?? []} running lang={lang} />}

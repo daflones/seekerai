@@ -24,7 +24,7 @@ import {
   sha256Hex,
 } from "./common.ts";
 import { getSecret } from "./secrets.ts";
-import { igCachePut, igMediaCached } from "./instagram.ts";
+import { igMediaCached, igProfileCached } from "./instagram.ts";
 import { notifyError, NotifyErrorInput } from "./notify.ts";
 import { callingCodeFor, toE164 } from "./phone.ts";
 import { emitJobEvent } from "./bus.ts";
@@ -1537,8 +1537,6 @@ async function fetchVideoBytes(
 }
 
 const APIFY_PLACES_ACTOR = (optionalEnv("APIFY_PLACES_ACTOR") ?? "compass/crawler-google-places").replace("/", "~");
-const APIFY_IG_ACTOR = (optionalEnv("APIFY_IG_ACTOR") ?? "apify/instagram-scraper").replace("/", "~");
-
 interface PlaceReview { autor: string; nota: number; texto: string; quando?: string; foto?: string }
 interface PlaceDetails {
   reviews: PlaceReview[];
@@ -1993,61 +1991,20 @@ async function fetchInstagramMedia(handleOrUrl: string | null | undefined): Prom
   const handle = raw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1] ?? raw.replace(/^@/, "").replace(/\/+$/, "");
   if (!/^[A-Za-z0-9._]{1,60}$/.test(handle)) return null;
 
-  // Fonte barata primeiro — cache (7d) + ScrapeCreators.
+  // Fonte única: cache (7d) + ScrapeCreators.
   try {
     const sc = await igMediaCached(handle);
-    if (sc && (sc.images.length || sc.videos.length || sc.captions.length)) return sc;
-  } catch { /* cai pro Apify */ }
-
-  const token = await getSecret("APIFY_API_TOKEN");
-  if (!token) return null;
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=80`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        directUrls: [`https://www.instagram.com/${handle}/`],
-        resultsType: "posts",
-        resultsLimit: 12,
-      }),
-      signal: AbortSignal.timeout(95_000),
-    },
-  ).catch(() => null);
-  if (!res?.ok) {
-    console.error("[site] apify instagram falhou:", res?.status ?? "network");
-    return { images: [], videos: [], captions: [], erro: `http:${res?.status ?? "network"}` };
-  }
-  const items = (await res.json().catch(() => [])) as unknown[];
-  const media: IgMedia = { images: [], videos: [], captions: [] };
-  if (!Array.isArray(items) || !items.length) media.erro = "vazio";
-  for (const item of items) {
-    if (!isRecord(item)) continue;
-    const caption = asString(item.caption, 600);
-    if (caption) media.captions.push(caption);
-    const type = asString(item.type, 40);
-    if (type === "Video" || asString(item.isVideo) === "true") {
-      const videoUrl = asString(item.videoUrl, 1200);
-      if (videoUrl) {
-        media.videos.push({ src: videoUrl, titulo: caption?.split("\n")[0]?.slice(0, 80) || "Reel" });
-      }
+    if (sc && (sc.images.length || sc.videos.length || sc.captions.length)) {
+      const media: IgMedia = {
+        images: sc.images.slice(0, 8),
+        videos: sc.videos.slice(0, 3),
+        captions: sc.captions.slice(0, 10),
+      };
+      return media;
     }
-    const pushImg = (v: unknown) => {
-      const u = asString(v, 1200);
-      if (u && u.startsWith("http")) media.images.push(u);
-    };
-    // Sidecar traz filhos em campos diferentes conforme a versão do actor.
-    const children = [item.images, item.childPosts, item.sidecarImages].filter(Array.isArray)[0] as unknown[] | undefined;
-    if (children?.length) for (const c of children) pushImg(isRecord(c) ? c.displayUrl ?? c.url : c);
-    else pushImg(item.displayUrl ?? item.imageUrl);
-  }
-  media.images = media.images.slice(0, 8);
-  media.videos = media.videos.slice(0, 2);
-  media.captions = media.captions.slice(0, 10);
-  if (!media.images.length && !media.videos.length && !media.erro) media.erro = "sem-midia";
-  // Apify também alimenta o cache — mesmo dado, fonte mais cara.
-  if (!media.erro) await igCachePut(handle, "media", media);
-  return media;
+    if (sc) return { images: [], videos: [], captions: [], erro: "sem-midia" };
+  } catch { /* sem chave/erro de rede → segue com cache vazio */ }
+  return { images: [], videos: [], captions: [], erro: "indisponivel" };
 }
 
 /** Upload pro bucket público site-assets, com retry — Storage falha intermitente. */
@@ -2597,21 +2554,29 @@ async function publishPremiumSite(
   // scrape é direto; sem @ a descoberta social pode demorar mais.
   const igCap = lead.instagram ? 60_000 : 125_000;
   const ig = await Promise.race([igPromise, sleep(igCap).then(() => null)]);
-  if (ig) {
-    for (const u of ig.images) {
-      if (sources.length < MAX_SITE_IMAGES && !sources.includes(u)) sources.push(u);
-    }
+  // Instagram PRIMEIRO: conteúdo real do negócio (posts, carrosséis,
+  // reels) tem prioridade sobre fotos genéricas de Maps/site — é o que
+  // faz o site parecer do próprio negócio em vez de stock.
+  const igImages = (ig?.images ?? []).slice(0, 6);
+  const igVideos = ig?.videos ?? [];
+  if (igImages.length || igVideos.length) {
+    onStep?.(48, `Reaproveitando ${igImages.length} ${igImages.length === 1 ? "imagem" : "imagens"}${igVideos.length ? ` e ${igVideos.length} ${igVideos.length === 1 ? "vídeo" : "vídeos"}` : ""} reais do Instagram`);
+  }
+  const merged = [...igImages];
+  for (const u of sources) {
+    if (merged.length < MAX_SITE_IMAGES && !merged.includes(u)) merged.push(u);
   }
   // Foto de perfil do Instagram (raspada na busca) — logo/fachada real.
   const igFoto = ((lead.dados as Record<string, unknown> | null)?.ig as
     { foto?: string | null } | undefined)?.foto;
-  if (igFoto && sources.length < MAX_SITE_IMAGES && !sources.includes(igFoto)) {
-    sources.push(igFoto);
+  if (igFoto && merged.length < MAX_SITE_IMAGES && !merged.includes(igFoto)) {
+    merged.push(igFoto);
   }
+  const imgSources = merged;
   // Descreve até 6 fotos reais em paralelo com os downloads — o redator
   // usa a lista "FOTO[i]" pra casar serviço↔foto (i = índice em sources).
   descsPromise = Promise.all(
-    sources.slice(0, 6).map((u, i) =>
+    imgSources.slice(0, 6).map((u, i) =>
       describeReferenceImage(apiKey, u).then((d) => ({ i, d })),
     ),
   );
@@ -2619,7 +2584,7 @@ async function publishPremiumSite(
   // source e precisa sobreviver a downloads que falham (sem shift).
   const publicUrls: { url: string; real: boolean; src: number }[] = [];
   {
-    const downloads = await Promise.all(sources.map(fetchImageBytes));
+    const downloads = await Promise.all(imgSources.map(fetchImageBytes));
     let i = 0, src = -1;
     for (const dl of downloads) {
       src++;
@@ -2659,8 +2624,14 @@ async function publishPremiumSite(
   }
 
   // 2) Gap-fill com IA — prompt específico por slot, direção de arte do tema.
+  // Reels do Instagram contam como cobertura visual: perfil com feed
+  // movimentado (fotos + vídeos) não precisa de imagem gerada pra "encher".
   const imgErrors: string[] = [];
-  const faltando = Math.min(SITE_IMAGE_TARGET - publicUrls.length, MAX_GENERATED_IMAGES);
+  const coberturaReal = publicUrls.length + Math.min(igVideos.length, 2);
+  const faltando = Math.max(0, Math.min(SITE_IMAGE_TARGET - coberturaReal, MAX_GENERATED_IMAGES));
+  if (!faltando && (igImages.length || igVideos.length)) {
+    onStep?.(55, "Imagens e vídeos reais do Instagram cobrem o site — sem geração de imagem");
+  }
   if (faltando > 0) {
     const visualRef = descs.join(" ").slice(0, 700).trim() || null;
 
@@ -2934,10 +2905,41 @@ async function generateAppHtml(
     const kind = asString(r.kind, 10) ?? "image";
     return url ? `- ${kind === "video" ? "Vídeo" : "Imagem"}: ${url}` : "";
   }).filter(Boolean).join("\n");
+
+  // @instagram de referência: raspa perfil+mídia via ScrapeCreators e
+  // injeta bio, legendas e URLs reais como inspiração/contexto da IA.
+  const igRaw = asString(context.ig, 300);
+  const igHandle = igRaw
+    ? (igRaw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1]
+      ?? igRaw.replace(/^@+/, "").replace(/\/+$/, ""))
+    : null;
+  let igBlock = "";
+  if (igHandle && /^[A-Za-z0-9._]{1,60}$/.test(igHandle)) {
+    onStep?.(15, `Lendo o Instagram @${igHandle}`);
+    const cap = new Promise<null>((r) => setTimeout(() => r(null), 35_000));
+    const [prof, media] = await Promise.race([
+      Promise.all([igProfileCached(igHandle), igMediaCached(igHandle)]),
+      cap,
+    ]) ?? [null, null];
+    if (prof || media) {
+      const imgs = (media?.images ?? []).slice(0, 8);
+      const caps = (media?.captions ?? []).slice(0, 6);
+      igBlock = [
+        `INSTAGRAM DE REFERÊNCIA @${igHandle}${prof?.categoria ? ` (${prof.categoria})` : ""} — use como inspiração de identidade visual, tom e conteúdo:`,
+        prof?.bio ? `Bio: ${prof.bio}` : "",
+        prof?.seguidores != null ? `Seguidores: ${prof.seguidores} · posts: ${prof.posts ?? "?"}` : "",
+        imgs.length ? `Imagens reais do perfil — incorpore estas URLs onde fizer sentido (hero, galeria, cards):\n${imgs.map((u) => `- Imagem: ${u}`).join("\n")}` : "",
+        media?.videos.length ? `O perfil tem ${media.videos.length} reels/vídeos recentes.` : "",
+        caps.length ? `Legendas reais (tom de voz, produtos, diferenciais):\n${caps.map((c) => `"${c.replace(/\s+/g, " ").slice(0, 160)}"`).join("\n")}` : "",
+      ].filter(Boolean).join("\n");
+    }
+  }
+
   const user = [
     `Pedido do usuário:\n${prompt}`,
     `\nAlvo: ${target === "mobile" ? "APLICATIVO MOBILE (UI de app, bottom nav, gestos)" : "APLICATIVO WEB (site/app web responsivo)"}`,
     mediaLines ? `\nMídias de referência do usuário (incorpore estas URLs):\n${mediaLines}` : "",
+    igBlock ? `\n${igBlock}` : "",
   ].join("");
 
   // Orçamento total da cadeia de provedores — a edge tem wall-clock

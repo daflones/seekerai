@@ -1141,6 +1141,16 @@ a.lead-action { text-decoration: none; }
 .st-go small { font-weight: 400; opacity: .75; font-size: 11px; }
 .st-go:disabled { opacity: .5; }
 .st-note { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.st-ig { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 12px;
+  border: 1px solid #ab7bcd26; border-radius: 10px; background: #ab7bcd08; }
+.st-ig svg { color: var(--violet); flex-shrink: 0; }
+.st-ig input { flex: 1; min-width: 0; background: none; border: none; outline: none;
+  color: var(--white); font-size: 12.5px; }
+.st-ig input::placeholder { color: var(--muted); }
+.st-ig-x { width: 18px; height: 18px; border-radius: 50%; border: none; background: #0009;
+  color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.st-ig small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+@media (max-width: 560px) { .st-ig small { display: none; } }
 .st-result { display: flex; flex-direction: column; gap: 12px; }
 .st-view-switch { display: flex; gap: 4px; background: var(--bg-2, #181021); border: 1px solid #ab7bcd26; border-radius: 999px; padding: 3px; }
 .st-view-switch button { display: flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 999px;

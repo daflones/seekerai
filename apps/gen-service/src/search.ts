@@ -19,34 +19,12 @@ import {
   sha256Hex,
 } from "./common.ts";
 import { getSecret, getSetting, requireSecret } from "./secrets.ts";
-import { igProfileCached, igCachePut } from "./instagram.ts";
+import { igProfileCached } from "./instagram.ts";
 import { notifyError, type NotifyErrorInput } from "./notify.ts";
 import { callingCodeFor, toE164 } from "./phone.ts";
 import { emitJobEvent } from "./bus.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-const FIELD_MASK = [
-  "places.id",
-  "places.displayName",
-  "places.formattedAddress",
-  "places.nationalPhoneNumber",
-  "places.internationalPhoneNumber",
-  "places.websiteUri",
-  "places.rating",
-  "places.userRatingCount",
-  "places.businessStatus",
-  "places.primaryTypeDisplayName",
-  "places.regularOpeningHours.openNow",
-  "places.regularOpeningHours.weekdayDescriptions",
-  "places.addressComponents",
-  "places.location",
-  "places.photos",
-  "nextPageToken",
-].join(",");
-
-const APIFY_ACTOR = "compass~crawler-google-places";
-const APIFY_IG_ACTOR = "apify~instagram-scraper";
 
 interface SearchBody {
   query?: string;
@@ -144,177 +122,7 @@ async function searchConfig(): Promise<LeadSearchConfig> {
   return cfg;
 }
 
-/* ---------- provedores (mesma cadeia da edge) ---------- */
-
-async function searchGooglePlaces(
-  query: string, regionCode: string, pages = 1, bias?: GeoBias,
-): Promise<NormalizedPlace[]> {
-  const key = await requireSecret("GOOGLE_PLACES_API_KEY");
-  const all: Record<string, unknown>[] = [];
-  let pageToken: string | null = null;
-  for (let p = 0; p < pages; p++) {
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": FIELD_MASK,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        textQuery: query,
-        languageCode: "pt-BR",
-        regionCode,
-        pageSize: 20,
-        ...(bias ? {
-          locationBias: {
-            circle: {
-              center: { latitude: bias.lat, longitude: bias.lng },
-              radius: bias.radiusM,
-            },
-          },
-        } : {}),
-        ...(pageToken ? { pageToken } : {}),
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) {
-      const detail = isRecord(data.error) ? asString(data.error.message, 300) : null;
-      console.error("[search] Google respondeu", res.status, detail ?? "");
-      if (!all.length) throw httpError(502, "Google Places indisponível no momento");
-      break;
-    }
-    const batch = (Array.isArray(data.places) ? data.places : []) as Record<string, unknown>[];
-    all.push(...batch);
-    pageToken = asString(data.nextPageToken, 300);
-    if (!pageToken || !batch.length) break;
-    if (p < pages - 1) await sleep(2000);
-  }
-  return all.map((p) => {
-    const place = isRecord(p) ? p : {};
-    const comps = (Array.isArray(place.addressComponents) ? place.addressComponents : [])
-      .filter(isRecord);
-    const comp = (...types: string[]) =>
-      comps.find((c) =>
-        Array.isArray(c.types) && types.some((t) => (c.types as unknown[]).includes(t)));
-    const loc = isRecord(place.location) ? place.location : {};
-    return {
-      id: asString(place.id, 300),
-      nome: isRecord(place.displayName) ? asString(place.displayName.text) : null,
-      endereco: asString(place.formattedAddress),
-      bairro: asString(comp("neighborhood", "sublocality_level_1")?.longText, 150),
-      cidade: asString(comp("locality", "postal_town", "administrative_area_level_2")?.longText, 150),
-      uf: asString(comp("administrative_area_level_1")?.shortText, 50),
-      pais: asString(comp("country")?.shortText, 2)?.toUpperCase() ?? null,
-      telefone: asString(place.internationalPhoneNumber ?? place.nationalPhoneNumber),
-      site: asString(place.websiteUri, 500),
-      avaliacao: typeof place.rating === "number" ? place.rating : null,
-      totalAvaliacoes:
-        typeof place.userRatingCount === "number" ? place.userRatingCount : null,
-      status: asString(place.businessStatus),
-      categoria: isRecord(place.primaryTypeDisplayName)
-        ? asString(place.primaryTypeDisplayName.text)
-        : null,
-      mapsUrl: null,
-      imagem: (() => {
-        const photos = Array.isArray(place.photos) ? place.photos : [];
-        const name = isRecord(photos[0]) ? asString(photos[0].name, 500) : null;
-        return name ? `gphoto:${name}` : null;
-      })(),
-      lat: typeof loc.latitude === "number" ? loc.latitude : null,
-      lng: typeof loc.longitude === "number" ? loc.longitude : null,
-      whatsapp: null,
-      instagram: null,
-      horariosLabel: parseWeekdayDescriptions(
-        isRecord(place.regularOpeningHours)
-          ? place.regularOpeningHours.weekdayDescriptions
-          : null,
-      ),
-    };
-  });
-}
-
-/** "segunda-feira: 09:00–19:00" (já localizado) → ["Segunda-feira","09:00–19:00"]. */
-function parseWeekdayDescriptions(list: unknown): [string, string][] | null {
-  const out = (Array.isArray(list) ? list : [])
-    .flatMap((d): [string, string][] => {
-      const m = asString(d, 200)?.match(/^(.+?):\s*(.+)$/);
-      if (!m) return [];
-      return [[m[1][0].toUpperCase() + m[1].slice(1), m[2].trim()]];
-    });
-  return out.length ? out : null;
-}
-
-const DAY_PT_SEARCH: Record<string, string> = {
-  monday: "Segunda", tuesday: "Terça", wednesday: "Quarta", thursday: "Quinta",
-  friday: "Sexta", saturday: "Sábado", sunday: "Domingo",
-};
-
-async function searchApify(
-  query: string, target = 20, bias?: GeoBias,
-): Promise<NormalizedPlace[]> {
-  const token = await requireSecret("APIFY_API_TOKEN");
-  // O actor aceita texto livre — "perto de lat,lng" vira viés real no Maps.
-  const q = bias ? `${query} near ${bias.lat},${bias.lng}` : query;
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        searchStringsArray: [q],
-        maxCrawledPlacesPerSearch: target,
-        language: "pt-BR",
-        maxReviews: 0,
-      }),
-      signal: AbortSignal.timeout(120_000),
-    },
-  );
-  const items = (await res.json().catch(() => [])) as unknown;
-  if (!res.ok) throw httpError(502, "Apify indisponível no momento");
-  return (Array.isArray(items) ? items : []).map((item) => {
-    const p = isRecord(item) ? item : {};
-    const loc = isRecord(p.location) ? p.location : {};
-    return {
-      id: asString(p.placeId ?? p.fid ?? p.cid, 300),
-      nome: asString(p.title),
-      endereco: asString(p.address, 500),
-      bairro: asString(p.neighborhood),
-      cidade: asString(p.city),
-      uf: asString(p.state),
-      telefone: asString(p.phone ?? p.phoneUnformatted),
-      site: asString(p.website, 500),
-      avaliacao: typeof p.totalScore === "number" ? p.totalScore : null,
-      totalAvaliacoes: typeof p.reviewsCount === "number" ? p.reviewsCount : null,
-      status: p.permanentlyClosed === true
-        ? "CLOSED_PERMANENTLY"
-        : p.temporarilyClosed === true
-          ? "CLOSED_TEMPORARILY"
-          : "OPERATIONAL",
-      categoria: asString(p.categoryName) ??
-        (Array.isArray(p.categories) && typeof p.categories[0] === "string"
-          ? p.categories[0]
-          : null),
-      mapsUrl: asString(p.url, 800),
-      imagem: asString(p.imageUrl, 800),
-      lat: typeof loc.lat === "number" ? loc.lat : null,
-      lng: typeof loc.lng === "number" ? loc.lng : null,
-      pais: asString(p.countryCode, 2)?.toUpperCase() ?? null,
-      whatsapp: null,
-      instagram: asString(p.instagramUrl ?? p.instagram, 300) ?? null,
-      horariosLabel: (() => {
-        const out = (Array.isArray(p.openingHours) ? p.openingHours : [])
-          .flatMap((d): [string, string][] => {
-            if (!isRecord(d)) return [];
-            const day = DAY_PT_SEARCH[(asString(d.day, 30) ?? "").toLowerCase()];
-            const hours = asString(d.hours, 120);
-            return day && hours ? [[day, hours]] : [];
-          });
-        return out.length ? out : null;
-      })(),
-    };
-  });
-}
+/* ---------- provedor: Serper (Google Maps) ---------- */
 
 /** Serper.dev /maps — horários em pt-BR, thumbnail e categoria local. */
 async function searchSerper(
@@ -436,24 +244,6 @@ function extractInstagram(place: NormalizedPlace): void {
   }
 }
 
-async function igApifyCall(token: string, body: Record<string, unknown>, timeoutMs: number): Promise<unknown[]> {
-  const res = await fetch(
-    `https://api.apify.com/v2/actors/${APIFY_IG_ACTOR}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${Math.round(timeoutMs / 1000)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs + 15_000),
-    },
-  ).catch(() => null);
-  if (!res?.ok) {
-    console.error("[ig-enrich] apify falhou:", res?.status ?? "network");
-    return [];
-  }
-  const items = (await res.json().catch(() => [])) as unknown[];
-  return Array.isArray(items) ? items : [];
-}
-
 async function enrichInstagram(places: NormalizedPlace[], cap = 8): Promise<void> {
   const comIg = places.filter((p) => p.instagram).slice(0, cap);
   if (!comIg.length) return;
@@ -472,65 +262,14 @@ async function enrichInstagram(places: NormalizedPlace[], cap = 8): Promise<void
     }
   };
 
-  const misses: NormalizedPlace[] = [];
+  // Fonte única: ScrapeCreators (com cache ig_cache). Sem fallback.
   await Promise.all(comIg.map(async (p) => {
     const handle = p.instagram!.replace(/^@/, "");
     try {
       const prof = await igProfileCached(handle);
       if (prof) applyProfile(p, prof);
-      else misses.push(p);
-    } catch {
-      misses.push(p);
-    }
+    } catch { /* perfil indisponível — lead segue sem métricas */ }
   }));
-  if (!misses.length) return;
-
-  let token: string;
-  try {
-    token = await requireSecret("APIFY_API_TOKEN");
-  } catch {
-    return;
-  }
-  const igHandleOf = (v: string) => {
-    const m = v.match(/instagram\.com\/(?:p\/)?([A-Za-z0-9_.]+)/i);
-    return (m ? m[1] : v.replace(/^@+/, "")).replace(/\/+$/, "");
-  };
-  const urls = misses
-    .map((p) => igHandleOf(p.instagram!))
-    .filter((h) => /^[A-Za-z0-9_.]{1,30}$/.test(h))
-    .map((h) => `https://www.instagram.com/${h}/`);
-  const details = await Promise.race([
-    igApifyCall(token, { directUrls: urls, resultsType: "details", resultsLimit: misses.length }, 55_000),
-    sleep(48_000).then(() => [] as unknown[]),
-  ]);
-
-  const profiles = new Map<string, Record<string, unknown>>();
-  for (const d of details) {
-    if (!isRecord(d)) continue;
-    const uname = asString(d.username, 80)?.toLowerCase();
-    if (uname) profiles.set(uname, d);
-  }
-  for (const p of misses) {
-    const uname = p.instagram!.replace(/^@/, "").toLowerCase();
-    const prof = profiles.get(uname);
-    if (!prof) continue;
-    const recent = (Array.isArray(prof.latestPosts) ? prof.latestPosts : [])
-      .filter(isRecord);
-    const likes = recent
-      .map((post) => (typeof post.likesCount === "number" ? post.likesCount : null))
-      .filter((n): n is number => n !== null);
-    const normalized = {
-      seguidores: typeof prof.followersCount === "number" ? prof.followersCount : null,
-      posts: typeof prof.postsCount === "number" ? prof.postsCount
-        : recent.length || null,
-      curtidas: likes.length ? Math.round(likes.reduce((a, b) => a + b, 0) / likes.length) : null,
-      foto: asString(prof.profilePicUrl, 1000),
-      bio: asString(prof.biography, 600),
-      verificado: prof.verified === true,
-    };
-    applyProfile(p, normalized);
-    await igCachePut(uname, "perfil", normalized);
-  }
 }
 
 function instagramFromHtml(html: string): string | null {
@@ -767,7 +506,7 @@ export async function handleSearch(req: Request): Promise<Response> {
       emitJobEvent(jobId, p, etapa, { achados: places.map(litePlace) });
     };
 
-    const [{ data: profile }, { data: sub }, replay, provider, cfg] = await Promise.all([
+    const [{ data: profile }, { data: sub }, replay, cfg] = await Promise.all([
       isDemo
         ? Promise.resolve({ data: null })
         : db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
@@ -776,9 +515,10 @@ export async function handleSearch(req: Request): Promise<Response> {
         : db.from("subscriptions").select("plans(slug)").eq("user_id", user.id)
           .eq("status", "active").limit(1).maybeSingle(),
       getSetting("search_replay", "off"),
-      getSetting("search_provider", "google_places"),
       searchConfig(),
     ]);
+    // Provedor único: Serper (Google Maps). Instagram via ScrapeCreators.
+    const provider = "serper";
     const isAdmin = profile?.role === "admin";
     const planSlug = (sub?.plans as { slug?: unknown } | null)?.slug;
     const planSlugStr = typeof planSlug === "string" ? planSlug : "default";
@@ -829,28 +569,12 @@ export async function handleSearch(req: Request): Promise<Response> {
     });
 
     try {
-      const runProviders = async (bias?: GeoBias, target = poolTarget, pages = providerPages) => {
-        const providers: [string, () => Promise<NormalizedPlace[]>][] = [
-          ["google_places", () => searchGooglePlaces(query, regionCode, pages, bias)],
-          ["apify", () => searchApify(query, target, bias)],
-          ["serper", () => searchSerper(query, regionCode, pages, bias)],
-        ].sort((a) => a[0] === provider ? -1 : 0) as [
-          string,
-          () => Promise<NormalizedPlace[]>,
-        ][];
-        let lastErr: unknown = null;
-        for (const [name, run] of providers) {
-          try {
-            return { resultados: await run(), provedor: name };
-          } catch (err) {
-            lastErr = err;
-            console.error(
-              `[search] ${name} falhou, tentando próximo:`,
-              err instanceof Error ? err.message : err,
-            );
-          }
+      const runProviders = async (bias?: GeoBias, pages = providerPages) => {
+        try {
+          return { resultados: await searchSerper(query, regionCode, pages, bias), provedor: "serper" };
+        } catch (err) {
+          throw err instanceof Error ? err : httpError(502, "Busca indisponível no momento. Tente novamente em instantes.");
         }
-        throw lastErr instanceof Error ? lastErr : httpError(502, "Busca indisponível no momento. Tente novamente em instantes.");
       };
 
       await progress(10, "Consultando provedores de mapa");
@@ -947,7 +671,7 @@ export async function handleSearch(req: Request): Promise<Response> {
         const bias = offsetKm(c, cfg.expandRadiusKm, expandRound - 1);
         let extra: NormalizedPlace[];
         try {
-          const r = await runProviders(bias, Math.ceil(poolTarget / 2), Math.max(1, Math.ceil(poolTarget / 40)));
+          const r = await runProviders(bias, Math.max(1, Math.ceil(poolTarget / 40)));
           extra = r.resultados.filter((p) => !seen.has(keyOf(p)));
           for (const p of extra) seen.add(keyOf(p));
         } catch {

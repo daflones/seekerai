@@ -1,6 +1,6 @@
-// Instagram via ScrapeCreators — fonte barata primária com fallback de
-// key (duas contas) e cache por handle no ig_cache (TTL 7 dias).
-// O Apify continua como fallback de última instância nos callers.
+// Instagram via ScrapeCreators — fonte única (docs oficiais:
+// /v1/instagram/profile e /v2/instagram/user/posts?trim=true).
+// Duas keys com fallback e cache por handle no ig_cache (TTL 7 dias).
 
 import { isRecord, serviceClient } from "./common.ts";
 import { getSecret } from "./secrets.ts";
@@ -91,44 +91,51 @@ export async function scProfile(handle: string): Promise<IgProfileData | null> {
   };
 }
 
-/** Últimos posts: imagens, vídeos e legendas pra gerar site. */
+/** Últimos posts (v2 oficial): imagens, vídeos e legendas pra gerar site. */
 export async function scMedia(handle: string): Promise<IgMediaData | null> {
-  const d = await scFetch(`/v1/instagram/user/posts?handle=${encodeURIComponent(handle)}`);
-  const raw = Array.isArray(d?.posts) ? d.posts : [];
-  const nodes = raw.map((p) => isRecord(p) && isRecord(p.node) ? p.node : p).filter(isRecord);
+  const d = await scFetch(`/v2/instagram/user/posts?handle=${encodeURIComponent(handle)}&trim=true`);
+  const raw = Array.isArray(d?.items) ? d.items : [];
+  const nodes = raw.filter(isRecord);
   if (!nodes.length) return null;
 
   const media: IgMediaData = { images: [], videos: [], captions: [] };
   const pushImg = (v: unknown) => {
     const u = asStr(v, 1200);
-    if (u?.startsWith("http") && media.images.length < 8 && !media.images.includes(u)) {
+    if (u?.startsWith("http") && media.images.length < 10 && !media.images.includes(u)) {
       media.images.push(u);
     }
   };
-  for (const n of nodes) {
-    const capEdges = isRecord(n.edge_media_to_caption) && Array.isArray(n.edge_media_to_caption.edges)
-      ? n.edge_media_to_caption.edges : [];
-    const cap = capEdges.length && isRecord(capEdges[0]) && isRecord(capEdges[0].node)
-      ? asStr(capEdges[0].node.text) : null;
-    if (cap) media.captions.push(cap);
-    if (n.is_video === true || String(n.__typename ?? "").includes("Video")) {
-      const vu = asStr(n.video_url, 1500);
-      if (vu && media.videos.length < 2) {
-        media.videos.push({ src: vu, titulo: cap?.split("\n")[0]?.slice(0, 80) || "Reel" });
-      }
+  const pushVid = (v: unknown, titulo: string) => {
+    const u = asStr(v, 1500);
+    if (u?.startsWith("http") && media.videos.length < 3 &&
+      !media.videos.some((x) => x.src === u)) {
+      media.videos.push({ src: u, titulo });
     }
-    const kids = isRecord(n.edge_sidecar_to_children) && Array.isArray(n.edge_sidecar_to_children.edges)
-      ? n.edge_sidecar_to_children.edges : [];
+  };
+  for (const n of nodes) {
+    // v2: caption é objeto {text}; v1-era trazia edge_media_to_caption.
+    const capObj = isRecord(n.caption) ? n.caption : null;
+    const cap = asStr(capObj?.text ?? n.caption, 600);
+    if (cap) media.captions.push(cap);
+    const titulo = cap?.split("\n")[0]?.slice(0, 80) || "Reel";
+    const mediaType = asNum(n.media_type);
+    // Carousel: filhos em carousel_media[] com display_uri/video_url próprios.
+    const kids = Array.isArray(n.carousel_media) ? n.carousel_media.filter(isRecord) : [];
     if (kids.length) {
       for (const k of kids) {
-        const kn = isRecord(k) && isRecord(k.node) ? k.node : null;
-        if (kn) pushImg(kn.display_url);
+        pushImg(k.display_uri ?? k.thumbnail_url);
+        if (asNum(k.media_type) === 2 || asStr(k.media_type, 10) === "2" || k.video_url) {
+          pushVid(k.video_url, titulo);
+        }
       }
+    } else if (mediaType === 2 || asStr(n.product_type, 20) === "clips" || n.video_url) {
+      pushVid(n.video_url, titulo);
+      pushImg(n.display_uri ?? n.thumbnail_url);
     } else {
-      pushImg(n.display_url ?? n.thumbnail_src);
+      pushImg(n.display_uri ?? n.thumbnail_url ?? n.image_url);
     }
   }
-  media.captions = media.captions.slice(0, 10);
+  media.captions = media.captions.slice(0, 12);
   return media.images.length || media.videos.length || media.captions.length ? media : null;
 }
 

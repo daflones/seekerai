@@ -20,6 +20,7 @@ const bodySchema = z.object({
     url: z.string().url().max(800),
     kind: z.enum(["image", "video"]),
   })).max(8).default([]),
+  ig: z.string().max(300).optional(),
 });
 
 const EDGE_TIMEOUT_MS = 300_000;
@@ -47,7 +48,7 @@ async function runJob(projectId: string, userId: string, token: string, payload:
         requestRef: `studio-${projectId}`,
         lang: "pt",
         prompt: payload.prompt,
-        context: { target: payload.target, refs: payload.refs },
+        context: { target: payload.target, refs: payload.refs, ig: payload.ig },
         jobId: projectId,
         jobTable: "studio_projects",
       }),
@@ -128,6 +129,7 @@ export async function POST(request: NextRequest) {
       prompt: parsed.data.prompt,
       target: parsed.data.target,
       refs: parsed.data.refs,
+      ig: parsed.data.ig ?? null,
       status: "running",
     })
     .select("id").single();
@@ -150,7 +152,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ projects: list ?? [] }, { headers: { "Cache-Control": "no-store" } });
   }
   const { data } = await session.supabase.from("studio_projects")
-    .select("id,status,html,erro,nome,target,site_slug,modelo,progresso,etapa,eventos,prompt,refs,created_at,lead_id,ganho_em,leads:lead_id(nome)")
+    .select("id,status,html,erro,nome,target,site_slug,modelo,progresso,etapa,eventos,prompt,refs,ig,created_at,lead_id,ganho_em,leads:lead_id(nome)")
     .eq("id", id).maybeSingle();
   if (data?.status === "running" && Date.now() - new Date(data.created_at).getTime() > STALE_MS) {
     const admin = createSupabaseAdminClient();
