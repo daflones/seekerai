@@ -38,6 +38,13 @@ async function runJob(jobId: string, userId: string, token: string, payload: z.i
     let upstream: Response;
     try {
       upstream = await callUpstream(upstreamUrl, genBase ? 900_000 : 240_000);
+      // Gen-service respondendo 5xx/HTML (deploy quebrado, proxy sem rota):
+      // a edge é o fallback — reserveAction é idempotente por requestRef,
+      // então não cobra duas vezes. Erros 4xx de negócio não caem aqui.
+      if (genBase && !upstream.ok && upstream.status >= 500) {
+        await upstream.arrayBuffer().catch(() => {});
+        upstream = await callUpstream(`${config!.url}/functions/v1/places-search`, 240_000);
+      }
     } catch (err) {
       // Gen-service fora do ar (DNS/conexão): cai na edge como rede de segurança.
       // Timeout não faz fallback — o gen pode seguir processando e cobrar;
