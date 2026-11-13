@@ -468,6 +468,10 @@ Deno.serve(async (req) => {
 
     const method = body.method === "pix" ? "pix" : body.method === "card" ? "card" : null;
     if (!method) throw httpError(400, "Informe method (card|pix)");
+    if (body.currency !== undefined && body.currency !== "brl" &&
+        body.currency !== "usd" && body.currency !== "eur" && body.currency !== "gbp") {
+      throw httpError(400, "Unsupported currency");
+    }
     const currency: BillingCurrency =
       body.currency === "usd" || body.currency === "eur" || body.currency === "gbp"
         ? body.currency : "brl";
