@@ -695,7 +695,7 @@ Deno.serve(async (req) => {
         .eq("id", jobId).eq("status", "running")
         .then(() => {}, () => {});
     };
-    const [{ data: profile }, { data: sub }, replay, provider] = await Promise.all([
+    const [{ data: profile }, { data: sub }, replay] = await Promise.all([
       isDemo
         ? Promise.resolve({ data: null })
         : db.from("profiles").select("role").eq("id", user.id).maybeSingle(),
@@ -704,8 +704,11 @@ Deno.serve(async (req) => {
         : db.from("subscriptions").select("plans(slug)").eq("user_id", user.id)
           .eq("status", "active").limit(1).maybeSingle(),
       getSetting("search_replay", "off"),
-      getSetting("search_provider", "google_places"),
     ]);
+    // Provedor único: Serper — o inputHash precisa bater com o do
+    // gen-service ("serper") senão a reserva por requestRef dá conflito
+    // de idempotência quando o fallback roda depois de um 5xx do gen.
+    const provider = "serper";
     const isAdmin = profile?.role === "admin";
     const planSlug = (sub?.plans as { slug?: unknown } | null)?.slug;
     // Profundidade da busca por plano: provedores devolvem ~20 por
@@ -751,16 +754,11 @@ Deno.serve(async (req) => {
     });
 
     try {
-      // Provedor configurado primeiro; se cair, a busca segue pelos
-      // outros (Apify sem crédito → Google Places → Serper).
+      // Provedor único: Serper (Google Maps). Sem fallback Apify/Google
+      // Places — chaves mortas só atrasavam a falha real.
       const providers: [string, () => Promise<NormalizedPlace[]>][] = [
-        ["google_places", () => searchGooglePlaces(query, regionCode, providerPages)],
-        ["apify", () => searchApify(query, planTarget)],
         ["serper", () => searchSerper(query, regionCode, providerPages)],
-      ].sort((a) => a[0] === provider ? -1 : 0) as [
-        string,
-        () => Promise<NormalizedPlace[]>,
-      ][];
+      ];
 
       await progress(12, "Consultando provedores de mapa");
       let resultados: NormalizedPlace[] | null = null;
