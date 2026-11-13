@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
-  Banknote, CreditCard, Filter, ReceiptText, RefreshCcw,
-  Target, TrendingUp, UserSearch, Wallet, CalendarClock,
+  Banknote, CreditCard, Filter, ReceiptText,
+  Target, UserSearch, Wallet, CalendarClock,
 } from "lucide-react";
 import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -9,7 +9,7 @@ import { AdminFinanceiro } from "@/components/admin-financeiro";
 import { AdminDiscount } from "@/components/admin-discount";
 import { FinList } from "@/components/fin-list";
 import {
-  addCents, emptyTotals, fmtMoney, fmtTotals, payCurrency,
+  addCents, CUR_LABEL, emptyTotals, fmtMoney, fmtTotals, PAY_CURRENCIES, payCurrency,
   type CurTotals, type PayCurrency,
 } from "@/lib/admin/money";
 
@@ -318,36 +318,21 @@ export default async function AdminFinanceiroPage() {
     <AdminFinanceiro />
 
     <div className="stat-grid">
-      <section className="stat-card fin-saldo">
-        <span className="stat-icon"><Banknote size={18} /></span>
-        <small>RECEITA TOTAL</small>
-        <strong>{fmtTotals(gross)}</strong>
-        <span className="stat-sub">{paid.length} pagamentos confirmados</span>
-      </section>
-      <section className="stat-card">
-        <span className="stat-icon"><TrendingUp size={18} /></span>
-        <small>RECEITA 30D</small>
-        <strong>{fmtTotals(totals30)}</strong>
-        <Delta now={totals30} before={totalsPrev30} />
-      </section>
-      <section className="stat-card">
-        <span className="stat-icon"><ReceiptText size={18} /></span>
-        <small>RECEITA 7D</small>
-        <strong>{fmtTotals(totals7)}</strong>
-        <span className="stat-sub">{paid.filter((p) => inWin(p.created_at, 7)).length} vendas na semana</span>
-      </section>
-      <section className="stat-card">
-        <span className="stat-icon"><RefreshCcw size={18} /></span>
-        <small>MRR → ARR</small>
-        <strong>{fmtTotals(mrr)}</strong>
-        <span className="stat-sub">ARR ≈ {fmtTotals({ brl: mrr.brl * 12, usd: mrr.usd * 12, eur: mrr.eur * 12, gbp: mrr.gbp * 12 })} · {subsRows.length} assinaturas</span>
-      </section>
-      <section className="stat-card">
-        <span className="stat-icon"><CreditCard size={18} /></span>
-        <small>TICKET MÉDIO 30D</small>
-        <strong>{fmtTotals(ticket30)}</strong>
-        <span className="stat-sub">por pagamento confirmado, em cada moeda</span>
-      </section>
+      {PAY_CURRENCIES.filter((c) => gross[c] !== 0 || totals30[c] !== 0 || totals7[c] !== 0 || mrr[c] !== 0 || ticket30[c] !== 0)
+        .map((c, i) => (
+        <section className={`stat-card${i === 0 ? " fin-saldo" : ""}`} key={`cur-${c}`}>
+          <span className="stat-icon"><Banknote size={18} /></span>
+          <small>RECEITA TOTAL · {CUR_LABEL[c]}</small>
+          <strong>{fmtMoney(gross[c], c)}</strong>
+          <span className="stat-sub">
+            30d {fmtMoney(totals30[c], c)} · 7d {fmtMoney(totals7[c], c)}<br />
+            MRR {fmtMoney(mrr[c], c)} · ticket médio {fmtMoney(ticket30[c], c)}
+          </span>
+          <Delta
+            now={{ brl: c === "brl" ? totals30.brl : 0, usd: c === "usd" ? totals30.usd : 0, eur: c === "eur" ? totals30.eur : 0, gbp: c === "gbp" ? totals30.gbp : 0 }}
+            before={{ brl: c === "brl" ? totalsPrev30.brl : 0, usd: c === "usd" ? totalsPrev30.usd : 0, eur: c === "eur" ? totalsPrev30.eur : 0, gbp: c === "gbp" ? totalsPrev30.gbp : 0 }} />
+        </section>
+      ))}
       <section className="stat-card">
         <span className="stat-icon"><Target size={18} /></span>
         <small>CONVERSÃO DE PAGAMENTO</small>
@@ -359,7 +344,7 @@ export default async function AdminFinanceiroPage() {
     <section className="adm-chart fin-rev-chart">
       <div className="adm-chart-head">
         <small>RECEITA POR DIA · 30 DIAS · SOMENTE R$</small>
-        <strong>{fmtTotals(totals30)}</strong>
+        <strong>{fmtMoney(totals30.brl, "brl")}</strong>
       </div>
       <Bars data={revSeries} />
       <div className="adm-chart-foot"><span>{revSeries[0]?.label}</span><span>passa o mouse pra ver o dia</span><span>{revSeries[29]?.label}</span></div>

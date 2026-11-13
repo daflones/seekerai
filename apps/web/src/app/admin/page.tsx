@@ -10,7 +10,7 @@ import { fetchAllRows } from "@/lib/supabase/admin";
 import { AdminCreditos } from "@/components/admin-creditos";
 import { AdminTools } from "@/components/admin-tools";
 import {
-  addCents, emptyTotals, fmtMoney, fmtTotals, payCurrency,
+  addCents, CUR_LABEL, emptyTotals, fmtMoney, fmtTotals, PAY_CURRENCIES, payCurrency,
   type CurTotals, type PayCurrency,
 } from "@/lib/admin/money";
 
@@ -302,9 +302,16 @@ export default async function AdminPage() {
       <section className="stat-card"><span className="stat-icon"><CreditCard size={18} /></span>
         <small>ASSINATURAS ATIVAS</small><strong>{(subs ?? []).length}</strong>
         <span className="stat-sub">MRR ≈ {fmtTotals(mrr)}</span></section>
-      <section className="stat-card"><span className="stat-icon"><ReceiptText size={18} /></span>
-        <small>RECEITA 30D</small><strong>{fmtTotals(paidCents30)}</strong>
-        <span className="stat-sub">{paidCentsPrev.brl + paidCentsPrev.usd + paidCentsPrev.eur + paidCentsPrev.gbp > 0 ? `vs ${fmtTotals(paidCentsPrev)} nos 30d anteriores` : `${paidRows.length} pagamentos em 60d`}</span></section>
+      {PAY_CURRENCIES.filter((c) => c === "brl" || paidCents30[c] !== 0).map((c) => (
+        <section className="stat-card" key={`rev-${c}`}>
+          <span className="stat-icon"><ReceiptText size={18} /></span>
+          <small>RECEITA 30D · {CUR_LABEL[c]}</small>
+          <strong>{fmtMoney(paidCents30[c], c)}</strong>
+          <span className="stat-sub">{paidCentsPrev[c] > 0
+            ? `vs ${fmtMoney(paidCentsPrev[c], c)} nos 30d anteriores`
+            : `${paidRows.length} pagamentos em 60d`}</span>
+        </section>
+      ))}
       <section className="stat-card"><span className="stat-icon"><Compass size={18} /></span>
         <small>BUSCAS 30D</small><strong>{sumDays(searchesDates, 30)}</strong>
         <span className="stat-sub"><Delta now={search7} before={searchPrev7} /></span></section>

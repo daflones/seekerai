@@ -8,6 +8,10 @@ export type CurTotals = Record<PayCurrency, number>;
 
 export const emptyTotals = (): CurTotals => ({ brl: 0, usd: 0, eur: 0, gbp: 0 });
 
+export const CUR_LABEL: Record<PayCurrency, string> = {
+  brl: "R$", usd: "US$", eur: "€", gbp: "£",
+};
+
 /** Moeda do pagamento: coluna currency > metadata.currency (legado) > brl. */
 export function payCurrency(p: { currency?: string | null; metadata?: unknown }): PayCurrency {
   const direct = (p.currency ?? "").toLowerCase();
