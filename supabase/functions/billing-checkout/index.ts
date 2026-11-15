@@ -481,13 +481,14 @@ Deno.serve(async (req) => {
     }
     const db = serviceClient();
 
-    // Provedor do botão Cartão — admin pode alternar em app_settings
+    // Provedor do botão Cartão — admin alterna em app_settings
     // (card_provider = mercadopago | stripe) para o checkout em BRL.
-    // Internacional (USD/EUR) é sempre Stripe: a conta MP é BR/BRL.
+    // Padrão: Stripe. Se o Stripe falhar num checkout BRL, cai pro
+    // Mercado Pago como fallback. Internacional é sempre Stripe.
     const cardProvider = currency !== "brl"
       ? "stripe"
-      : (await getSetting("card_provider", "mercadopago")) === "stripe"
-        ? "stripe" : "mercadopago";
+      : (await getSetting("card_provider", "stripe")) === "mercadopago"
+        ? "mercadopago" : "stripe";
     if (method === "card" && currency !== "brl" && cardProvider === "mercadopago") {
       throw httpError(400, "Card checkout is temporarily unavailable for international orders");
     }
@@ -539,12 +540,31 @@ Deno.serve(async (req) => {
           }
         }
         // provider_ref do Stripe precisa ser o id da sessão — o webhook casa por ele.
-        const customerId = await ensureStripeCustomer(db, user.id, user.email);
-        const session = await createStripePackSession(user.id, customerId, currency, pack);
-        await db.from("payments")
-          .update({ provider_ref: session.id })
-          .eq("provider", "stripe").eq("provider_ref", internalRef);
-        return json({ provider: "stripe", method, checkoutUrl: session.url });
+        try {
+          const customerId = await ensureStripeCustomer(db, user.id, user.email);
+          const session = await createStripePackSession(user.id, customerId, currency, pack);
+          await db.from("payments")
+            .update({ provider_ref: session.id })
+            .eq("provider", "stripe").eq("provider_ref", internalRef);
+          return json({ provider: "stripe", method, checkoutUrl: session.url });
+        } catch (stripeErr) {
+          // Fallback BRL: Stripe fora → Mercado Pago assume o checkout.
+          if (currency !== "brl") throw stripeErr;
+          console.error("[checkout] stripe falhou — fallback mercadopago:", stripeErr);
+          await db.from("payments").update({ provider: "mercadopago" })
+            .eq("provider", "stripe").eq("provider_ref", internalRef);
+          try {
+            const pref = await createMpPreference({
+              title: `SeekerAi — +${pack.credits} créditos`,
+              internalRef, payerEmail: user.email ?? null, amountCents: pack.amountCents,
+            });
+            return json({ provider: "mercadopago", method, checkoutUrl: pref.url });
+          } catch (mpErr) {
+            await db.from("payments").update({ status: "failed" })
+              .eq("provider", "mercadopago").eq("provider_ref", internalRef);
+            throw mpErr;
+          }
+        }
       }
       try {
         const charge = await createMercosulPackPix(internalRef, pack, user.email ?? null);
@@ -644,12 +664,30 @@ Deno.serve(async (req) => {
             throw err;
           }
         }
-        const customerId = await ensureStripeCustomer(db, user.id, user.email);
-        const session = await createStripeDomainSession(user.id, customerId, priceCents, host);
-        await db.from("payments")
-          .update({ provider_ref: session.id })
-          .eq("id", payment.id);
-        return json({ provider: "stripe", method, checkoutUrl: session.url, domainId: domain.id });
+        try {
+          const customerId = await ensureStripeCustomer(db, user.id, user.email);
+          const session = await createStripeDomainSession(user.id, customerId, priceCents, host);
+          await db.from("payments")
+            .update({ provider_ref: session.id })
+            .eq("id", payment.id);
+          return json({ provider: "stripe", method, checkoutUrl: session.url, domainId: domain.id });
+        } catch (stripeErr) {
+          // Fallback BRL: Stripe fora → Mercado Pago assume o checkout.
+          if (currency !== "brl") throw stripeErr;
+          console.error("[checkout] stripe falhou — fallback mercadopago:", stripeErr);
+          await db.from("payments").update({ provider: "mercadopago" }).eq("id", payment.id);
+          try {
+            const pref = await createMpPreference({
+              title: `SeekerAi — Domínio ${host}`,
+              internalRef, payerEmail: user.email ?? null, amountCents: priceCents,
+            });
+            return json({ provider: "mercadopago", method, checkoutUrl: pref.url, domainId: domain.id });
+          } catch (mpErr) {
+            await db.from("payments").update({ status: "failed" }).eq("id", payment.id);
+            await db.from("domains").update({ status: "removed" }).eq("id", domain.id);
+            throw mpErr;
+          }
+        }
       }
       try {
         const charge = await createMercosulDomainPix(internalRef, priceCents, host, user.email ?? null);
@@ -770,52 +808,62 @@ Deno.serve(async (req) => {
       .not("plan_id", "is", null);
 
     if (method === "card") {
-      if (cardProvider === "mercadopago") {
-        // Cobrança única por período — a renovação é um novo checkout,
-        // mesmo ciclo de vida dos pagamentos PIX.
-        const internalRef = crypto.randomUUID();
+      // Stripe primeiro (padrão); se a API falhar num checkout BRL, cai
+      // pro Mercado Pago como fallback — mesma cobrança, provider trocado.
+      let stripeSession: { id: string; url: string } | null = null;
+      if (cardProvider === "stripe") {
+        try {
+          const couponId = effPct > 0 ? await ensureStripeCoupon(effPct, upgradePct > 0 ? "upgrade" : "first-purchase") : undefined;
+          const customerId = await ensureStripeCustomer(db, user.id, user.email);
+          stripeSession = await createStripeSession(
+            plan, user.id, customerId, currency, amountCents, periodDef.months, periodDef.label, couponId,
+          );
+        } catch (err) {
+          if (currency !== "brl") throw err;
+          console.error("[checkout] stripe falhou — fallback mercadopago:", err);
+        }
+      }
+      if (stripeSession) {
         const { error } = await db.from("payments").insert({
           user_id: user.id,
           plan_id: plan.id,
-          provider: "mercadopago",
-          provider_ref: internalRef,
+          provider: "stripe",
+          provider_ref: stripeSession.id,
           method: "card",
           amount_cents: chargedCents,
           currency,
           status: "pending",
-          metadata: { period, months: periodDef.months, currency, ...discMeta, ...changeMeta, ...fbMeta },
+          metadata: { currency, period, months: periodDef.months, ...discMeta, ...changeMeta, ...fbMeta },
         });
         if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
-        try {
-          const pref = await createMpPreference({
-            title: `SeekerAi — ${plan.nome} · ${periodDef.label}`,
-            internalRef, payerEmail: user.email ?? null, amountCents: chargedCents,
-          });
-          return json({ provider: "mercadopago", method, checkoutUrl: pref.url });
-        } catch (err) {
-          await db.from("payments").update({ status: "failed" })
-            .eq("provider", "mercadopago").eq("provider_ref", internalRef);
-          throw err;
-        }
+        return json({ provider: "stripe", method, checkoutUrl: stripeSession.url });
       }
-      const couponId = effPct > 0 ? await ensureStripeCoupon(effPct, upgradePct > 0 ? "upgrade" : "first-purchase") : undefined;
-      const customerId = await ensureStripeCustomer(db, user.id, user.email);
-      const session = await createStripeSession(
-        plan, user.id, customerId, currency, amountCents, periodDef.months, periodDef.label, couponId,
-      );
+      // Cobrança única por período — a renovação é um novo checkout,
+      // mesmo ciclo de vida dos pagamentos PIX.
+      const internalRef = crypto.randomUUID();
       const { error } = await db.from("payments").insert({
         user_id: user.id,
         plan_id: plan.id,
-        provider: "stripe",
-        provider_ref: session.id,
+        provider: "mercadopago",
+        provider_ref: internalRef,
         method: "card",
         amount_cents: chargedCents,
         currency,
         status: "pending",
-        metadata: { currency, period, months: periodDef.months, ...discMeta, ...changeMeta, ...fbMeta },
+        metadata: { period, months: periodDef.months, currency, ...discMeta, ...changeMeta, ...fbMeta },
       });
       if (error) throw httpError(500, `Falha ao registrar pagamento: ${error.message}`);
-      return json({ provider: "stripe", method, checkoutUrl: session.url });
+      try {
+        const pref = await createMpPreference({
+          title: `SeekerAi — ${plan.nome} · ${periodDef.label}`,
+          internalRef, payerEmail: user.email ?? null, amountCents: chargedCents,
+        });
+        return json({ provider: "mercadopago", method, checkoutUrl: pref.url });
+      } catch (err) {
+        await db.from("payments").update({ status: "failed" })
+          .eq("provider", "mercadopago").eq("provider_ref", internalRef);
+        throw err;
+      }
     }
 
     // PIX — provider_ref é a nossa referência interna, ecoada pelo webhook.

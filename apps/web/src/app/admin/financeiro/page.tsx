@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AdminFinanceiro } from "@/components/admin-financeiro";
 import { AdminDiscount } from "@/components/admin-discount";
+import { AdminCardProvider } from "@/components/admin-card-provider";
 import { FinList } from "@/components/fin-list";
 import {
   addCents, CUR_LABEL, emptyTotals, fmtMoney, fmtTotals, PAY_CURRENCIES, payCurrency,
@@ -145,6 +146,7 @@ export default async function AdminFinanceiroPage() {
     { data: subs },
     { data: plansData },
     { data: discSetting },
+    { data: cardProviderSetting },
   ] = await Promise.all([
     supabase.from("payments")
       .select("id,user_id,plan_id,status,provider,method,amount_cents,currency,metadata,created_at")
@@ -154,8 +156,10 @@ export default async function AdminFinanceiroPage() {
       .eq("status", "active"),
     supabase.from("plans").select("id,slug,nome,preco_centavos").eq("ativo", true),
     supabase.from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle(),
+    supabase.from("app_settings").select("value").eq("key", "card_provider").maybeSingle(),
   ]);
   const discountPct = Math.min(90, Math.max(0, Math.trunc(Number(discSetting?.value ?? 0)) || 0));
+  const cardProvider = cardProviderSetting?.value === "mercadopago" ? "mercadopago" : "stripe";
 
   const pays = (payments ?? []) as PayRow[];
   const now = Date.now();
@@ -351,6 +355,7 @@ export default async function AdminFinanceiroPage() {
     </section>
 
     <AdminDiscount initialPct={discountPct} />
+    <AdminCardProvider initialProvider={cardProvider} />
 
     <div className="dash-grid">
       <section className="dash-panel">
