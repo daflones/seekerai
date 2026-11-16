@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/auth/session";
 import { authReady } from "@/lib/auth/config";
 import { fetchAllRows } from "@/lib/supabase/admin";
 import { AdminCreditos } from "@/components/admin-creditos";
+import { AdminProviderCredits } from "@/components/admin-provider-credits";
 import { AdminTools } from "@/components/admin-tools";
 import {
   addCents, CUR_LABEL, emptyTotals, fmtMoney, fmtTotals, PAY_CURRENCIES, payCurrency,
@@ -441,6 +442,7 @@ export default async function AdminPage() {
               ))}
             </ul>}
       </section>
+      <AdminProviderCredits />
       <section className="dash-panel">
         <h2><Sparkles size={16} /> Console de testes</h2>
         <AdminTools />

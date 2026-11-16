@@ -586,6 +586,7 @@ a.lead-action { text-decoration: none; }
 .adm-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 6px 12px; border-radius: 999px; border: 1px solid #b387d133; }
 .adm-pill-ok { background: #6be3cc12; color: var(--cyan); border-color: #6be3cc33; }
 .adm-pill-warn { background: #f59e0b12; color: var(--warn); border-color: #f59e0b40; }
+.adm-pill-danger { background: #f43f5e14; color: var(--danger); border-color: #f43f5e40; }
 .adm-delta { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; }
 .adm-delta-up { color: var(--cyan); }
 .adm-delta-down { color: var(--danger); }
