@@ -24,7 +24,7 @@ import {
   sha256Hex,
 } from "../_shared/common.ts";
 import { getSecret } from "../_shared/secrets.ts";
-import { igMediaCached } from "../_shared/instagram.ts";
+import { igCachePut, igMediaCached, scMedia } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
 
@@ -2229,6 +2229,7 @@ async function publishPremiumSite(
   })();
   // Instagram: o @ do lead (vem do Serper) dispara o scrape já; sem @,
   // o placePromise já procurou no HTML do site.
+  let igHandle: string | null = null;
   const igPromise = (async () => {
     let handle = asString(lead.instagram, 300) ?? null;
     if (!handle) {
@@ -2238,6 +2239,9 @@ async function publishPremiumSite(
         await db.from("leads").update({ instagram: handle }).eq("id", leadId).is("instagram", null);
       }
     }
+    const h = handle?.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1]
+      ?? handle?.replace(/^@+/, "").replace(/\/+$/, "");
+    igHandle = h && /^[A-Za-z0-9._]{1,60}$/.test(h) ? h : null;
     return handle ? fetchInstagramMedia(handle) : null;
   })();
 
@@ -2310,14 +2314,28 @@ async function publishPremiumSite(
   // então um reel que falha não pode "cobrir" o site no papel.
   const igVideoPromise = (async () => {
     // Reels chegam a ~50MB — sequencial pra não estourar a memória do edge.
-    const out: { src: string; titulo: string }[] = [];
-    let idx = 0;
-    for (const v of ig?.videos ?? []) {
-      const dl = await fetchVideoBytes(v.src);
-      if (!dl) continue;
-      const ext = dl.contentType.includes("webm") ? "webm" : "mp4";
-      const url = await uploadSiteAsset(db, slug, `video-${++idx}.${ext}`, dl.bytes, dl.contentType);
-      if (url) out.push({ src: url, titulo: v.titulo });
+    const downloadAll = async (vids: { src: string; titulo: string }[]) => {
+      const out: { src: string; titulo: string }[] = [];
+      let idx = 0;
+      for (const v of vids) {
+        const dl = await fetchVideoBytes(v.src);
+        if (!dl) continue;
+        const ext = dl.contentType.includes("webm") ? "webm" : "mp4";
+        const url = await uploadSiteAsset(db, slug, `video-${++idx}.${ext}`, dl.bytes, dl.contentType);
+        if (url) out.push({ src: url, titulo: v.titulo });
+      }
+      return out;
+    };
+    let out = await downloadAll(ig?.videos ?? []);
+    // URLs assinadas do CDN do Instagram expiram — o cache de mídia (7d)
+    // pode estar com links mortos. Se nada subiu, raspa o perfil de novo
+    // (sem cache) e tenta uma segunda vez com as URLs frescas.
+    if (!out.length && (ig?.videos?.length ?? 0) > 0 && igHandle) {
+      const fresh = await scMedia(igHandle).catch(() => null);
+      if (fresh?.videos?.length) {
+        await igCachePut(igHandle, "media", fresh).catch(() => {});
+        out = await downloadAll(fresh.videos.slice(0, 3));
+      }
     }
     return out;
   })();
