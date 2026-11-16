@@ -723,7 +723,8 @@ export function BeautySite({ slug, config }: { slug: string; config: SiteConfig 
             <h2 className="bbeauty-footer-h2">{S.footerA}<br /><em>{vocab?.ctaEm ?? S.ctaEmFb}</em></h2>
             <div className="bbeauty-footer-pills">
               <Magnetic><CtaButton className="bbeauty-pill primary"><Sparkles size={15} /> {ctaLabel}</CtaButton></Magnetic>
-              {waNumber && <Magnetic><a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
+              {/* CTA primário já é WhatsApp ("zap") — pill solto seria duplicado. */}
+              {ctaKind !== "zap" && waNumber && <Magnetic><a className="bbeauty-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
               {cfg.contato.mapsUrl && <Magnetic><a className="bbeauty-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> {S.comoChegar}</a></Magnetic>}
               {igUrl(cfg.contato.instagram) && <Magnetic><a className="bbeauty-pill" href={igUrl(cfg.contato.instagram)!} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
             </div>

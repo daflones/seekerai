@@ -597,8 +597,12 @@ export function BarbershopSite({ slug, config }: { slug: string; config: SiteCon
           <div className="bshop-footer-body" ref={footBodyRef}>
             <h2 className="bshop-footer-h2">{S.footerBarberA}<br /><em>{S.footerBarberB}</em></h2>
             <div className="bshop-footer-pills">
-              {bookingEnabled && <Magnetic><button className="bshop-pill primary" onClick={() => openBook()}><Scissors size={15} /> {S.agendarAgora}</button></Magnetic>}
-              {waNumber && <Magnetic><a className="bshop-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
+              {bookingEnabled
+                ? <Magnetic><button className="bshop-pill primary" onClick={() => openBook()}><Scissors size={15} /> {S.agendarAgora}</button></Magnetic>
+                : waNumber && <Magnetic><a className="bshop-pill primary" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
+              {/* Com agendamento ligado o WhatsApp vira secundário; sem ele
+                  o primário acima já é o botão de WhatsApp — sem duplicar. */}
+              {bookingEnabled && waNumber && <Magnetic><a className="bshop-pill" href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener"><MessageCircle size={15} /> WhatsApp</a></Magnetic>}
               {cfg.contato.mapsUrl && <Magnetic><a className="bshop-pill" href={cfg.contato.mapsUrl} target="_blank" rel="noopener"><MapPin size={15} /> {S.comoChegar}</a></Magnetic>}
               {igUrl(cfg.contato.instagram) && <Magnetic><a className="bshop-pill" href={igUrl(cfg.contato.instagram)!} target="_blank" rel="noopener"><Instagram size={15} /> Instagram</a></Magnetic>}
             </div>
