@@ -1515,8 +1515,10 @@ async function fetchVideoBytes(
   if (!res?.ok) return null;
   const len = Number(res.headers.get("content-length") ?? 0);
   if (len > 70_000_000) return null;
+  // CDN do Instagram às vezes devolve octet-stream — o src já é URL
+  // de vídeo, então aceita e trata como mp4 na extensão.
   const contentType = res.headers.get("content-type")?.split(";")[0] ?? "video/mp4";
-  if (!contentType.startsWith("video/")) return null;
+  if (!contentType.startsWith("video/") && contentType !== "application/octet-stream") return null;
   return { bytes: new Uint8Array(await res.arrayBuffer()), contentType };
 }
 
@@ -2310,6 +2312,22 @@ async function publishPremiumSite(
     merged.push(igFoto);
   }
   const imgSources = merged;
+  // Reels do Instagram: download/re-hospedagem começa JUNTO com as
+  // imagens — o resultado real (videos.length) decide o gap-fill de IA,
+  // então um reel que falha não pode "cobrir" o site no papel.
+  const igVideoPromise = (async () => {
+    // Reels chegam a ~50MB — sequencial pra não estourar a memória do edge.
+    const out: { src: string; titulo: string }[] = [];
+    let idx = 0;
+    for (const v of ig?.videos ?? []) {
+      const dl = await fetchVideoBytes(v.src);
+      if (!dl) continue;
+      const ext = dl.contentType.includes("webm") ? "webm" : "mp4";
+      const url = await uploadSiteAsset(db, slug, `video-${++idx}.${ext}`, dl.bytes, dl.contentType);
+      if (url) out.push({ src: url, titulo: v.titulo });
+    }
+    return out;
+  })();
   // Descreve até 6 fotos reais em paralelo com os downloads — o redator
   // usa a lista "FOTO[i]" pra casar serviço↔foto (i = índice em sources).
   descsPromise = Promise.all(
@@ -2331,6 +2349,9 @@ async function publishPremiumSite(
       if (url) publicUrls.push({ url, real: true, src });
     }
   }
+
+  // Vídeos que subiram de verdade — só eles contam como cobertura.
+  const videos = await igVideoPromise;
 
   const descPairs = (await descsPromise) ?? [];
   const descs = descPairs.filter((x): x is { i: number; d: string } => Boolean(x.d)).map((x) => x.d);
@@ -2364,9 +2385,9 @@ async function publishPremiumSite(
   // Reels do Instagram contam como cobertura visual: perfil com feed
   // movimentado (fotos + vídeos) não precisa de imagem gerada pra "encher".
   const imgErrors: string[] = [];
-  const coberturaReal = publicUrls.length + Math.min(igVideos.length, 2);
+  const coberturaReal = publicUrls.length + Math.min(videos.length, 2);
   const faltando = Math.max(0, Math.min(SITE_IMAGE_TARGET - coberturaReal, MAX_GENERATED_IMAGES));
-  if (!faltando && (igImages.length || igVideos.length)) {
+  if (!faltando && (igImages.length || videos.length)) {
     onStep?.(55, "Imagens e vídeos reais do Instagram cobrem o site — sem geração de imagem");
   }
   if (faltando > 0) {
@@ -2400,26 +2421,10 @@ async function publishPremiumSite(
   }
 
   // 3) SiteConfig: base determinística + patch de IA (OpenRouter → NVIDIA).
-  // Em paralelo: re-hospeda vídeos do Instagram e espera as avaliações
-  // do Maps (antes só nota/total — agora com autor e texto).
-  const igVideoPromise = (async () => {
-    // Reels chegam a ~50MB — sequencial pra não estourar a memória do edge.
-    const out: { src: string; titulo: string }[] = [];
-    let idx = 0;
-    for (const v of ig?.videos ?? []) {
-      const dl = await fetchVideoBytes(v.src);
-      if (!dl) continue;
-      const ext = dl.contentType.includes("webm") ? "webm" : "mp4";
-      const url = await uploadSiteAsset(db, slug, `video-${++idx}.${ext}`, dl.bytes, dl.contentType);
-      if (url) out.push({ src: url, titulo: v.titulo });
-    }
-    return out;
-  })();
+  // Em paralelo: avaliações do Maps (antes só nota/total — agora com
+  // autor e texto). Vídeos já subiram na etapa de imagens.
   onStep?.(75, "Organizando avaliações, vídeos e mapas");
-  const [videos, place] = await Promise.all([
-    igVideoPromise,
-    Promise.race([placePromise, sleep(45_000).then(() => ({ reviews: [], imageUrls: [] } as PlaceDetails))]),
-  ]);
+  const place = await Promise.race([placePromise, sleep(45_000).then(() => ({ reviews: [], imageUrls: [] } as PlaceDetails))]);
 
   // Fotos do Maps re-hospedadas — URLs do Google expiram, então
   // copiamos pro Storage como o resto das imagens reais.
