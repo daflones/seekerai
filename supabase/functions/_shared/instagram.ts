@@ -101,7 +101,7 @@ export async function scMedia(handle: string): Promise<IgMediaData | null> {
   const media: IgMediaData = { images: [], videos: [], captions: [] };
   const pushImg = (v: unknown) => {
     const u = asStr(v, 1200);
-    if (u?.startsWith("http") && media.images.length < 8 && !media.images.includes(u)) {
+    if (u?.startsWith("http") && media.images.length < 10 && !media.images.includes(u)) {
       media.images.push(u);
     }
   };
@@ -113,7 +113,7 @@ export async function scMedia(handle: string): Promise<IgMediaData | null> {
     if (cap) media.captions.push(cap);
     if (n.is_video === true || String(n.__typename ?? "").includes("Video")) {
       const vu = asStr(n.video_url, 1500);
-      if (vu && media.videos.length < 2) {
+      if (vu && media.videos.length < 3) {
         media.videos.push({ src: vu, titulo: cap?.split("\n")[0]?.slice(0, 80) || "Reel" });
       }
     }

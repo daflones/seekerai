@@ -2278,26 +2278,35 @@ async function publishPremiumSite(
   })();
 
   // 1) Imagens reais: baixa e re-hospeda (URLs de terceiros expiram).
-  const sources = await resolveLeadImageSources(lead, context);
   // Instagram é bonus — não pode segurar o pipeline. Com @ no lead o
   // scrape é direto; sem @ a descoberta social pode demorar mais.
   const igCap = lead.instagram ? 60_000 : 125_000;
   const ig = await Promise.race([igPromise, sleep(igCap).then(() => null)]);
-  if (ig) {
-    for (const u of ig.images) {
-      if (sources.length < MAX_SITE_IMAGES && !sources.includes(u)) sources.push(u);
-    }
+  // Instagram PRIMEIRO: conteúdo real do negócio (posts, carrosséis,
+  // reels) tem prioridade sobre fotos genéricas de Maps/site — usa
+  // TODAS as mídias disponíveis antes de qualquer outra fonte e muito
+  // antes de gerar imagem com IA.
+  const igImages = (ig?.images ?? []).slice(0, MAX_SITE_IMAGES);
+  const igVideos = ig?.videos ?? [];
+  if (igImages.length || igVideos.length) {
+    onStep?.(48, `Reaproveitando ${igImages.length} ${igImages.length === 1 ? "imagem" : "imagens"}${igVideos.length ? ` e ${igVideos.length} ${igVideos.length === 1 ? "vídeo" : "vídeos"}` : ""} reais do Instagram`);
+  }
+  const sources = await resolveLeadImageSources(lead, context);
+  const merged = [...igImages];
+  for (const u of sources) {
+    if (merged.length < MAX_SITE_IMAGES && !merged.includes(u)) merged.push(u);
   }
   // Foto de perfil do Instagram (raspada na busca) — logo/fachada real.
   const igFoto = ((lead.dados as Record<string, unknown> | null)?.ig as
     { foto?: string | null } | undefined)?.foto;
-  if (igFoto && sources.length < MAX_SITE_IMAGES && !sources.includes(igFoto)) {
-    sources.push(igFoto);
+  if (igFoto && merged.length < MAX_SITE_IMAGES && !merged.includes(igFoto)) {
+    merged.push(igFoto);
   }
+  const imgSources = merged;
   // Descreve até 6 fotos reais em paralelo com os downloads — o redator
   // usa a lista "FOTO[i]" pra casar serviço↔foto (i = índice em sources).
   descsPromise = Promise.all(
-    sources.slice(0, 6).map((u, i) =>
+    imgSources.slice(0, 6).map((u, i) =>
       describeReferenceImage(apiKey, u).then((d) => ({ i, d })),
     ),
   );
@@ -2305,7 +2314,7 @@ async function publishPremiumSite(
   // source e precisa sobreviver a downloads que falham (sem shift).
   const publicUrls: { url: string; real: boolean; src: number }[] = [];
   {
-    const downloads = await Promise.all(sources.map(fetchImageBytes));
+    const downloads = await Promise.all(imgSources.map(fetchImageBytes));
     let i = 0, src = -1;
     for (const dl of downloads) {
       src++;
@@ -2345,8 +2354,14 @@ async function publishPremiumSite(
   }
 
   // 2) Gap-fill com IA — prompt específico por slot, direção de arte do tema.
+  // Reels do Instagram contam como cobertura visual: perfil com feed
+  // movimentado (fotos + vídeos) não precisa de imagem gerada pra "encher".
   const imgErrors: string[] = [];
-  const faltando = Math.min(SITE_IMAGE_TARGET - publicUrls.length, MAX_GENERATED_IMAGES);
+  const coberturaReal = publicUrls.length + Math.min(igVideos.length, 2);
+  const faltando = Math.max(0, Math.min(SITE_IMAGE_TARGET - coberturaReal, MAX_GENERATED_IMAGES));
+  if (!faltando && (igImages.length || igVideos.length)) {
+    onStep?.(55, "Imagens e vídeos reais do Instagram cobrem o site — sem geração de imagem");
+  }
   if (faltando > 0) {
     const visualRef = descs.join(" ").slice(0, 700).trim() || null;
 
@@ -2373,7 +2388,7 @@ async function publishPremiumSite(
       if (!dl) continue;
       const ext = dl.contentType.includes("png") ? "png" : dl.contentType.includes("webp") ? "webp" : "jpg";
       const url = await uploadSiteAsset(db, slug, `ai-${++i}.${ext}`, dl.bytes, dl.contentType);
-      if (url) publicUrls.push({ url, real: false });
+      if (url) publicUrls.push({ url, real: false, src: -1 });
     }
   }
 
@@ -2544,7 +2559,7 @@ async function publishPremiumSite(
       ig: ig ? { imgs: ig.images.length, vids: ig.videos.length, erro: ig.erro ?? null } : "sem-instagram/timeout",
       videosRehosted: videos.length,
       place: { reviews: place.reviews.length, imgs: placeImgs.length, horarios: place.horariosLabel?.length ?? 0, instagram: place.instagram ?? null },
-      sources: sources.length,
+      sources: imgSources.length,
     },
   };
 }

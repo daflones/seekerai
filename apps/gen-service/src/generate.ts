@@ -2291,8 +2291,10 @@ async function publishPremiumSite(
   const ig = await Promise.race([igPromise, sleep(igCap).then(() => null)]);
   // Instagram PRIMEIRO: conteúdo real do negócio (posts, carrosséis,
   // reels) tem prioridade sobre fotos genéricas de Maps/site — é o que
-  // faz o site parecer do próprio negócio em vez de stock.
-  const igImages = (ig?.images ?? []).slice(0, 6);
+  // faz o site parecer do próprio negócio em vez de stock. Usa TODAS
+  // as mídias disponíveis (até o teto do pipeline) antes de qualquer
+  // outra fonte e muito antes de gerar imagem com IA.
+  const igImages = (ig?.images ?? []).slice(0, MAX_SITE_IMAGES);
   const igVideos = ig?.videos ?? [];
   if (igImages.length || igVideos.length) {
     onStep?.(48, `Reaproveitando ${igImages.length} ${igImages.length === 1 ? "imagem" : "imagens"}${igVideos.length ? ` e ${igVideos.length} ${igVideos.length === 1 ? "vídeo" : "vídeos"}` : ""} reais do Instagram`);
