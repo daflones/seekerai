@@ -1633,6 +1633,23 @@ interface SerperDetails {
 
 async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): Promise<SerperDetails> {
   const empty: SerperDetails = { reviews: [], horariosLabel: [], imageUrls: [] };
+  const dados = isRecord(lead.dados) ? lead.dados : {};
+  // Cache por lead (30d, no próprio dados): regenerar site não gasta
+  // crédito Serper de novo — reviews/horários já foram pagos uma vez.
+  const cached = isRecord(dados.serperDetails) ? dados.serperDetails : null;
+  if (
+    cached && typeof cached.fetchedAt === "string" &&
+    Date.now() - Date.parse(cached.fetchedAt) < 30 * 24 * 3600 * 1000 &&
+    (asString(cached.lang, 8) ?? "pt") === lang
+  ) {
+    return {
+      reviews: Array.isArray(cached.reviews) ? cached.reviews as PlaceReview[] : [],
+      horariosLabel: Array.isArray(cached.horariosLabel) ? cached.horariosLabel as [string, string][] : [],
+      imageUrls: Array.isArray(cached.imageUrls) ? cached.imageUrls as string[] : [],
+      avaliacao: typeof cached.avaliacao === "number" ? cached.avaliacao : undefined,
+      totalAvaliacoes: typeof cached.totalAvaliacoes === "number" ? cached.totalAvaliacoes : undefined,
+    };
+  }
   // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
   const keys = [
     await getSecret("SERPER_API_KEY_5"),
@@ -1657,6 +1674,11 @@ async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): P
   // cid; lead com placeId ChIJ resolve o cid via busca por nome+cidade.
   const placeId = asString(lead.place_id, 300);
   let cid = placeId && /^\d+$/.test(placeId) ? placeId : null;
+  // A busca Serper já grava maps?cid=NNN — reusar o cid pula a chamada /maps.
+  if (!cid) {
+    cid = (asString(lead.maps_url, 800) ?? asString(dados.mapsUrl, 800) ?? "")
+      .match(/cid=(\d+)/)?.[1] ?? null;
+  }
   let hit: Record<string, unknown> | null = null;
   if (!cid) {
     const nome = asString(lead.nome, 150);
@@ -1710,13 +1732,26 @@ async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): P
       }];
     });
   const thumb = hit ? asString(hit.thumbnailUrl, 1200) : null;
-  return {
+  const result: SerperDetails = {
     reviews,
     horariosLabel,
     imageUrls: thumb ? [thumb] : [],
     avaliacao: hit && typeof hit.rating === "number" ? hit.rating : undefined,
     totalAvaliacoes: hit && typeof hit.ratingCount === "number" ? hit.ratingCount : undefined,
   };
+  // Persiste no lead — próxima geração (nova versão, outro serviço)
+  // reusa reviews/horários sem gastar crédito Serper de novo.
+  if (typeof lead.id === "string" && lead.id) {
+    try {
+      await serviceClient().from("leads").update({
+        dados: {
+          ...dados,
+          serperDetails: { ...result, lang, cid, fetchedAt: new Date().toISOString() },
+        },
+      }).eq("id", lead.id);
+    } catch { /* cache best-effort */ }
+  }
+  return result;
 }
 
 
@@ -2566,7 +2601,11 @@ async function publishPremiumSite(
     { onConflict: "slug" },
   );
   if (siteErr) throw httpError(502, `Falha ao publicar site: ${siteErr.message}`);
-  await db.from("leads").update({ dados: { ...dados, siteSlug: slug } }).eq("id", leadId);
+  // Re-lê dados antes de gravar — serperDetails/cache de mídia podem ter
+  // sido escritos no meio do job; o snapshot do início não pode clobber.
+  const { data: leadFresh } = await db.from("leads").select("dados").eq("id", leadId).maybeSingle();
+  const dadosFresh = isRecord(leadFresh?.dados) ? leadFresh.dados : dados;
+  await db.from("leads").update({ dados: { ...dadosFresh, siteSlug: slug } }).eq("id", leadId);
 
   return {
     slug,
