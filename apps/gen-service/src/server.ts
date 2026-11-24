@@ -9,6 +9,7 @@ import { handle } from "./generate.ts";
 import { handleSearch } from "./search.ts";
 import { recentJobEvents, subscribeJob, clearJobEvents, emitJobEvent, type JobEvent } from "./bus.ts";
 import { asString, isRecord, serviceClient } from "./common.ts";
+import { providerCredits } from "./provider-credits.ts";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
@@ -82,6 +83,13 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/provider-credits") {
+      const { credits } = await providerCredits();
+      res.writeHead(200, { "Content-Type": "application/json" })
+        .end(JSON.stringify({ credits, at: new Date().toISOString() }));
       return;
     }
 
