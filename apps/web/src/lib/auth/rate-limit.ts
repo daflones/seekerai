@@ -11,6 +11,7 @@ export async function authRateLimit(action: string, account: string, headers: He
   const accountLimit = action === "login" ? 10
     : action === "admin-plan" ? 30
     : action === "app-action" ? 90
+    : action === "admin-ai" ? 60
     : 5;
   const ipLimit = ip === "shared" ? 120 : action === "app-action" ? 90 : 30;
   const rules = [

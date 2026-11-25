@@ -27,6 +27,7 @@ const DEFAULT_T: Messages["shell"] = {
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/admin/ia", label: "Agente IA", icon: Sparkles },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/onboarding", label: "Onboarding", icon: ClipboardList },
   { href: "/admin/financeiro", label: "Financeiro", icon: CircleDollarSign },

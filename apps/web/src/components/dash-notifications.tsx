@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowUpRight, Bell, CheckCheck, Globe, LifeBuoy, Zap } from "lucide-react";
+import { ArrowUpRight, Bell, CheckCheck, Globe, LifeBuoy, Sparkles, Zap } from "lucide-react";
 
 export interface DashNotif {
   id: string;
@@ -18,6 +18,7 @@ export interface DashNotif {
 const ICONS: Record<string, typeof Bell> = {
   chamado_respondido: LifeBuoy,
   chat_admin: LifeBuoy,
+  admin_aviso: Sparkles,
   dominio: Globe,
   dominio_expirado: Globe,
   plano_expirado: Zap,
@@ -25,6 +26,7 @@ const ICONS: Record<string, typeof Bell> = {
 const LINKS: Record<string, string> = {
   chamado_respondido: "/app/suporte",
   chat_admin: "/app/suporte",
+  admin_aviso: "/app",
   dominio: "/app/dominios",
   dominio_expirado: "/app/dominios",
   plano_expirado: "/app/planos",
