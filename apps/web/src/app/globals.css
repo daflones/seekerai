@@ -113,6 +113,13 @@ h1, h2, h3, h4 { font-family: var(--font-heading); line-height: 1.2; letter-spac
 .hero-reassurance { display: flex; justify-content: center; gap: 24px; margin-top: 20px; color: var(--muted); font-size: 10px; }
 .hero-reassurance span { display: inline-flex; align-items: center; gap: 6px; }
 .hero-reassurance svg { color: var(--cyan); }
+.hero-price-from { color: var(--white); font-weight: 600; }
+.hero-price-from svg { color: var(--violet-light); }
+
+/* Prova social — totais reais logo abaixo do hero */
+.social-proof { display: flex; align-items: center; justify-content: center; gap: 26px; flex-wrap: wrap; margin-top: -8px; padding: 14px 0 26px; color: var(--muted); font-size: 12px; }
+.social-proof strong { color: var(--white); font-weight: 800; }
+.social-proof-note { font-size: 10px; opacity: .75; }
 .hero-product { position: relative; margin-top: 65px; animation: enter 1.1s .15s both; }
 .product-caption { display: flex; justify-content: space-between; align-items: center; padding-inline: 4px; margin-bottom: 13px; color: var(--muted); font-size: 9px; letter-spacing: .06em; }
 .product-caption > span { display: flex; gap: 8px; align-items: center; }
@@ -399,6 +406,7 @@ select option { background: var(--panel); color: var(--white); }
 .billing-toggles { display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; margin-bottom: 43px; }
 .billing-toggles .payment-toggle { margin: 0; }
 .toggle-off { font-style: normal; font-size: 8px; font-weight: 750; color: var(--ok, #6fe3b3); margin-left: 2px; }
+.toggle-best { font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--violet-light); margin-left: 2px; padding: 1px 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--violet-light) 40%, transparent); }
 .plans-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 1060px; margin-inline: auto; }
 .plan-card { padding: 25px 21px 30px; border: 1px solid color-mix(in srgb, var(--violet-light) 16%, transparent); border-radius: 14px; background: linear-gradient(140deg, color-mix(in srgb, var(--ink) 40%, transparent), var(--ink)); }
 .plan-tag { display: flex; align-items: center; gap: 5px; width: fit-content; min-height: 21px; font-size: 6px; letter-spacing: .07em; padding: 4px 8px; border: 1px solid color-mix(in srgb, var(--white) 8%, transparent); border-radius: 5px; color: var(--muted); }

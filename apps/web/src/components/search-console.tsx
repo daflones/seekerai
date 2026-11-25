@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { fmtCompact, igHandle, igUrl, placeImageSrc, type PlaceResult } from "@/lib/app-client";
 import { isCreditsError, OutOfCredits } from "./out-of-credits";
+import { PlanOffer } from "./plan-offer";
 import { formatPotential, potentialEstimate } from "@/lib/catalog";
 import { cityGroupsFor, nicheGroupsFor, serviceCategory, serviceName } from "@/lib/catalog-i18n";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
@@ -564,15 +565,18 @@ export function SearchConsole({
       onClick={() => setUpgradeOpen(false)}>
       <section className="pix-panel pix-modal seek-upgrade" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="pix-close" aria-label={t.tutClose} onClick={() => setUpgradeOpen(false)}>×</button>
-        <div className="seek-tut">
-          <p className="seek-tut-title">{t.tutT}</p>
+        <div className="seek-tut seek-tut-offer">
+          <p className="seek-tut-title">{t.upT}</p>
+          <p className="seek-tut-sub">{t.upS}</p>
+          <PlanOffer lang={lang} />
+          <p className="seek-tut-steps">{t.tutT}</p>
           <ol>
             <li><span className="seek-tut-num">1</span><span>{t.tutS1}</span></li>
             <li><span className="seek-tut-num">2</span><span>{t.tutS2}</span></li>
             <li><span className="seek-tut-num">3</span><span>{t.tutS3}</span></li>
           </ol>
           <Link href="/app/planos" className="button button-primary button-small">
-            <Sparkles size={14} />{t.tutCta}
+            <Sparkles size={14} />{t.upCta}
           </Link>
         </div>
       </section>

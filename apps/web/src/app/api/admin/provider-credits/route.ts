@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { verifiedSession } from "@/lib/auth/session";
 import { genServiceUrl } from "@/lib/gen-service";
 
@@ -97,7 +97,7 @@ async function localFallback(): Promise<ProviderCredit[]> {
   return [...serper, ...scrape, ...openrouter];
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const session = await verifiedSession();
   if (!session) return NextResponse.json({ error: "Entre novamente." }, { status: 401 });
   if (session.profile?.role !== "admin") {

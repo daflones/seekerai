@@ -229,6 +229,25 @@ a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
 .seek-tut-num { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #a573ca30; color: var(--violet-light); font-size: 10px; font-weight: 800; }
 .seek-tut .button { margin-top: 14px; display: inline-flex; }
 
+/* Aviso pós-checkout — "seus créditos já estão na carteira" */
+.seek-paid-hint { margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+
+/* Modal de upgrade — oferta de planos dentro do radar */
+.seek-tut-offer .seek-tut-sub { margin: -6px 0 12px; font-size: 12px; color: var(--fg2); line-height: 1.55; }
+.seek-tut-steps { margin: 14px 0 0; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.seek-tut-offer ol { margin-top: 8px; }
+
+/* Cards de oferta dentro do app (modal + aviso de créditos) */
+.upsell-plans { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px; }
+.upsell-plan { position: relative; padding: 11px 13px 10px; border-radius: 11px; }
+.upsell-plan .cta-plan-price { font-size: 15px; }
+.upsell-flag { position: absolute; top: -7px; right: 10px; padding: 2px 8px; border-radius: 999px; background: var(--violet); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.upsell-off { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; color: var(--cyan); font-style: normal; }
+.upsell-cta { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px !important; font-size: 11px !important; color: var(--muted) !important; }
+.upsell-plan:hover .upsell-cta { color: var(--white); }
+.no-credits-body .upsell-plans { max-width: 420px; }
+.seek-upgrade .upsell-plans { margin-bottom: 4px; }
+
 /* Aviso "créditos acabaram" */
 .no-credits { display: flex; align-items: flex-start; gap: 13px; margin-top: 16px; padding: 16px 18px; border-radius: 14px; border: 1px solid #f2b87944; background: #f2b87910; color: #f2b879; }
 .no-credits-body { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }

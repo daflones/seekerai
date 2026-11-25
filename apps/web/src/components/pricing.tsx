@@ -34,6 +34,7 @@ export function Pricing({ plans, source, locale, t, discountPct = 0 }: { plans: 
           {BILLING_PERIODS.map((p) => <button key={p.id} aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
             <CalendarClock size={15} />{periodLabel[p.id]}
             {p.discountPct > 0 && <em className="toggle-off">{p.discountPct}%</em>}
+            {p.id === "anual" && <em className="toggle-best">{t.bestPick}</em>}
           </button>)}
         </div>
         {locale.isBrazil && (

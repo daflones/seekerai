@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Buscar oportunidades", robots: { index: false } };
 
 export default async function BuscarPage({ searchParams }: {
-  searchParams: Promise<{ primeira?: string }>;
+  searchParams: Promise<{ primeira?: string; checkout?: string }>;
 }) {
   const [{ supabase, user, profile }, loc, params] = await Promise.all([
     requireSession("/app/buscar"), getLocale(), searchParams,
@@ -39,6 +39,9 @@ export default async function BuscarPage({ searchParams }: {
     <span className="eyebrow">{t.eyebrow}</span>
     <h1>{t.title}<span className="gradient-text">.</span></h1>
     <p className="private-intro">{t.intro}</p>
+    {params.checkout === "1" && (
+      <p className="auth-success seek-paid-hint" role="status">{t.paidReady}</p>
+    )}
     <SearchConsole
       services={((services ?? []) as { slug: string; nome: string; categoria: string }[])
         .map((s) => ({ slug: s.slug, nome: serviceName(s.slug, s.nome, loc.lang), categoria: serviceCategory(s.categoria, loc.lang) }))}

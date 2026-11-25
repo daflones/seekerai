@@ -72,7 +72,7 @@ export function CheckoutSuccess({ features, fallback, t }: {
       {feats.length > 0 && <ul className="paid-benefits">
         {feats.map((f) => <li key={f}><CheckCircle2 size={12} />{f}</li>)}
       </ul>}
-      <Link href="/app/buscar" className="button button-primary button-small">{t.paidCta}</Link>
+      <Link href="/app/buscar?checkout=1" className="button button-primary button-small">{t.paidCta}</Link>
     </div>;
   }
 

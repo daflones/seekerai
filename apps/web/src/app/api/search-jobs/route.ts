@@ -7,6 +7,7 @@ import { supabasePublicConfig } from "@/lib/auth/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { refundCreditAction } from "@/lib/billing/refund";
 import { genServiceUrl } from "@/lib/gen-service";
+import { demoFirstSearch } from "@/lib/demo-search";
 
 // Jobs de busca: a chamada à edge roda no servidor em background,
 // então trocar de aba ou sair da página não cancela o radar.
@@ -174,6 +175,24 @@ export async function POST(request: NextRequest) {
       .eq("id", running.id).eq("status", "running");
     const ref = (running.payload as { requestRef?: string } | null)?.requestRef;
     await refundCreditAction(admin, session.user.id, ref);
+  }
+
+  // Primeira busca de quem nunca assinou: serve ~20 estabelecimentos
+  // reais já salvos no banco (zero API), cobrando o custo normal de
+  // busca. Sem leads suficientes ou com saldo estourado entre a
+  // checagem e a reserva, cai no fluxo real abaixo.
+  if (profile.role !== "admin") {
+    const demo = await demoFirstSearch(admin, session.user.id, parsed.data);
+    if (demo.kind === "job") {
+      return NextResponse.json({ jobId: demo.jobId },
+        { headers: { "Cache-Control": "no-store" } });
+    }
+    if (demo.kind === "credits") {
+      return NextResponse.json(
+        { error: "Créditos insuficientes — assine um plano para usar o radar." },
+        { status: 403 },
+      );
+    }
   }
 
   const { data: job, error } = await admin.from("search_jobs")

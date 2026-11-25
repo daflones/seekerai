@@ -19,9 +19,9 @@ export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 
-// Landing sem preços: a seção #planos vira um CTA direto pro cadastro.
-// Pra voltar a mostrar os cards com valores, basta ligar a flag —
-// o componente <Pricing> e os cards do CTA final continuam aqui.
+// Landing sem preços: a seção #planos vira CTA pro cadastro e o preço
+// só aparece dentro do app (planos/checkout). A vitrine de conversão
+// fica pra prova social + demo — preço se mostra no fluxo de compra.
 const SHOW_LANDING_PRICES = false;
 
 export default async function Home() {
@@ -30,18 +30,38 @@ export default async function Home() {
   const [loc, theme] = await Promise.all([getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
   const h = t.home;
-  // Cards de preço desligados (SHOW_LANDING_PRICES=false): as duas
-  // queries que só os alimentam ficam puladas — 2 roundtrips a menos
-  // no TTFB da landing.
+  // Flag de preços desligada: a landing não mostra valores — o preço
+  // aparece só dentro do app (checkout). Ligando a flag, os cards de
+  // plano e o "a partir de" do hero voltam automaticamente.
   const pricing: Awaited<ReturnType<typeof publicPlanCards>> = SHOW_LANDING_PRICES
     ? await publicPlanCards()
     : { plans: [], source: "preview" };
-  const { data: discRow } = SHOW_LANDING_PRICES ? await createSupabaseAdminClient()
-    .from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle()
-    : { data: null };
+  const admin = createSupabaseAdminClient();
+  // Prova social busca os totais reais sempre; o desconto só interessa
+  // quando os cards de preço estão ligados.
+  const [{ data: discRow }, { count: leadsCount }, { count: sitesCount }] = await Promise.all([
+    SHOW_LANDING_PRICES
+      ? admin.from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle()
+      : Promise.resolve({ data: null }),
+    admin.from("leads").select("id", { count: "exact", head: true }),
+    admin.from("sites").select("id", { count: "exact", head: true }).eq("publicado", true),
+  ]);
   const discountPct = Math.min(90, Math.max(0, Math.trunc(Number(discRow?.value ?? 0)) || 0));
   const disc = (cents: number) =>
     discountPct > 0 ? Math.max(100, Math.round(cents * (100 - discountPct) / 100)) : cents;
+  // "A partir de R$ X/mês" no hero — menor plano visível já com o
+  // desconto de 1ª compra aplicado (mesmo número que o checkout cobra).
+  const fromCents = pricing.plans.length
+    ? Math.min(...pricing.plans
+        .filter((p) => p.priceCents > 0)
+        .map((p) => disc(loc.isBrazil ? p.priceCents : planIntlCents(p, loc.currency) ?? p.priceCents)))
+    : 0;
+  const priceFrom = fromCents > 0
+    ? h.rePrice.replace("{price}", loc.isBrazil
+        ? `R$ ${formatPlanPrice(fromCents)}`
+        : formatMoney(fromCents, loc.currency, loc.lang))
+      + (discountPct > 0 ? ` · ${discountPct}% ${t.pricing.firstBuy}` : "")
+    : "";
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -54,7 +74,7 @@ export default async function Home() {
         operatingSystem: "Web",
         inLanguage: { pt: "pt-BR", en: "en", es: "es", fr: "fr", de: "de", it: "it" }[loc.lang],
         description: `${h.heroDesc1} ${h.heroDesc2}`,
-        offers: { "@type": "Offer", price: "0", priceCurrency: loc.currency.toUpperCase(), description: h.re2 },
+        offers: { "@type": "Offer", price: (fromCents / 100).toFixed(2), priceCurrency: loc.currency.toUpperCase(), description: h.re2 },
       },
       {
         "@type": "FAQPage",
@@ -79,7 +99,7 @@ export default async function Home() {
             <h1>{h.heroA}<br />{h.heroB} <span className="hero-word">{h.heroWord}<svg viewBox="0 0 420 18" fill="none" aria-hidden="true"><path d="M3 13C100 0 296 0 416 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></span><span className="hero-period">.</span></h1>
             <p className="hero-description">{h.heroDesc1}<br className="desktop-break" /> {h.heroDesc2}</p>
             <div className="hero-ctas"><Link href="/cadastro" className="button button-primary">{h.cta1} <ArrowUpRight size={17} /></Link><a href="#demonstracao" className="button button-glass"><span className="play-circle"><Play size={10} fill="currentColor" /></span>{h.cta2}</a></div>
-            <div className="hero-reassurance"><span><Check size={13} />{h.re2}</span><span><Check size={13} />{h.re3}</span></div>
+            <div className="hero-reassurance"><span><Check size={13} />{h.re2}</span><span><Check size={13} />{h.re3}</span>{priceFrom && <span className="hero-price-from"><Check size={13} />{priceFrom}</span>}</div>
           </div>
           <div className="hero-product container" id="demonstracao">
             <div className="product-caption"><span><span className="status-dot" /> {h.captionL}</span><span>{h.captionR} <ArrowDown size={12} /></span></div>
@@ -88,6 +108,14 @@ export default async function Home() {
           </div>
           <div className="hero-bottom container"><span>{h.madeFor}</span><div><span><Code2 size={17} />{h.seg1}</span><span><Compass size={17} />{h.seg2}</span><span><WandSparkles size={17} />{h.seg3}</span><span><Zap size={17} />{h.seg4}</span></div></div>
         </section>
+
+      {(leadsCount ?? 0) > 0 && (
+        <div className="container social-proof">
+          <span><strong>{(leadsCount ?? 0).toLocaleString(loc.lang === "pt" ? "pt-BR" : loc.lang)}+</strong> {h.spFound}</span>
+          <span><strong>{(sitesCount ?? 0).toLocaleString(loc.lang === "pt" ? "pt-BR" : loc.lang)}+</strong> {h.spSites}</span>
+          <span className="social-proof-note">{h.spNote}</span>
+        </div>
+      )}
 
         <section id="como-funciona" className="section light-section">
           <div className="container">

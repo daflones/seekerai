@@ -501,12 +501,9 @@ Deno.serve(async (req) => {
     };
     const fbMeta = (fb.fbp || fb.fbc) ? { fb } : {};
 
-    // Pacote avulso de créditos — só para quem já tem assinatura ativa.
+    // Pacote avulso de créditos — porta de entrada pra quem ainda não
+    // assina ("sem compromisso mensal"). O webhook soma no saldo igual.
     if (body.creditPack === true) {
-      const { data: sub } = await db.from("subscriptions")
-        .select("id").eq("user_id", user.id)
-        .in("status", ["active", "past_due"]).limit(1).maybeSingle();
-      if (!sub) throw httpError(403, "Pacote de créditos disponível só para assinantes");
       const packs = await creditPacks();
       const pack = packs[typeof body.packId === "string" ? body.packId : "pack50"]
         ?? packs[Object.keys(packs)[0]] ?? DEFAULT_PACKS.pack50;

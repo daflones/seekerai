@@ -106,6 +106,7 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
 
   const isIntl = !locale.isBrazil;
   const tc = getMessages(locale.lang).common;
+  const tp = getMessages(locale.lang).pricing;
   const money = (cents: number) => formatMoney(cents, locale.currency, locale.lang);
   const def = periodDef(period);
   // Gringo: preço internacional configurado no admin (USD/EUR/GBP por plano).
@@ -247,6 +248,7 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
         {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
           <CalendarClock size={14} />{periodLabel[p.id]}
           {p.discountPct > 0 && <em className="toggle-off">{p.discountPct}%</em>}
+          {p.id === "anual" && <em className="toggle-best">{tp.bestPick}</em>}
         </button>)}
       </div>
       <div className="plan-grid plan-grid-upgrades">
@@ -269,6 +271,7 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
         {BILLING_PERIODS.map((p) => <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
           <CalendarClock size={14} />{periodLabel[p.id]}
           {p.discountPct > 0 && <em className="toggle-off">{p.discountPct}%</em>}
+          {p.id === "anual" && <em className="toggle-best">{tp.bestPick}</em>}
         </button>)}
       </div>
       <div className="plan-grid">
@@ -276,9 +279,9 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
       </div>
     </>}
 
-    {hasSubscription && packs.length > 0 && <section id="creditos" className="pack-section">
-      <h3 className="pack-section-title">{t.packTitle}</h3>
-      <p className="pack-section-sub">{t.packSub}</p>
+    {packs.length > 0 && <section id="creditos" className={`pack-section${hasSubscription ? "" : " pack-section-nosub"}`}>
+      <h3 className="pack-section-title">{hasSubscription ? t.packTitle : t.packNoSubT}</h3>
+      <p className="pack-section-sub">{hasSubscription ? t.packSub : t.packNoSubP}</p>
       <div className="pack-rows">
         {packs.map((pack) => <article key={pack.id} className="pack-row">
           <div className="pack-amount"><strong>+{pack.credits}</strong><small>{t.packCredits}</small></div>
@@ -323,7 +326,7 @@ export function PlanCheckout({ plans, allPlans, hasSubscription, currentPlanSlug
             {feats.length > 0 && <ul className="paid-benefits">
               {feats.map((f) => <li key={f.id}><CheckCircle2 size={12} />{f.text}</li>)}
             </ul>}
-            <Link href="/app/buscar" className="button button-primary button-small">{tc.paidCta}</Link>
+            <Link href="/app/buscar?checkout=1" className="button button-primary button-small">{tc.paidCta}</Link>
           </div>;
         })() : <>
           <h2><QrCode size={18} /> {t.pixPay} {pix.pack ? `+${pix.pack.credits}` : lookup.find((p) => p.slug === pix.plan)?.name}</h2>
