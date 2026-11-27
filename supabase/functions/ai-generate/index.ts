@@ -23,7 +23,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
-import { getSecret } from "../_shared/secrets.ts";
+import { getSecret, serperApiKeys } from "../_shared/secrets.ts";
 import { igCachePut, igMediaCached, scMedia } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
@@ -1650,12 +1650,7 @@ async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): P
       totalAvaliacoes: typeof cached.totalAvaliacoes === "number" ? cached.totalAvaliacoes : undefined,
     };
   }
-  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
-  const keys = [
-    await getSecret("SERPER_API_KEY_5"),
-    await getSecret("SERPER_API_KEY_6"),
-    await getSecret("SERPER_API_KEY_7"),
-  ].filter((k): k is string => Boolean(k));
+  const keys = await serperApiKeys();
   if (!keys.length) return empty;
   const gl = (leadPais(lead) ?? "BR").toLowerCase();
   const post = async (path: string, body: Record<string, unknown>) => {

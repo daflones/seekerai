@@ -18,7 +18,7 @@ import {
   settleAction,
   sha256Hex,
 } from "./common.ts";
-import { getSecret, getSetting, requireSecret } from "./secrets.ts";
+import { getSetting, requireSecret, serperApiKeys } from "./secrets.ts";
 import { igProfileCached } from "./instagram.ts";
 import { notifyError, type NotifyErrorInput } from "./notify.ts";
 import { callingCodeFor, toE164 } from "./phone.ts";
@@ -128,12 +128,7 @@ async function searchConfig(): Promise<LeadSearchConfig> {
 async function searchSerper(
   query: string, regionCode: string, pages = 1, bias?: GeoBias,
 ): Promise<NormalizedPlace[]> {
-  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
-  const keys = [
-    await getSecret("SERPER_API_KEY_5"),
-    await getSecret("SERPER_API_KEY_6"),
-    await getSecret("SERPER_API_KEY_7"),
-  ].filter((k): k is string => Boolean(k));
+  const keys = await serperApiKeys();
   if (!keys.length) throw httpError(502, "Serper não configurado");
   const deadKeys = new Set<string>();
   const fetchPage = async (page: number, ll: string | null) => {

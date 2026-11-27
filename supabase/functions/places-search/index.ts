@@ -16,7 +16,7 @@ import {
   settleAction,
   sha256Hex,
 } from "../_shared/common.ts";
-import { getSecret, getSetting, requireSecret } from "../_shared/secrets.ts";
+import { getSetting, requireSecret, serperApiKeys } from "../_shared/secrets.ts";
 import { igProfileCached } from "../_shared/instagram.ts";
 import { notifyError, NotifyErrorInput } from "../_shared/notify.ts";
 import { callingCodeFor, toE164 } from "../_shared/phone.ts";
@@ -82,12 +82,7 @@ interface SiteCheck {
  * thumbnail e category em português. Terceira fonte da cadeia.
  */
 async function searchSerper(query: string, regionCode: string, pages = 1): Promise<NormalizedPlace[]> {
-  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
-  const keys = [
-    await getSecret("SERPER_API_KEY_5"),
-    await getSecret("SERPER_API_KEY_6"),
-    await getSecret("SERPER_API_KEY_7"),
-  ].filter((k): k is string => Boolean(k));
+  const keys = await serperApiKeys();
   if (!keys.length) throw httpError(502, "Serper não configurado");
   // Key que falhou uma vez não vale retentar a cada página — com
   // paginação paralela cada tentativa custava até 30s de espera morta.

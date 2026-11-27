@@ -23,7 +23,7 @@ import {
   settleAction,
   sha256Hex,
 } from "./common.ts";
-import { getSecret } from "./secrets.ts";
+import { getSecret, serperApiKeys } from "./secrets.ts";
 import { igCachePut, igMediaCached, igProfileCached, scMedia } from "./instagram.ts";
 import { notifyError, NotifyErrorInput } from "./notify.ts";
 import { callingCodeFor, toE164 } from "./phone.ts";
@@ -1652,14 +1652,9 @@ async function fetchSerperReviews(lead: Record<string, unknown>, lang = "pt"): P
       totalAvaliacoes: typeof cached.totalAvaliacoes === "number" ? cached.totalAvaliacoes : undefined,
     };
   }
-  // Principal + reservas (_2.._7): se uma chave falhar (cota/rate
-  // limit) a próxima responde a mesma requisição.
-  // Só as chaves com crédito — _1.._4 estão sem saldo no Serper.
-  const keys = [
-    await getSecret("SERPER_API_KEY_5"),
-    await getSecret("SERPER_API_KEY_6"),
-    await getSecret("SERPER_API_KEY_7"),
-  ].filter((k): k is string => Boolean(k));
+  // Rotação completa: chaves com saldo primeiro (_4.._7), históricas
+  // (_1.._3) por último — chave morta falha rápido e é pulada.
+  const keys = await serperApiKeys();
   if (!keys.length) return empty;
   const gl = (leadPais(lead) ?? "BR").toLowerCase();
   const post = async (path: string, body: Record<string, unknown>) => {

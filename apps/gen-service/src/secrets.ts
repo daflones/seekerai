@@ -61,6 +61,19 @@ export async function requireSecret(name: string): Promise<string> {
   return value;
 }
 
+// Chaves Serper em ordem de preferência: as que têm saldo primeiro
+// (_4.._7), depois as históricas (_1.._3 e a base) como última tentativa.
+// Chave sem crédito falha rápido (401) e é pulada na rotação.
+const SERPER_KEY_NAMES = [
+  "SERPER_API_KEY_4", "SERPER_API_KEY_5", "SERPER_API_KEY_6", "SERPER_API_KEY_7",
+  "SERPER_API_KEY_2", "SERPER_API_KEY_3", "SERPER_API_KEY_1", "SERPER_API_KEY",
+];
+
+export async function serperApiKeys(): Promise<string[]> {
+  const keys = await Promise.all(SERPER_KEY_NAMES.map(getSecret));
+  return [...new Set(keys.filter((k): k is string => Boolean(k)))];
+}
+
 const settingsCache = new Map<string, { v: unknown; t: number }>();
 
 export async function getSetting<T>(key: string, fallback: T): Promise<T> {
