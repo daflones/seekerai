@@ -19,10 +19,11 @@ export const dynamic = "force-dynamic";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://seekerai.digital";
 
-// Landing sem preços: a seção #planos vira CTA pro cadastro e o preço
-// só aparece dentro do app (planos/checkout). A vitrine de conversão
-// fica pra prova social + demo — preço se mostra no fluxo de compra.
-const SHOW_LANDING_PRICES = false;
+// Preços da landing são configuráveis no admin (/admin/planos →
+// "Preços na landing", app_settings.landing_show_prices). Ligado:
+// cards reais, "a partir de" no hero, CTA final e JSON-LD. Desligado:
+// a seção #planos vira CTA pro cadastro e o preço só aparece no app.
+// Chave ausente = ligado (comportamento padrão).
 
 export default async function Home() {
   // Logado não vê landing — vai direto pro painel.
@@ -30,21 +31,22 @@ export default async function Home() {
   const [loc, theme] = await Promise.all([getLocale(), getTheme()]);
   const t = getMessages(loc.lang);
   const h = t.home;
-  // Flag de preços desligada: a landing não mostra valores — o preço
-  // aparece só dentro do app (checkout). Ligando a flag, os cards de
-  // plano e o "a partir de" do hero voltam automaticamente.
-  const pricing: Awaited<ReturnType<typeof publicPlanCards>> = SHOW_LANDING_PRICES
-    ? await publicPlanCards()
-    : { plans: [], source: "preview" };
   const admin = createSupabaseAdminClient();
-  // Prova social busca os totais reais sempre; o desconto só interessa
-  // quando os cards de preço estão ligados.
-  const [{ data: discRow }, { count: leadsCount }, { count: sitesCount }] = await Promise.all([
+  // Prova social busca os totais reais sempre; preços e desconto só
+  // quando a vitrine está ligada no admin.
+  const [{ data: priceRow }, { count: leadsCount }, { count: sitesCount }] = await Promise.all([
+    admin.from("app_settings").select("value").eq("key", "landing_show_prices").maybeSingle(),
+    admin.from("leads").select("id", { count: "exact", head: true }),
+    admin.from("sites").select("id", { count: "exact", head: true }).eq("publicado", true),
+  ]);
+  const SHOW_LANDING_PRICES = priceRow?.value !== false;
+  const [pricing, { data: discRow }] = await Promise.all([
+    SHOW_LANDING_PRICES
+      ? publicPlanCards()
+      : Promise.resolve<Awaited<ReturnType<typeof publicPlanCards>>>({ plans: [], source: "preview" }),
     SHOW_LANDING_PRICES
       ? admin.from("app_settings").select("value").eq("key", "first_purchase_discount_pct").maybeSingle()
       : Promise.resolve({ data: null }),
-    admin.from("leads").select("id", { count: "exact", head: true }),
-    admin.from("sites").select("id", { count: "exact", head: true }).eq("publicado", true),
   ]);
   const discountPct = Math.min(90, Math.max(0, Math.trunc(Number(discRow?.value ?? 0)) || 0));
   const disc = (cents: number) =>
@@ -174,6 +176,7 @@ export default async function Home() {
                 <Link key={plan.slug} href={`/cadastro?plano=${plan.slug}`}
                   className={`cta-plan${plan.featured ? " is-featured" : ""}`}>
                   <strong>{plan.name}</strong>
+                  {plan.content.description && <span className="cta-plan-desc">{plan.content.description}</span>}
                   <span className="cta-plan-price">
                     {plan.priceCents > 0 && discountPct > 0 &&
                       <s className="cta-plan-was">{loc.isBrazil

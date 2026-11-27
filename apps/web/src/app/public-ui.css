@@ -139,6 +139,9 @@
 /* ── Final CTA / Footer ── */
 .final-cta { margin: 40px auto 80px; width: min(1200px, calc(100% - 64px)); border-radius: 28px; padding: 90px 30px; background: radial-gradient(ellipse at 70% 10%, #d7baff 0%, transparent 55%), linear-gradient(125deg, #efe6ff, #bfa1f2 55%, #a88bdf); color: #251338; border: 1px solid #f6eaff80; box-shadow: inset 0 0 60px #ffffff40, 0 30px 80px #9667ff25; }
 .final-cta .eyebrow, .final-cta p, .final-cta .cta-benefits li { color: #4b3567; }
+/* final-note usa var(--muted) — no tema escuro fica cinza-claro sobre
+   o painel lavanda. Fixado no roxo-escuro do painel. */
+.final-cta .final-note { color: #251338; }
 .final-cta .eyebrow::before { background: #2c1b43; box-shadow: 0 0 0 4px #2c1b4318; }
 .final-cta h2 { font-weight: 400; font-size: clamp(38px, 5vw, 70px); letter-spacing: -.05em; }
 .final-cta .gradient-text { background: none; -webkit-text-fill-color: #5a2fc0; }
@@ -146,9 +149,15 @@
 .final-cta .button-primary { background: #1d1428; color: #fff; box-shadow: 0 10px 30px #1d142840; }
 .final-cta .cta-orbit { border-color: #2c1b4320; box-shadow: none; }
 .cta-wordmark { -webkit-text-stroke-color: #2c1b4325; }
-.cta-plan { background: #ffffff70; border-color: #ffffff90; color: #251338; }
-.cta-plan strong, .cta-plan em { color: #251338; }
-.cta-plan-price { color: #4a22b0; }
+/* O painel final-cta é lavanda claro nos DOIS temas — os cards internos
+   usam cores claras fixas. Escopo em .final-cta pra não vazar pro
+   upsell do app (que depende das vars de tema). */
+.final-cta .cta-plan { background: #ffffff70; border-color: #ffffff90; color: #251338; }
+.final-cta .cta-plan strong, .final-cta .cta-plan em { color: #251338; }
+.final-cta .cta-plan-price { color: #4a22b0; }
+.final-cta .cta-plan-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 10px; line-height: 1.5; color: #251338; margin-top: 2px; min-height: 30px; }
+.final-cta .cta-plan-price small, .final-cta .cta-plan-price s, .final-cta .cta-plan-was { color: #7a6390 !important; }
+.final-cta .cta-plan:hover { border-color: #a88bdf; background: #ffffffa6; }
 .footer { background: var(--ink); border-top: 1px solid var(--border); }
 .footer-links { font-size: 12px; }
 .footer-top p { font-size: 12px; }

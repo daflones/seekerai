@@ -6,6 +6,7 @@ import { PlanEditor } from "@/components/plan-editor";
 import { AdminPacks } from "@/components/admin-packs";
 import { AdminCheckoutVisibility } from "@/components/admin-checkout-visibility";
 import { AdminUpgradeDiscount } from "@/components/admin-upgrade-discount";
+import { AdminLandingPrices } from "@/components/admin-landing-prices";
 
 export default async function PlanAdminPage() {
   const { supabase } = await requireSession("/admin/planos", { admin: true });
@@ -17,6 +18,8 @@ export default async function PlanAdminPage() {
     .select("value").eq("key", "checkout_hidden").maybeSingle();
   const { data: upgRow } = await supabase.from("app_settings")
     .select("value").eq("key", "upgrade_discounts").maybeSingle();
+  const { data: landingRow } = await supabase.from("app_settings")
+    .select("value").eq("key", "landing_show_prices").maybeSingle();
   const upgradeDisc = (upgRow?.value ?? {}) as Record<string, number>;
   const packs = parseCreditPacks(packsRow?.value).length
     ? parseCreditPacks(packsRow?.value)
@@ -45,6 +48,7 @@ export default async function PlanAdminPage() {
     <AdminUpgradeDiscount
       plans={plans.map((p) => ({ slug: p.slug, name: p.name, order: p.order }))}
       initial={upgradeDisc} />
+    <AdminLandingPrices initial={landingRow?.value !== false} />
     <AdminCheckoutVisibility
       plans={plans.filter((p) => p.slug !== "gratis").map((p) => ({ slug: p.slug, name: p.name }))}
       packs={packs} hiddenPlans={hiddenPlans} hiddenPacks={hiddenPacks} />

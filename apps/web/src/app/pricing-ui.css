@@ -20,6 +20,11 @@
 .plan-card .plan-off-tag { display: inline-flex; width: fit-content; margin: -4px 0 8px; padding: 4px 10px; font-size: 8px; font-weight: 750; letter-spacing: .07em; color: var(--plan-accent); background: #ffffff0d; border: 1px solid var(--plan-line); border-radius: 99px; }
 .cta-plan-price s.cta-plan-was, .cta-plan-price .cta-plan-was { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-right: 5px; }
 .plan-card .plan-description { min-height: 47px; margin-top: 0; font-size: 11px; line-height: 1.85; color: var(--plan-dim); }
+/* Card claro (cream) fica claro nos dois temas — o --plan-dim cinza-
+   rosado original tinha contraste ruim. Texto quase-preto do tema. */
+.plan-theme-cream .plan-description { color: #3d2b52; }
+/* Cards escuros: descrição um pouco mais presente que o --plan-dim. */
+.plan-theme-teal .plan-description, .plan-theme-violet .plan-description, .plan-theme-gold .plan-description { color: color-mix(in srgb, var(--plan-text) 72%, transparent); }
 .plan-card .plan-divider { background: var(--plan-line); margin-block: 20px 21px; }
 .plan-card ul { display: grid; gap: 15px; margin: 0; }
 .plan-card li { display: flex; align-items: flex-start; gap: 8px; padding: 0; font-size: 11px; line-height: 1.8; color: var(--plan-text); }
@@ -239,7 +244,10 @@ a.cre-lead:hover { color: #e9ddf2; text-decoration: underline; }
 
 /* Cards de oferta dentro do app (modal + aviso de créditos) */
 .upsell-plans { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px; }
-.upsell-plan { position: relative; padding: 11px 13px 10px; border-radius: 11px; }
+/* Fundo próprio por tema — o .cta-plan base é translúcido e sumia
+   em painel claro; no escuro fica vidro sobre o modal. */
+.upsell-plan { position: relative; padding: 11px 13px 10px; border-radius: 11px; background: var(--panel-raised); border-color: var(--border); }
+[data-theme="dark"] .upsell-plan { background: #ffffff08; }
 .upsell-plan .cta-plan-price { font-size: 15px; }
 .upsell-flag { position: absolute; top: -7px; right: 10px; padding: 2px 8px; border-radius: 999px; background: var(--violet); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .upsell-off { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; color: var(--cyan); font-style: normal; }

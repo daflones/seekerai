@@ -728,6 +728,7 @@ select option { background: var(--panel); color: var(--white); }
   /* Linha compacta: nome + cta à esquerda, preço à direita. */
   .cta-plan { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; padding: 13px 15px; }
   .cta-plan strong { font-size: 12px; }
+  .cta-plan-desc { display: none; }
   .cta-plan-price { font-size: 14px; margin-left: auto; text-align: right; }
   .cta-plan em { margin-top: 0; font-size: 10px; }
   .cta-wordmark { margin: 44px 0 -60px; font-size: clamp(64px, 21vw, 110px); }
