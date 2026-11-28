@@ -6,6 +6,7 @@ import {
   RefreshCw, Save, Trash2, TrendingUp, Wallet,
 } from "lucide-react";
 import { FinList } from "@/components/fin-list";
+import { FinCalc } from "@/components/fin-calc";
 import { fmtTotals, unitsToTotals, type PayCurrency } from "@/lib/admin/money";
 
 interface Chave { id: string; label: string; pixKeyMask: string; pix_key_type: string; hasDocument: boolean }
@@ -229,6 +230,8 @@ export function AdminFinanceiro() {
       {error && <p role="alert" className="auth-error">{error}</p>}
       {notice && <p role="status" className="editor-saved"><CheckCircle2 size={15} />{notice}</p>}
     </section>
+
+    <FinCalc />
 
     <section className="dash-panel">
       <h2><RefreshCw size={16} /> Histórico de saques</h2>

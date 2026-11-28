@@ -942,6 +942,19 @@ a.lead-action { text-decoration: none; }
 .fin-nova-chave .editor-block-label { margin-top: 10px; }
 .fin-nova-chave .button { margin-top: 14px; align-self: flex-start; }
 
+/* Calculadora do financeiro */
+.fin-calc { max-width: 420px; }
+.fin-calc-disp { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 14px 16px; margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--ink); min-height: 58px; justify-content: center; }
+.fin-calc-disp small { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.fin-calc-disp strong { font-size: 26px; font-weight: 800; color: var(--white); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; word-break: break-all; }
+.fin-calc-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.fin-calc-key { padding: 12px 0; font-size: 15px; font-weight: 700; color: var(--white); background: var(--panel-raised, rgba(255,255,255,.04)); border: 1px solid var(--border); border-radius: 9px; cursor: pointer; transition: background .12s, border-color .12s, transform .05s; }
+.fin-calc-key:hover { border-color: var(--violet); }
+.fin-calc-key:active { transform: scale(.97); }
+.fin-calc-key.is-fn { color: var(--muted); font-size: 13px; }
+.fin-calc-key.is-op { color: var(--violet); font-size: 18px; }
+.fin-calc-key.is-eq { background: var(--violet); border-color: var(--violet); color: #fff; }
+
 /* Paginador de listas */
 .fin-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; }
 .fin-pager button { display: inline-flex; align-items: center; gap: 4px; padding: 7px 13px; font-size: 11px; font-weight: 600; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: color .15s, border-color .15s; }

@@ -9,9 +9,9 @@ import { ThemeToggle } from "./theme-toggle";
 import type { Locale, Theme } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 
-export function Navigation({ t = getMessages("pt").nav, locale, theme }: { t?: Messages["nav"]; locale: Locale; theme: Theme }) {
+export function Navigation({ t = getMessages("pt").nav, locale, theme, showPlans = true }: { t?: Messages["nav"]; locale: Locale; theme: Theme; showPlans?: boolean }) {
   const [open, setOpen] = useState(false);
-  const links: [string, string][] = [[t.how, "#como-funciona"], [t.features, "#recursos"], [t.portfolio, "#portfolio"], [t.plans, "#planos"]];
+  const links: [string, string][] = [[t.how, "#como-funciona"], [t.features, "#recursos"], [t.portfolio, "#portfolio"], ...(showPlans ? [[t.plans, "#planos"] as [string, string]] : [])];
   return (
     <header className="nav-shell">
       <nav className="floating-nav" aria-label={t.main}>

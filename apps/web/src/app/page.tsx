@@ -92,7 +92,7 @@ export default async function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <Navigation t={t.nav} locale={loc} theme={theme} />
+      <Navigation t={t.nav} locale={loc} theme={theme} showPlans={SHOW_LANDING_PRICES ? pricing.plans.length > 0 : true} />
       <main id="conteudo">
         <section className="hero">
           <div className="cosmic-grid" aria-hidden="true" /><div className="hero-orbit orbit-one" aria-hidden="true" /><div className="hero-orbit orbit-two" aria-hidden="true" />
@@ -157,12 +157,12 @@ export default async function Home() {
 
         <section className="section toolkit-section light-section"><div className="container"><div className="section-heading centered"><span className="eyebrow">{h.teyebrow}</span><h2>{h.ttitleA}<br /><span className="muted-heading">{h.ttitleB}</span></h2></div><div className="toolkit-grid">{[{ icon: Search, title: h.tk1t, text: h.tk1p }, { icon: Radar, title: h.tk2t, text: h.tk2p }, { icon: MessageCircle, title: h.tk3t, text: h.tk3p }, { icon: AudioLines, title: h.tk4t, text: h.tk4p }, { icon: Bookmark, title: h.tk5t, text: h.tk5p }, { icon: Globe, title: h.tk6t, text: h.tk6p }].map(({ icon: Icon, title, text }, i) => <Reveal as="article" key={title} delay={(i % 3) * 0.08}><span><Icon size={21} /></span><h3>{title}</h3><p>{text}</p></Reveal>)}</div><p className="roadmap-footnote">{h.tfoot}</p></div></section>
 
-        <div className="container">{SHOW_LANDING_PRICES
+        {SHOW_LANDING_PRICES && pricing.plans.length === 0 ? null : <div className="container">{SHOW_LANDING_PRICES
           ? <Pricing plans={pricing.plans} source={pricing.source} locale={loc} t={t.pricing} discountPct={discountPct} />
           : <section id="planos" className="section pricing-section">
               <div className="section-heading centered"><span className="eyebrow">{t.pricing.eyebrow}</span><h2>{t.pricing.titleA}<br /><span className="muted-heading">{t.pricing.titleB}</span></h2><p>{t.pricing.sub}</p></div>
               <div className="pricing-cta"><Link href="/cadastro" className="button button-primary">{h.ctab} <ArrowUpRight size={16} /></Link><p className="pricing-note"><ShieldCheck size={15} />{h.ctanote}</p></div>
-            </section>}</div>
+            </section>}</div>}
 
         <section className="section faq-section light-section"><div className="container faq-layout"><div className="section-heading"><span className="eyebrow">{h.faqeyebrow}</span><h2>{h.faqtitleA}<br />{h.faqtitleB}</h2><p>{h.faqp}</p></div><div className="faq-list">{h.faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></div></section>
 
@@ -195,7 +195,7 @@ export default async function Home() {
           <span className="cta-wordmark" aria-hidden="true">seekerai.</span>
         </div></section>
       </main>
-      <footer className="footer"><div className="container"><div className="footer-top"><div><Brand /><p>{h.footSlogan1}<br />{h.footSlogan2}</p></div><div className="footer-links"><a href="#como-funciona">{h.footHow}</a><a href="#planos">{h.footPlans}</a><Link href="/explorar">{h.footDemo} <ArrowUpRight size={12} /></Link></div><div className="footer-links"><Link href="/termos">{h.footTerms}</Link><Link href="/privacidade">{h.footPrivacy}</Link><Link href="/cadastro">{h.footEarly}</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} SeekerAi. {h.footCopy}</span><LocaleSwitcher current={loc} /><span><span className="status-dot" />{h.footBuilding}</span></div></div></footer>
+      <footer className="footer"><div className="container"><div className="footer-top"><div><Brand /><p>{h.footSlogan1}<br />{h.footSlogan2}</p></div><div className="footer-links"><a href="#como-funciona">{h.footHow}</a>{(SHOW_LANDING_PRICES ? pricing.plans.length > 0 : true) && <a href="#planos">{h.footPlans}</a>}<Link href="/explorar">{h.footDemo} <ArrowUpRight size={12} /></Link></div><div className="footer-links"><Link href="/termos">{h.footTerms}</Link><Link href="/privacidade">{h.footPrivacy}</Link><Link href="/cadastro">{h.footEarly}</Link></div></div><div className="footer-bottom"><span>© {new Date().getFullYear()} SeekerAi. {h.footCopy}</span><LocaleSwitcher current={loc} /><span><span className="status-dot" />{h.footBuilding}</span></div></div></footer>
       <div className="mobile-sticky-cta"><Link href="/explorar" className="button button-primary">{h.stickyCta} <ArrowRight size={16} /></Link></div>
     </>
   );
