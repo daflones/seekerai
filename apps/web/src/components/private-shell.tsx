@@ -36,6 +36,7 @@ const ADMIN_NAV = [
   { href: "/admin/criacoes", label: "Criações", icon: Shapes },
   { href: "/admin/dominios", label: "Domínios", icon: Globe },
   { href: "/admin/planos", label: "Cards de plano", icon: PanelsTopLeft },
+  { href: "/admin/landing", label: "Landing page", icon: Globe },
   { href: "/admin/busca", label: "Busca de leads", icon: Radar },
   { href: "/admin/integracoes", label: "Integrações", icon: ShieldCheck },
 ];

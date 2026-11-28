@@ -9,9 +9,9 @@ import { ThemeToggle } from "./theme-toggle";
 import type { Locale, Theme } from "@/lib/i18n/shared";
 import { getMessages, type Messages } from "@/lib/i18n/messages";
 
-export function Navigation({ t = getMessages("pt").nav, locale, theme, showPlans = true }: { t?: Messages["nav"]; locale: Locale; theme: Theme; showPlans?: boolean }) {
+export function Navigation({ t = getMessages("pt").nav, locale, theme, showPlans = true, productLinks }: { t?: Messages["nav"]; locale: Locale; theme: Theme; showPlans?: boolean; productLinks?: [string, string][] }) {
   const [open, setOpen] = useState(false);
-  const links: [string, string][] = [[t.how, "#como-funciona"], [t.features, "#recursos"], [t.portfolio, "#portfolio"], ...(showPlans ? [[t.plans, "#planos"] as [string, string]] : [])];
+  const links: [string, string][] = [[t.how, "#como-funciona"], ...(productLinks ?? [[t.features, "#recursos"], [t.portfolio, "#portfolio"]] as [string, string][]), ...(showPlans ? [[t.plans, "#planos"] as [string, string]] : [])];
   return (
     <header className="nav-shell">
       <nav className="floating-nav" aria-label={t.main}>
@@ -24,7 +24,7 @@ export function Navigation({ t = getMessages("pt").nav, locale, theme, showPlans
           <Link href="/cadastro" className="button button-small">{t.start} <ArrowUpRight size={14} /></Link>
           <button className="mobile-menu-button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? t.closeMenu : t.openMenu}>{open ? <X size={20} /> : <Menu size={20} />}</button>
         </div>
-        {open && <div id="mobile-menu" className="mobile-menu">{links.map(([label, href]) => <a href={href} key={href} onClick={() => setOpen(false)}>{label}</a>)}<Link href="/login">{t.enter}</Link><div className="mobile-menu-locale"><LocaleSwitcher current={locale} /></div></div>}
+        {open && <div id="mobile-menu" className="mobile-menu">{links.map(([label, href]) => <a href={href} key={href} onClick={() => setOpen(false)}>{label}</a>)}<Link href="/cadastro">{t.start}</Link><Link href="/login">{t.enter}</Link><div className="mobile-menu-locale"><LocaleSwitcher current={locale} /></div></div>}
       </nav>
     </header>
   );
