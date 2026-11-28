@@ -29,6 +29,14 @@ test.beforeEach(async ({ page }) => {
 async function solve(page: Page) {
   await page.getByRole("button", { name: "Concluir verificação local", exact: true }).click();
 }
+async function logout(page: Page) {
+  // "Sair da conta" fica dentro do menu "Minha conta" (details/summary).
+  await page.locator("details.workspace-account > summary").click();
+  await Promise.all([
+    page.waitForURL(/\/login$/, { waitUntil: "domcontentloaded" }),
+    page.getByRole("button", { name: "Sair da conta" }).click(),
+  ]);
+}
 async function login(page: Page, email: string) {
   if (new URL(page.url()).pathname !== "/login") await page.goto("/login");
   await page.getByLabel("E-mail", { exact: true }).fill(email);
@@ -52,10 +60,7 @@ test("usuário entra com cookie HttpOnly, persiste após reload e sai", async ({
   expect(session?.sameSite).toBe("Lax");
   await page.reload();
   await expect(page.getByRole("heading", { name: "Bem-vindo, Conta comum." })).toBeVisible();
-  await Promise.all([
-    page.waitForURL(/\/login$/, { waitUntil: "domcontentloaded" }),
-    page.getByRole("button", { name: "Sair da conta" }).click(),
-  ]);
+  await logout(page);
   await expect(page).toHaveURL(/\/login$/);
   expect((await context.cookies()).filter((cookie) => cookie.name.includes("auth-token"))).toHaveLength(0);
   await page.goto("/app");
@@ -71,14 +76,11 @@ test("admin depende de role no banco e usuário comum não atravessa a proteçã
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/app\?estado=acesso-negado/);
   await expect(page.getByRole("heading", { name: "Painel administrativo." })).toHaveCount(0);
-  await Promise.all([
-    page.waitForURL(/\/login$/, { waitUntil: "domcontentloaded" }),
-    page.getByRole("button", { name: "Sair da conta" }).click(),
-  ]);
+  await logout(page);
   await login(page, "admin@example.test");
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole("heading", { name: "Painel administrativo." })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "4 créditos", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Regras de créditos" })).toBeVisible();
 });
 
 test("falha de login exige novo captcha e a configuração permanece ao trocar para cadastro", async ({ page }) => {
@@ -96,13 +98,14 @@ test("falha de login exige novo captcha e a configuração permanece ao trocar p
   await expect(newChallenge).toBeVisible();
   expect(await newChallenge.getAttribute("data-challenge-id")).not.toBe(firstId);
   await page.getByRole("link", { name: "Criar minha conta", exact: true }).click();
-  await expect(page).toHaveURL(/\/cadastro$/);
+  // next dev compila /cadastro na primeira visita — o default de 5s não basta.
+  await expect(page).toHaveURL(/\/cadastro$/, { timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Concluir verificação local" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Criar minha conta", exact: true })).toBeDisabled();
   expect(scriptLoads).toBe(1);
 });
 
-test("cadastro exige aceite, não pré-marca marketing e solicita confirmação de e-mail", async ({ page }) => {
+test("cadastro exige aceite, não pré-marca marketing e entra direto no app", async ({ page }) => {
   await page.goto("/cadastro?plano=pro");
   await page.getByLabel("Seu nome", { exact: true }).fill("Cadastro de teste");
   await page.getByLabel("Telefone", { exact: true }).fill("(11) 99999-9999");
@@ -112,9 +115,12 @@ test("cadastro exige aceite, não pré-marca marketing e solicita confirmação 
   await expect(page.getByRole("checkbox", { name: /Quero receber/ })).not.toBeChecked();
   await page.getByRole("checkbox", { name: /Li e aceito/ }).check();
   await solve(page);
-  await page.getByRole("button", { name: "Criar minha conta", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("e-mail de confirmação");
-  await expect(page).toHaveURL(/\/cadastro\?plano=pro/);
+  // Confirmação de e-mail desligada: a sessão já volta no signup e o
+  // cadastro cai direto nas boas-vindas do painel, sem tela de "confira seu e-mail".
+  await Promise.all([
+    page.waitForURL(/\/boas-vindas/, { waitUntil: "domcontentloaded", timeout: 30_000 }),
+    page.getByRole("button", { name: "Criar minha conta", exact: true }).click(),
+  ]);
 });
 
 test("recuperação tem captcha e mensagens sem enumeração; API rejeita CSRF", async ({ page, request }) => {
@@ -131,7 +137,8 @@ test("recuperação tem captcha e mensagens sem enumeração; API rejeita CSRF",
   expect(response.status()).toBe(403);
 });
 
-test("admin edita preço e benefícios que passam a aparecer na landing e cadastro", async ({ page }) => {
+test("admin edita preço e benefícios que passam a aparecer na landing e cadastro", async ({ page, browser }) => {
+  test.setTimeout(90_000); // login + compiles de /admin/planos, landing e /cadastro em dev
   await login(page, "admin@example.test");
   await page.goto("/admin/planos");
   await page.getByRole("group", { name: "Plano em edição" }).getByRole("button", { name: /^Pro/ }).click();
@@ -141,11 +148,16 @@ test("admin edita preço e benefícios que passam a aparecer na landing e cadast
   await page.getByLabel("Motivo da alteração", { exact: true }).fill("Melhorar apresentação da oferta");
   await page.getByRole("button", { name: "Salvar plano e card" }).click();
   await expect(page.getByRole("status")).toContainText("Salvo");
-  await page.goto("/#planos");
-  const card = page.locator(".plan-card").filter({ has: page.getByRole("heading", { name: "Pro para agências", exact: true }) });
-  await expect(card).toContainText("59,90");
+  // A landing redireciona visitante logado para o app — a vitrine pública
+  // é conferida num contexto anônimo separado.
+  const anon = await browser.newContext();
+  const landing = await anon.newPage();
+  await landing.goto("/#planos");
+  const card = landing.locator(".plan-card").filter({ has: landing.getByRole("heading", { name: "Pro para agências", exact: true }) });
+  await expect(card).toContainText("59,90", { timeout: 30_000 });
   await expect(card).toContainText("Agente de vendas com IA e contexto");
   await card.getByRole("link", { name: "Quero o SeekerAi Pro" }).click();
-  await expect(page.getByText("Plano de interesse:")).toContainText("Pro para agências");
-  await expect(page.getByText("Plano de interesse:")).toContainText("59,90");
+  await expect(landing.getByText("Plano de interesse:")).toContainText("Pro para agências", { timeout: 30_000 });
+  await expect(landing.getByText("Plano de interesse:")).toContainText("59,90");
+  await anon.close();
 });

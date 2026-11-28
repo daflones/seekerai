@@ -18,6 +18,10 @@ const child = spawn(process.execPath, [
     TURNSTILE_SECRET_KEY: "local-captcha-fixture-secret",
     AUTH_RATE_LIMIT_SECRET: "local-rate-limit-fixture-secret",
     SUPABASE_AUTH_READY: "true",
+    // Liga o Turnstile (mockado via interceptação de rota) e a verificação
+    // de captcha no GoTrue — a suíte exercita o caminho real de produção.
+    SEEKERAI_E2E_CAPTCHA: "1",
+    NEXT_PUBLIC_SEEKERAI_E2E_CAPTCHA: "1",
     SEEKERAI_DEV_DIST_DIR: ".next-auth-test",
     NEXT_TELEMETRY_DISABLED: "1",
   },

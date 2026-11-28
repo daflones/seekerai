@@ -9,6 +9,8 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3100",
     channel: process.env.CI ? undefined : "msedge",
+    // A app resolve o idioma por Accept-Language — os testes assumem pt-BR.
+    locale: "pt-BR",
     trace: "retain-on-failure",
   },
   projects: [

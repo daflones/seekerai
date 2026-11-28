@@ -12,7 +12,8 @@ export const runtime = "nodejs";
 // Servidor local (next dev): o Turnstile não roda em 127.0.0.1, então as
 // chamadas de auth vão pelo client de serviço — o GoTrue dispensa CAPTCHA
 // para a service key. Em produção (NODE_ENV=production) nunca entra aqui.
-const DEV_NO_CAPTCHA = process.env.NODE_ENV === "development";
+// A suíte E2E liga SEEKERAI_E2E_CAPTCHA=1 para exercitar o caminho real.
+const DEV_NO_CAPTCHA = process.env.NODE_ENV === "development" && process.env.SEEKERAI_E2E_CAPTCHA !== "1";
 
 type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 async function adoptSession(supabase: ServerClient, session: { access_token: string; refresh_token: string } | null) {
@@ -28,7 +29,7 @@ function authError(code?: string) {
   if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") {
     return reply({ error: "Muitas tentativas. Aguarde antes de tentar novamente." }, 429, { "Retry-After": "60" });
   }
-  return reply({ error: "Não foi possível concluir. Confira os dados e, se necessário, confirme seu e-mail." }, 400);
+  return reply({ error: "Não foi possível concluir. Confira os dados e tente novamente." }, 400);
 }
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
@@ -100,13 +101,15 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
           p_user: data.user.id, p_name: input.name, p_phone: input.phone, p_marketing: input.marketing,
         });
         if (consentError) {
-          return reply({ message: "Confira seu e-mail para continuar. Após entrar, você poderá concluir os dados e o aceite da conta." });
+          return data.session
+            ? reply({ redirect: `/completar-cadastro?next=${encodeURIComponent(next)}`, signupStatus: "profile_required" })
+            : reply({ signupStatus: "signin_required" });
         }
       }
       // Com confirmação de e-mail desligada, o signUp já devolve sessão
       // (cookies gravados pelo client SSR) — entra direto no app.
-      if (data.session) return reply({ redirect: next });
-      return reply({ message: "Se o cadastro puder ser concluído, você receberá um e-mail de confirmação. Confira também a pasta de spam." });
+      if (data.session) return reply({ redirect: next, signupStatus: "ready" });
+      return reply({ signupStatus: "signin_required" });
     }
 
     if (action === "recover") {

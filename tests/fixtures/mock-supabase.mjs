@@ -21,7 +21,7 @@ const sessions = new Map();
 const usedCaptchas = new Set();
 for (const [email, role] of [["user@example.test", "user"], ["admin@example.test", "admin"]]) {
   const id = randomUUID();
-  accounts.set(email, { id, email, role, name: role === "admin" ? "Admin de teste" : "Conta comum", consent: true, balance: 50 });
+  accounts.set(email, { id, email, role, name: role === "admin" ? "Admin de teste" : "Conta comum", consent: true, welcomed: true, balance: 50 });
 }
 
 function json(response, status, body, headers = {}) {
@@ -79,9 +79,10 @@ const server = createServer(async (request, response) => {
       if (!validCaptcha(body)) return json(response, 400, { code: "captcha_failed", msg: "Captcha invalid" });
       const found = accounts.get(body.email);
       if (found) return json(response, 200, { ...user(found), identities: [] });
-      const created = { id: randomUUID(), email: body.email, role: "user", name: body.data?.full_name || "", consent: false, balance: 50 };
+      const created = { id: randomUUID(), email: body.email, role: "user", name: body.data?.full_name || "", consent: false, welcomed: false, balance: 50 };
       accounts.set(body.email, created);
-      return json(response, 200, user(created));
+      // Confirmação de e-mail desligada no projeto real: signup já devolve sessão.
+      return json(response, 200, session(created));
     }
     if (url.pathname === "/auth/v1/recover") {
       return validCaptcha(body) ? json(response, 200, {}) : json(response, 400, { code: "captcha_failed", msg: "Captcha invalid" });
@@ -120,6 +121,7 @@ const server = createServer(async (request, response) => {
       const filtered = rows.filter((item) => !id || id === item.id).map((item) => ({
         id: item.id, nome: item.name, role: item.role, consentimento_em: item.consent ? "2026-10-21" : null,
         terms_version: item.consent ? "2026-10-21" : null, onboarding_concluido: item.consent,
+        onboarding_visto_em: item.welcomed ? "2026-10-21T00:00:00Z" : null,
       }));
       return json(response, 200, id ? filtered[0] : filtered, { "Content-Range": `0-${Math.max(0, filtered.length - 1)}/${filtered.length}` });
     }

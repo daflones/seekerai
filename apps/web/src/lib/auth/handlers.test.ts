@@ -116,6 +116,25 @@ describe("endpoints de autenticação", () => {
     expect((await request("signup", signup)).status).toBe(200);
     expect(sdk.rpc).not.toHaveBeenCalled();
   });
+  it("abre o painel no cadastro com sessão e preserva o plano escolhido", async () => {
+    sdk.auth.signUp.mockResolvedValue({ data: { user: verifiedUser, session: { access_token: "test-token", refresh_token: "test-refresh" } }, error: null });
+    expect(await (await request("signup", signup)).json()).toEqual({ redirect: "/app", signupStatus: "ready" });
+    expect(await (await request("signup", { ...signup, plan: "pro" })).json()).toEqual({ redirect: "/app?plano=pro", signupStatus: "ready" });
+  });
+  it("com sessão, falha de consentimento leva ao complemento do perfil sem pedir e-mail", async () => {
+    sdk.auth.signUp.mockResolvedValue({ data: { user: verifiedUser, session: { access_token: "test-token", refresh_token: "test-refresh" } }, error: null });
+    sdk.rpc.mockResolvedValueOnce({ error: { code: "temporary_failure" } });
+    expect(await (await request("signup", { ...signup, plan: "pro" })).json()).toEqual({
+      redirect: "/completar-cadastro?next=%2Fapp%3Fplano%3Dpro", signupStatus: "profile_required",
+    });
+  });
+  it("não afirma acesso liberado sem sessão nem promete envio de confirmação", async () => {
+    sdk.auth.signUp.mockResolvedValue({ data: { user: verifiedUser, session: null }, error: null });
+    const result = await (await request("signup", signup)).json();
+    expect(result).toEqual({ signupStatus: "signin_required" });
+    sdk.auth.signUp.mockResolvedValue({ data: { user: null, session: null }, error: { code: "user_already_exists" } });
+    expect(await (await request("signup", signup)).json()).toEqual(result);
+  });
   it("faz recuperação sem expor existência da conta e encaminha token nativo", async () => {
     const first = await (await request("recover", signup)).json();
     sdk.auth.resetPasswordForEmail.mockResolvedValue({ error: { code: "user_not_found" } });

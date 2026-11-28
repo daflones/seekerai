@@ -10,8 +10,9 @@ import { CALLING_CODES } from "@/lib/phone";
 
 export type AuthMode = "login" | "signup" | "recover" | "password" | "onboarding";
 // next dev: Turnstile não funciona em 127.0.0.1 — o servidor também pula a
-// verificação só nesse modo (ver /api/auth/[action]).
-const DEV_NO_CAPTCHA = process.env.NODE_ENV === "development";
+// verificação só nesse modo (ver /api/auth/[action]). A suíte E2E liga
+// NEXT_PUBLIC_SEEKERAI_E2E_CAPTCHA=1 para exercitar o widget real.
+const DEV_NO_CAPTCHA = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_SEEKERAI_E2E_CAPTCHA !== "1";
 const DEV_TOKEN = DEV_NO_CAPTCHA ? "dev-sem-captcha" : null;
 type Fields = { email: string; password: string; confirmPassword: string; name: string; phone: string; terms: boolean; marketing: boolean };
 
@@ -48,6 +49,7 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t, regio
   const [epoch, setEpoch] = useState(0);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [destination, setDestination] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const profileMode = mode === "signup" || mode === "onboarding";
   const passwordMode = mode === "login" || mode === "signup" || mode === "password";
@@ -86,15 +88,19 @@ export function AuthForm({ mode, available, siteKey, next, plan, email, t, regio
       if (data.redirect) {
         const target = new URL(data.redirect, window.location.origin);
         if (target.origin !== window.location.origin) throw new Error("redirect");
+        if (mode === "signup") {
+          setMessage(data.signupStatus === "profile_required" ? tt.signupProfile : tt.signupReady);
+          setDestination(`${target.pathname}${target.search}${target.hash}`);
+        }
         // A document navigation avoids stale RSC/session state after cookie mutations.
         window.location.replace(target.href);
       }
-      else setMessage(data.message || tt.received);
+      else setMessage(mode === "signup" ? tt.signupSignIn : data.message || tt.received);
     } catch { setError(tt.errConn); }
     finally { clearTimeout(timer); setToken(DEV_TOKEN); setEpoch((value) => value + 1); }
   }
 
-  if (message) return <div className="auth-success" role="status"><CheckCircle2 size={30} /><h3>{tt.emailStep}</h3><p>{message}</p><Link href="/login" className="button button-primary">{tt.backLogin} <ArrowUpRight size={16} /></Link></div>;
+  if (message) return <div className="auth-success" role="status"><CheckCircle2 size={30} /><h3>{mode === "signup" ? destination ? tt.signupReadyTitle : tt.signupSignInTitle : tt.emailStep}</h3><p>{message}</p><Link href={destination || (mode === "signup" && plan ? `/login?next=${encodeURIComponent(`/app?plano=${plan}`)}` : "/login")} className="button button-primary">{destination ? tt.signupContinue : tt.backLogin} <ArrowUpRight size={16} /></Link></div>;
 
   const oauthTarget = mode === "signup" && plan ? `/app?plano=${encodeURIComponent(plan)}` : (next || "/app");
   const googleHref = `/api/auth/google?next=${encodeURIComponent(oauthTarget)}`;
